@@ -71,7 +71,15 @@ private:
 
       Paths[CurrLevel].insert(B);
       PathLookup.insert(std::make_pair(B, CurrLevel));
-
+      INFO {
+        if (B->Term && isa<SyncIRStmt>(B->Term)) {
+          llvm::outs() << "Sync is terminator & Current level = " << CurrLevel
+                       << "\n";
+        } else if (B->Term && isa<LoopIRStmt>(B->Term)) {
+          llvm::outs() << "Loop is terminator & Current level = " << CurrLevel
+                       << "\n";
+        }
+      }
       if (B->Term && isa<SyncIRStmt>(B->Term)) {
         // sync instruction should have only one successor
         IRBasicBlock *SISucc = *(B->Succs.begin());
@@ -198,9 +206,7 @@ public:
       auto *bb = WorkList.front();
       WorkList.pop_front();
 
-      DBG {
-        llvm::outs() << "visit " << bb->getInd() << "\n";
-      }
+      DBG { llvm::outs() << "visit " << bb->getInd() << "\n"; }
 
       assert(PathLookup.find(bb) != PathLookup.end());
       if (PathLookup[bb] == 0)
@@ -209,7 +215,7 @@ public:
       // we should only visit a path once, because sync continue blocks should
       // only have one parent
       // TODO: does this assumption make sense?
-      if (visited[path]) { 
+      if (visited[path]) {
         continue;
       }
 
@@ -448,7 +454,7 @@ struct FinalizeExplicitCPS {
           IS = dyn_cast<ISpawnIRExpr>(EWS->Expr.get());
           if (IS) {
             EWS->Expr.release();
-          }          
+          }
         }
 
         // has destination => expr has a spawn

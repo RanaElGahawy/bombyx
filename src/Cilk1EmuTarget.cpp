@@ -67,7 +67,7 @@ void printOriginalSource(IRProgram &P, llvm::raw_ostream &out,
   for (auto &F : P) {
     if (F->Info.RootFun) {
       R.RemoveText(F->Info.RootFun->getSourceRange());
-    } 
+    }
   }
   R.getEditBuffer(SM.getMainFileID()).write(out);
 }
@@ -266,41 +266,56 @@ private:
           Indent() << "SN_BIND(SN_" << SpawnNextFnName << ", &sp" << SpawnCtr
                    << "k, " << GetSym(IdentDest->Ident->Name) << ");\n";
         } else {
-          Indent() << "SN_BIND_EXT(SN_" << SpawnNextFnName << ", &sp" << SpawnCtr
-                   << "k, &(";
+          Indent() << "SN_BIND_EXT(SN_" << SpawnNextFnName << ", &sp"
+                   << SpawnCtr << "k, &(";
           ES->Dest->print(Out, C);
           Out << "));\n";
         }
       } else {
         Indent() << "SN_BIND_VOID(SN_" << SpawnNextFnName << ", &sp" << SpawnCtr
-        << "k);\n";
+                 << "k);\n";
       }
     }
 
-    Indent() << SpawnFnName << "_closure sp" << SpawnCtr << "c(sp" << SpawnCtr
-             << "k);\n";
+    if (ES->SN) {
+      Indent() << SpawnFnName << "_closure sp" << SpawnCtr << "c(sp" << SpawnCtr
+               << "k);\n";
+      auto DstArgIt = ES->Fn->Vars.begin();
+      for (auto &Arg : ES->Args) {
+        auto &DstArg = *DstArgIt;
+        assert(DstArg.DeclLoc == IRVarDecl::ARG);
+        Indent() << "sp" << SpawnCtr << "c." << GetSym(DstArg.Name);
+        Out << " = ";
+        Arg->print(Out, C);
+        Out << ";\n";
+        DstArgIt++;
+      }
+    } else {
+      Indent() << "auto sp" << SpawnCtr << "c = std::make_shared<"
+               << SpawnFnName << "_closure>(sp" << SpawnCtr << "k);\n";
+      auto DstArgIt = ES->Fn->Vars.begin();
+      for (auto &Arg : ES->Args) {
+        auto &DstArg = *DstArgIt;
+        assert(DstArg.DeclLoc == IRVarDecl::ARG);
+        Indent() << "sp" << SpawnCtr << "c->" << GetSym(DstArg.Name);
+        Out << " = ";
+        Arg->print(Out, C);
+        Out << ";\n";
+        DstArgIt++;
+      }
+    }
 
     // we do not create spawn destination functions.
     // we expect them to be in argument first order
     // assert(ES->Fn->Info.RootFun);
-    auto DstArgIt = ES->Fn->Vars.begin();
-    for (auto &Arg : ES->Args) {
-      auto &DstArg = *DstArgIt;
-      assert(DstArg.DeclLoc == IRVarDecl::ARG);
-      Indent() << "sp" << SpawnCtr << "c." << GetSym(DstArg.Name);
-      Out << " = ";
-      Arg->print(Out, C);
-      Out << ";\n";
-      DstArgIt++;
-    }
 
     if (ES->SN) {
       Indent() << "spawn<" << SpawnFnName << "_closure> sp" << SpawnCtr << "(sp"
-             << SpawnCtr << "c);\n\n";
+               << SpawnCtr << "c);\n\n";
     } else {
-      Indent() << "cilk_spawn taskSpawn(sp" << SpawnCtr << "c.getTask(),std::shared_ptr<" << SpawnFnName << "_closure>(&sp"  << SpawnCtr << "c));\n"; 
+      Indent() << "cilk_spawn taskSpawn(sp" << SpawnCtr << "c->getTask(), sp"
+               << SpawnCtr << "c);\n";
     }
-    
   }
 
   void visitStmt(IRStmt *S, IRBasicBlock *B) {
@@ -353,13 +368,11 @@ public:
 
 void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
                    clang::CompilerInstance &CI) {
-  // 1. Print the original source file with the original root functions removed.
-  printOriginalSource(P, out, C, CI);
-  out << "\n";
 
-  // 2. Print forward declarations of each function, include Cilk1 emulation
+  // 1. Print forward declarations of each function, include Cilk1 emulation
   // file.
   out << "#include \"cilk_explicit.hh\"\n";
+
   for (auto &F : P) {
     printFunDecl(F.get(), out, C);
     out << ";\n";
@@ -370,6 +383,10 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
       printClosureDecl(F.get(), out, C);
     }
   }
+
+  // 2. Print the original source file with the original root functions removed.
+  printOriginalSource(P, out, C, CI);
+  out << "\n";
 
   // 3. Print the implementation of each function.
   for (auto &F : P) {

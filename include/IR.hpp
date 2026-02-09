@@ -43,6 +43,7 @@ struct IRVarDecl {
   Sym Name;
   enum { LOCAL, ARG } DeclLoc;
   bool IsEphemeral = false;
+  bool InWhile = false;
 };
 
 typedef std::variant<ASTVarRef, IRFunction *> IRFunRef;
@@ -61,7 +62,8 @@ struct IRPrintContext {
   bool GraphVizEscapeChars = false;
   std::function<void(llvm::raw_ostream &, IRVarRef)> IdentCB =
       &identPrintSimple;
-  std::function<void(IRPrintContext*, llvm::raw_ostream &, IRExpr*)> ExprCB = &exprPrintId;
+  std::function<void(IRPrintContext *, llvm::raw_ostream &, IRExpr *)> ExprCB =
+      &exprPrintId;
 };
 
 class IRExpr {
@@ -141,7 +143,8 @@ struct DRefIRExpr : IRLvalExpr {
   IRType PointeeType;
 
 public:
-  DRefIRExpr(IRExpr *E, IRType PointeeType) : Expr(E), PointeeType(PointeeType), IRLvalExpr(EXK_LVAL_DREF) {}
+  DRefIRExpr(IRExpr *E, IRType PointeeType)
+      : Expr(E), PointeeType(PointeeType), IRLvalExpr(EXK_LVAL_DREF) {}
 
   static bool classof(const IRExpr *E) { return E->getKind() == EXK_LVAL_DREF; }
 
@@ -183,7 +186,8 @@ struct AccessIRExpr : IRLvalExpr {
 
 public:
   AccessIRExpr(IRVarRef Struct, std::string Field, bool Arrow)
-      : Struct(Struct), Field(Field), Arrow(Arrow), IRLvalExpr(EXK_LVAL_ACCESS) {}
+      : Struct(Struct), Field(Field), Arrow(Arrow),
+        IRLvalExpr(EXK_LVAL_ACCESS) {}
 
   static bool classof(const IRExpr *E) {
     return E->getKind() == EXK_LVAL_ACCESS;
@@ -519,11 +523,11 @@ public:
 };
 
 struct LoopIRStmt : IRTerminatorStmt {
-  std::unique_ptr<IRExpr> Cond;
   IRStmt *Inc;
   IRStmt *Init;
 
 public:
+  std::unique_ptr<IRExpr> Cond;
   LoopIRStmt(IRExpr *Cond) : Cond(Cond), IRTerminatorStmt(STK_LOOP) {}
   LoopIRStmt(IRExpr *Cond, IRStmt *Inc, IRStmt *Init)
       : Cond(Cond), Inc(Inc), Init(Init), IRTerminatorStmt(STK_LOOP) {}
@@ -751,7 +755,10 @@ public:
   }
   void VisitIdent(IdentIRExpr *Node) {}
   void VisitAccess(AccessIRExpr *Node) {}
-  void VisitIndex(IndexIRExpr *Node) { Visit(Node->Arr.get()); Visit(Node->Ind.get()); }
+  void VisitIndex(IndexIRExpr *Node) {
+    Visit(Node->Arr.get());
+    Visit(Node->Ind.get());
+  }
   void VisitCast(CastIRExpr *Node) { Visit(Node->E.get()); }
   void VisitDRef(DRefIRExpr *Node) { Visit(Node->Expr.get()); }
   void VisitStmt(IRStmt *S) {
@@ -934,9 +941,7 @@ public:
   unsigned getInd() const { return Ind; }
   const std::string &getName() const { return Name; }
   const IRType &getReturnType() const { return Ret; }
-  bool isVoid() const {
-    return (Ret->isVoidType());
-  }
+  bool isVoid() const { return (Ret->isVoidType()); }
 };
 
 class IRProgram {
@@ -991,6 +996,34 @@ private:
 
 public:
   void traverse(IRFunction &F);
+};
+
+struct SyncInLoopDetector : public ScopedIRTraverser {
+  int LoopDepth = 0;
+  std::vector<IRBasicBlock *> SyncBlocks;
+
+  void handleScope(ScopeEvent SE) override {
+    if (SE == ScopeEvent::Open) {
+      if (auto *B = CurrentBlock) {
+        if (B->Term && isa<LoopIRStmt>(B->Term)) {
+          LoopDepth++;
+        }
+      }
+    }
+    if (SE == ScopeEvent::Close) {
+      if (LoopDepth > 0)
+        LoopDepth--;
+    }
+  }
+
+  void visitBlock(IRBasicBlock *B) override {
+    CurrentBlock = B;
+    if (LoopDepth > 0 && B->Term && isa<SyncIRStmt>(B->Term)) {
+      SyncBlocks.push_back(B);
+    }
+  }
+
+  IRBasicBlock *CurrentBlock = nullptr;
 };
 
 /*

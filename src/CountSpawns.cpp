@@ -242,7 +242,8 @@ private:
 
         if (!BodyCnt->isEmpty()) {
           if (loopCount) {
-            *CDestL += std::make_pair(std::shared_ptr<IRExpr>(loopCount), BodyCnt);
+            *CDestL +=
+                std::make_pair(std::shared_ptr<IRExpr>(loopCount), BodyCnt);
           } else {
             CDestL->N = -1;
             delete BodyCnt;
@@ -278,9 +279,9 @@ public:
   void countSpawns(IRBasicBlock *Entry) {
     EnvTy Env;
     countSpawns(Env, InvalidCount, Entry);
-    //if (!InvalidCount->isEmpty()) {
-    //  PANIC("Espawn used before closure declaration..");
-    //}
+    // if (!InvalidCount->isEmpty()) {
+    //   PANIC("Espawn used before closure declaration..");
+    // }
   }
 };
 
@@ -288,7 +289,8 @@ IRExpr *SymCountToExpr(SymbolicCount *C) {
   auto *NELit = new IntLiteralIRExpr(C->N);
   IRExpr *L = NELit;
   for (const auto &fe : C->S) {
-    auto *MulE = new BinopIRExpr(BinopIRExpr::BINOP_MUL, fe.first.get(),
+    auto *LoopCountCopy = fe.first->clone();
+    auto *MulE = new BinopIRExpr(BinopIRExpr::BINOP_MUL, LoopCountCopy,
                                  SymCountToExpr(fe.second));
     L = new BinopIRExpr(BinopIRExpr::BINOP_ADD, L, MulE);
   }

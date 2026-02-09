@@ -11,17 +11,22 @@ enum HardCilkBaseType {
   TY_UINT64,
   TY_ADDR,
   TY_VOID,
-  TY_LAST
+  TY_LAST,
+  TY_FLOAT32,
+  TY_FLOAT64,
 };
 
 struct HardCilkRecordType {
   std::string Name;
-  std::vector<std::pair<std::string, std::unique_ptr<std::variant<HardCilkBaseType, HardCilkRecordType>>>> Fields;
+  std::vector<std::pair<
+      std::string,
+      std::unique_ptr<std::variant<HardCilkBaseType, HardCilkRecordType>>>>
+      Fields;
 };
 
 using HardCilkType = std::variant<HardCilkBaseType, HardCilkRecordType>;
-using HardCilkRecordField = std::pair<std::string, std::unique_ptr<HardCilkType>>;
-
+using HardCilkRecordField =
+    std::pair<std::string, std::unique_ptr<HardCilkType>>;
 
 struct HCTaskInfo {
   std::set<IRFunction *> SendArgList;
@@ -35,7 +40,7 @@ struct HCTaskInfo {
 
 using TaskInfosTy = std::unordered_map<IRFunction *, HCTaskInfo>;
 
-HardCilkType* clangTypeToHardCilk(IRType &Ty);
+HardCilkType *clangTypeToHardCilk(IRType &Ty);
 
 class HardCilkTarget {
 private:

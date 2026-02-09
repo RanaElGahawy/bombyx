@@ -32,6 +32,9 @@ int VERBOSITY = 0;
 
 struct ConvertOpts {
   std::set<int> DumpPasses;
+
+  // flags to pass when running the program
+  // default: TC_CILK1EMU
   enum { TG_CILK1EMU, TG_HARDCILK } Target = TG_CILK1EMU;
   bool HCGenDriver = false;
 };
@@ -127,7 +130,7 @@ class BombyxPragmaHandler : public clang::PragmaHandler {
 private:
   void daePragma(clang::Preprocessor &PP, clang::PragmaIntroducer Introducer,
                  clang::Token &FirstToken) {
-        
+
     clang::Token Tok;
     // Consume remaining tokens until end of directive
     PP.Lex(Tok);
@@ -173,7 +176,8 @@ private:
       GIgnoreFns.insert(PP.getSpelling(Tok));
     } else {
       PANIC("fuck");
-      //PP.Diag(Tok.getLocation(), clang::diag::err_expected_after) << "IGNORE";
+      // PP.Diag(Tok.getLocation(), clang::diag::err_expected_after) <<
+      // "IGNORE";
     }
 
     // Consume remaining tokens until end of directive

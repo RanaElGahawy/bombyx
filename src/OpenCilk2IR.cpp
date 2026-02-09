@@ -18,21 +18,36 @@
 
 std::set<std::string> GIgnoreFns;
 std::vector<clang::RecordDecl *> GRecordDecls;
-
 //////////////////////////////////
 // Scan AST for relevant tasks //
 ////////////////////////////////
 using FunLookupTy =
     std::unordered_map<const clang::FunctionDecl *, IRFunction *>;
 
+// collect variables used inside the while condition
+class CondVarCollector : public clang::RecursiveASTVisitor<CondVarCollector> {
+public:
+  std::set<clang::ValueDecl *> Vars;
+
+  bool VisitDeclRefExpr(clang::DeclRefExpr *DRE) {
+    if (auto *VD = llvm::dyn_cast<clang::ValueDecl>(DRE->getDecl())) {
+      Vars.insert(VD);
+    }
+    return true;
+  }
+};
+
 class CilkAnalyzeVisitor
     : public clang::RecursiveASTVisitor<CilkAnalyzeVisitor> {
   FunctionDecl *CurrF = nullptr;
-  bool SpawnCtx = true;
+  bool WhileCtx = false;
+  bool SyncInWhile = false;
 
 public:
   std::set<FunctionDecl *> Tasks;
   std::set<FunctionDecl *> TaskCallers;
+  std::unordered_map<FunctionDecl *, std::vector<WhileStmt *>> WhileWithSync;
+
   explicit CilkAnalyzeVisitor() {}
 
   bool VisitFunctionDecl(FunctionDecl *Decl) {
@@ -76,6 +91,28 @@ public:
     }
     return true;
   }
+
+  bool VisitWhileStmt(WhileStmt *WS) {
+
+    WhileCtx = true;
+    TraverseStmt(WS->getBody());
+    if (SyncInWhile) {
+      Tasks.insert(CurrF);
+      WhileWithSync[CurrF].push_back(WS);
+      SyncInWhile = false;
+    }
+
+    WhileCtx = false;
+    return true;
+  }
+
+  bool VisitCilkSyncStmt(CilkSyncStmt *Node) {
+    if (WhileCtx == true) {
+      SyncInWhile = true;
+      return true;
+    }
+    return true;
+  }
 };
 
 ////////////////////////
@@ -89,12 +126,19 @@ private:
 
   std::unordered_map<ASTVarRef, IRVarRef> &VarLookup;
   std::set<FunctionDecl *> Tasks;
+  std::set<ASTVarRef> LoopCarriedVars;
   IRFunction *F;
   bool ExprCtx = false;
   bool CallCtx = false;
   bool SpawnCtx = false;
   bool SyncNext = false;
+  bool WhileCtx = false;
+  bool SyncInWhile = false;
 
+  /* Basicially get a Clang expression visit it then in the visit appropriate
+  function and convert it to an IR and return it throught the stack ExprStack
+  all this while we mark that we are in the context of this expression in
+  case of nested calls inside */
   IRExpr *getExpr(Expr *E) {
     assert(E);
     ExprCtx = true;
@@ -106,6 +150,8 @@ private:
     return IRE;
   }
 
+  /* Come back here; most probably when waiting  for a cilk sync.
+  Check when cilk sync is set to true */
   void pushIRStmt(IRStmt *S) {
     CurrB->pushStmtBack(S);
     if (SyncNext) {
@@ -196,9 +242,7 @@ public:
     }
   }
 
-  void VisitNullStmt(NullStmt *Node) {
-    
-  }
+  void VisitNullStmt(NullStmt *Node) {}
 
   void VisitDeclStmt(DeclStmt *Node) {
     for (auto *D : Node->decls()) {
@@ -316,6 +360,9 @@ public:
     auto *BodyB = F->createBlock();
     auto *JoinB = F->createBlock();
 
+    // if (!CurrB->Term) {
+    //   PANIC("No Terminator for current B");
+    // }
     CurrB->Succs.insert(WhileB);
     WhileB->Succs.insert(BodyB);
     WhileB->Succs.insert(JoinB);
@@ -326,9 +373,57 @@ public:
     auto *WhileS = new LoopIRStmt(Cond, nullptr, nullptr);
     WhileB->Term = (IRTerminatorStmt *)WhileS;
 
+    auto *temp = CurrB;
+
     CurrB = BodyB;
+    WhileCtx = true;
     handleStmt(WS->getBody());
-    CurrB->Succs.insert(WhileB);
+    WhileCtx = false;
+    if (SyncInWhile) {
+      SyncInWhile = false;
+      // PANIC("Sync in while detected")
+
+      CondVarCollector CVC;
+      CVC.TraverseStmt(WS->getCond());
+      for (auto *VD : CVC.Vars) {
+        auto It = VarLookup.find(VD);
+        if (It != VarLookup.end()) {
+          // It->second->InWhile = true;
+          It->second->DeclLoc = IRVarDecl::ARG;
+        }
+      }
+
+      IRExpr *CondIf = nullptr;
+      CondIf = getExpr(WS->getCond());
+      auto *IRS = new IfIRStmt(CondIf);
+      temp->Term = (IRTerminatorStmt *)IRS;
+      temp->Succs.remove(WhileB);
+      IRBasicBlock *BranchB = temp;
+      BranchB->Succs.insert(BodyB);
+      BranchB->Succs.insert(JoinB);
+
+      IRFunRef FR(F->Info.RootFun);
+      std::vector<IRExpr *> LoopArgs;
+
+      for (auto &V : F->Vars) {
+        if (V.DeclLoc == IRVarDecl::ARG) {
+          LoopArgs.push_back(new IdentIRExpr(&V));
+        }
+      }
+
+      auto *SpawnLoop = new ISpawnIRExpr(FR, LoopArgs);
+      pushIRStmt(new ExprWrapIRStmt(SpawnLoop));
+
+      // auto *SpawnLoop = new CallIRExpr(FR, LoopArgs);
+
+      // // auto SpawnedE = new ExprWrapIRStmt(SpawnLoop);
+      // if (SpawnLoop) {
+      //   HandleCilkSpawn(SpawnLoop);
+      // }
+
+    } else {
+      CurrB->Succs.insert(WhileB);
+    }
 
     CurrB = JoinB;
   }
@@ -360,6 +455,9 @@ public:
 
   void VisitCilkSyncStmt(CilkSyncStmt *Node) {
     assert(!CurrB->Term);
+    if (WhileCtx == true) {
+      SyncInWhile = true;
+    }
     auto *SyncS = new SyncIRStmt();
     CurrB->Term = (IRTerminatorStmt *)SyncS;
     auto *JoinB = F->createBlock();
@@ -369,7 +467,7 @@ public:
 
   void VisitCilkSpawnStmt(CilkSpawnStmt *Stmt) {
     Expr *E = dyn_cast<Expr>(Stmt->getSpawnedStmt());
-    if (!E)  {
+    if (!E) {
       PANIC("unrecognized expression in cilk spawn statement");
     }
     SpawnCtx = true;
@@ -393,7 +491,8 @@ public:
   void VisitMemberExpr(MemberExpr *Node) {
     IdentIRExpr *IE = dyn_cast<IdentIRExpr>(getExpr(Node->getBase()));
     assert(IE);
-    auto *AE = new AccessIRExpr(IE->Ident, Node->getMemberDecl()->getName().str(), Node->isArrow());
+    auto *AE = new AccessIRExpr(
+        IE->Ident, Node->getMemberDecl()->getName().str(), Node->isArrow());
     delete IE;
     ExprStack.push_back(AE);
   }
@@ -587,6 +686,8 @@ public:
       llvm_unreachable("Non function identifier used for call expression.");
     }
 
+    // the first function has cilk_spawn but the second doesn't
+    // (implicit cilk spawn, so we are adding a sync)
     if (!SpawnCtx & Tasks.find(Node->getDirectCallee()) != Tasks.end()) {
       auto *SpawnedE = ExprStack.back();
       ExprStack.pop_back();
@@ -604,8 +705,6 @@ public:
     auto *CastE = new CastIRExpr(Node->getType(), E);
     ExprStack.push_back(CastE);
   }
-
-  
 
   void VisitCilkSpawnExpr(CilkSpawnExpr *Node) {
     SpawnCtx = true;
@@ -643,20 +742,23 @@ private:
   IRProgram &P;
   std::set<FunctionDecl *> &Tasks;
   std::set<FunctionDecl *> &TaskCallers;
+  std::unordered_map<FunctionDecl *, std::vector<WhileStmt *>> &WhileWithSync;
 
 public:
   FunLookupTy FunLookup;
-  explicit Cilk2IRVisitor(clang::ASTContext *Context, IRProgram &P,
-                          std::set<FunctionDecl *> &Tasks,
-                          std::set<FunctionDecl *> &TaskCallers)
-      : Context(Context), P(P), Tasks(Tasks), TaskCallers(TaskCallers) {}
+  explicit Cilk2IRVisitor(
+      clang::ASTContext *Context, IRProgram &P, std::set<FunctionDecl *> &Tasks,
+      std::set<FunctionDecl *> &TaskCallers,
+      std::unordered_map<FunctionDecl *, std::vector<WhileStmt *>>
+          &WhileWithSync)
+      : Context(Context), P(P), Tasks(Tasks), TaskCallers(TaskCallers),
+        WhileWithSync(WhileWithSync) {}
 
   bool VisitFunctionDecl(clang::FunctionDecl *Decl) {
     if (Tasks.find(Decl) == Tasks.end() &&
         TaskCallers.find(Decl) == TaskCallers.end()) {
       return true;
     }
-
     if (Decl->getBody()) {
       IRFunction *F =
           P.createFunc(Decl->getName().str(), Decl->getDeclaredReturnType());
@@ -725,7 +827,8 @@ void finalizeFunction(IRFunction *F, FunLookupTy &FunLookup) {
 
 void OpenCilk2IR(IRProgram &P, clang::ASTContext *Context, SourceManager &SM) {
   CilkAnalyzeVisitor AVisitor;
-  Cilk2IRVisitor Visitor(Context, P, AVisitor.Tasks, AVisitor.TaskCallers);
+  Cilk2IRVisitor Visitor(Context, P, AVisitor.Tasks, AVisitor.TaskCallers,
+                         AVisitor.WhileWithSync);
   // Only visit declarations declared in the input TU
   auto Decls = Context->getTranslationUnitDecl()->decls();
   for (auto &Decl : Decls) {
