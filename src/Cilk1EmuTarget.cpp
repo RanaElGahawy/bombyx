@@ -408,10 +408,19 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
                        .IdentCB = [&](llvm::raw_ostream &Out, IRVarRef VR) {
                          switch (VR->DeclLoc) {
                          case IRVarDecl::ARG: {
+
+                           std::string name = GetSym(VR->Name);
+
+                           if (!F->Info.IsTask) {
+                             if (!name.empty() && name.back() == '0') {
+                               name.pop_back();
+                             }
+                           }
+
                            if (F->Info.IsTask) {
-                             Out << "largs->" << GetSym(VR->Name);
+                             Out << "largs->" << name;
                            } else {
-                             Out << GetSym(VR->Name);
+                             Out << name;
                            }
                            break;
                          }
