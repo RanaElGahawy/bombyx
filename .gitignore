@@ -1,27 +1,53 @@
 # Ignore everything
 /*
 
-# Allow main project structure
+# Allow main folders
 !/src/
 !/support/
 !/tests/
 !/include/
 
-# Allow important root files
+# Allow root files
 !CMakeLists.txt
 !.gitignore
 !.clang-format
 !.vscode/
 
-# Inside tests: ignore generated outputs
-tests/**/_out.txt
-tests/**/*.out
+# Ignore everything inside test output folders first
+/tests/ex/*
+/tests/im/*
 
-# Ignore compiled binaries (no extension)
-tests/ex/*
-tests/im/*
+# Re-allow only what you want to keep
+!/tests/ex/*.cpp
+!/tests/ex/*.txt
+!/tests/ex/*.sh
+!/tests/im/*.cpp
+!/tests/im/*.txt
+!/tests/im/*.sh
 
-# But keep source + expected outputs
-!tests/**/*.cpp
-!tests/**/*.txt
-!tests/**/run_cilk_tests.sh
+# But ignore generated output txt files again
+/tests/ex/*_out.txt
+/tests/im/*_out.txt
+/tests/ex/out.txt
+/tests/im/out.txt
+
+# Ignore compiled binaries with no extension
+/tests/ex/fib
+/tests/ex/listing_7
+/tests/ex/listing_8
+/tests/ex/listing_9
+/tests/ex/listing_10
+/tests/ex/listing_11
+/tests/ex/listing_13
+/tests/ex/nq
+/tests/ex/nqueens
+
+/tests/im/fib
+/tests/im/listing_7
+/tests/im/listing_8
+/tests/im/listing_9
+/tests/im/listing_10
+/tests/im/listing_11
+/tests/im/listing_13
+/tests/im/nq
+/tests/im/nqueens

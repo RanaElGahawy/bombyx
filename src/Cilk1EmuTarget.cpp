@@ -256,8 +256,8 @@ private:
 
   void handleSpawn(ESpawnIRStmt *ES, IRFunction *F) {
     const std::string &SpawnFnName = ES->Fn->getName();
-    Indent() << "cont sp" << SpawnCtr << "k;\n";
     if (ES->SN) {
+      Indent() << "cont sp" << SpawnCtr << "k;\n";
       const std::string &SpawnNextFnName = ES->SN->Fn->getName();
       if (ES->Dest) {
         if (ES->Local) {
@@ -282,8 +282,11 @@ private:
                << "k);\n";
       auto DstArgIt = ES->Fn->Vars.begin();
       for (auto &Arg : ES->Args) {
+        while (DstArgIt != ES->Fn->Vars.end() &&
+               DstArgIt->DeclLoc != IRVarDecl::ARG)
+          DstArgIt++;
+        assert(DstArgIt != ES->Fn->Vars.end());
         auto &DstArg = *DstArgIt;
-        assert(DstArg.DeclLoc == IRVarDecl::ARG);
         Indent() << "sp" << SpawnCtr << "c." << GetSym(DstArg.Name);
         Out << " = ";
         Arg->print(Out, C);
@@ -291,12 +294,24 @@ private:
         DstArgIt++;
       }
     } else {
+      // Fire-and-forget spawn (no spawn_next). Pass the parent's k
+      // continuation so the spawned task can eventually SEND_ARGUMENT
+      // back to the original caller.
       Indent() << "auto sp" << SpawnCtr << "c = std::make_shared<"
-               << SpawnFnName << "_closure>(sp" << SpawnCtr << "k);\n";
+               << SpawnFnName << "_closure>(";
+      if (F->Info.IsTask) {
+        Out << "largs->k";
+      } else {
+        Out << "CONT_DUMMY";
+      }
+      Out << ");\n";
       auto DstArgIt = ES->Fn->Vars.begin();
       for (auto &Arg : ES->Args) {
+        while (DstArgIt != ES->Fn->Vars.end() &&
+               DstArgIt->DeclLoc != IRVarDecl::ARG)
+          DstArgIt++;
+        assert(DstArgIt != ES->Fn->Vars.end());
         auto &DstArg = *DstArgIt;
-        assert(DstArg.DeclLoc == IRVarDecl::ARG);
         Indent() << "sp" << SpawnCtr << "c->" << GetSym(DstArg.Name);
         Out << " = ";
         Arg->print(Out, C);

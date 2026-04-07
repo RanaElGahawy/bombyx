@@ -392,8 +392,14 @@ void ClosureDeclIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
 }
 
 IRStmt *ClosureDeclIRStmt::clone() {
-  PANIC("unimplemented");
-  return nullptr;
+  auto *C = new ClosureDeclIRStmt(Fn);
+  for (auto &[Src, Dst] : Caller2Callee) {
+    C->addCallerToCaleeVarMapping(Src, Dst);
+  }
+  if (SpawnCount) {
+    C->annotateSpawnCount(SpawnCount->clone());
+  }
+  return C;
 }
 
 void ReturnIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
@@ -433,7 +439,10 @@ void IRBasicBlock::iteratePreds(std::function<void(IRBasicBlock *B)> CB) {
 
 void IRBasicBlock::clone(IRBasicBlock *Dest) {
   for (auto &Stmt : Stmts) {
-    Dest->pushStmtBack(Stmt->clone());
+    auto *Cloned = Stmt->clone();
+    if (Stmt->Silent)
+      Cloned->setSilent();
+    Dest->pushStmtBack(Cloned);
   }
   if (Term != nullptr) {
     Dest->Term = dyn_cast<IRTerminatorStmt>(Term->clone());
@@ -757,7 +766,9 @@ void ScopedIRTraverser::traverse(IRFunction &F) {
         if (ElseB && ElseB != JoinB) {
           WorkList.push_back(WorkItem(ElseB));
           WorkList.push_back(WorkItem(Else));
-          JoinCounts[JoinB] += 1;
+          if (JoinB) {
+            JoinCounts[JoinB] += 1;
+          }
         }
         WorkList.push_back(WorkItem(ThenB));
         WorkList.push_back(WorkItem(Open));

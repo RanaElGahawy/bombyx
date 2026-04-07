@@ -1,38 +1,33 @@
 #!/bin/bash
 
-set -e  # stop on first error (you can remove if you want all to run)
+set -e  # stop on first error (remove if you want all tests to continue)
 
 CLANG="xcrun /opt/opencilk/bin/clang++"
 FLAGS="-fopencilk"
 
+BASE="/Users/ranaelgahawy/Desktop/bombyx/tests"
+
 echo "=== Running OpenCilk tests ==="
 
-echo ">> nqueens"
-$CLANG nqueens.cpp $FLAGS -o nq
-./nq
+run_test () {
+  NAME=$1
 
-echo ">> fib"
-$CLANG fib.cpp $FLAGS -o fib
-./fib
+  echo ">> $NAME"
 
-echo ">> listing_7"
-$CLANG listing_7.cpp $FLAGS -o listing_7
-./listing_7
+  $CLANG $NAME.cpp $FLAGS -o $NAME
+  ./$NAME > ${NAME}.txt || echo "⚠️ $NAME crashed"
 
-echo ">> listing_8"
-$CLANG listing_8.cpp $FLAGS -o listing_8
-./listing_8
+  diff "$BASE/ex/${NAME}.txt" "$BASE/im/${NAME}.txt" || echo "❌ $NAME output differs"
+}
 
-echo ">> listing_9"
-$CLANG listing_9.cpp $FLAGS -o listing_9
-./listing_9 || echo "⚠️ listing_9 crashed (bus error)"
-
-echo ">> listing_10"
-$CLANG listing_10.cpp $FLAGS -o listing_10
-./listing_10
-
-echo ">> listing_11"
-$CLANG listing_11.cpp $FLAGS -o listing_11
-./listing_11
+# Tests with expected outputs
+run_test "nqueens"
+run_test "fib"
+run_test "listing_7"
+run_test "listing_8"
+run_test "listing_9"
+run_test "listing_10"
+run_test "listing_11"
+run_test "listing_13"
 
 echo "✅ Done"
