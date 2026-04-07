@@ -319,8 +319,8 @@ void ESpawnIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   }
   Out << ")";
   if (SN) {
-    Out <<  "[" << SN->Fn->getName() << "]";
-  } 
+    Out << "[" << SN->Fn->getName() << "]";
+  }
 }
 
 IRStmt *ESpawnIRStmt::clone() {
@@ -328,10 +328,9 @@ IRStmt *ESpawnIRStmt::clone() {
   for (auto &Arg : Args) {
     NewArgs.push_back(Arg->clone());
   }
-  
+
   IRLvalExpr *ND = Dest ? (dyn_cast<IRLvalExpr>(Dest->clone())) : nullptr;
-  return new ESpawnIRStmt(ND, Fn, SN, NewArgs,
-                          Local);
+  return new ESpawnIRStmt(ND, Fn, SN, NewArgs, Local);
 }
 
 void ExprWrapIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
@@ -405,8 +404,7 @@ void ReturnIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
 }
 
 IRStmt *ReturnIRStmt::clone() {
-  assert(RetVal);
-  IRExpr *NewRetVal = RetVal->clone();
+  IRExpr *NewRetVal = RetVal ? RetVal->clone() : nullptr;
   return new ReturnIRStmt(NewRetVal);
 }
 
@@ -788,4 +786,3 @@ void ScopedIRTraverser::traverse(IRFunction &F) {
     }
   }
 }
-

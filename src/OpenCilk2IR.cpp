@@ -37,6 +37,58 @@ public:
   }
 };
 
+// Collect all variables that are assigned (written to) inside the while body
+// but declared OUTSIDE it. These are the loop-carried variables that must be
+// promoted to arguments when converting a while-with-sync to tail recursion.
+// Variables declared inside the while body (like loop-local temporaries)
+// are excluded since they don't carry state across iterations.
+class LoopBodyVarCollector
+    : public clang::RecursiveASTVisitor<LoopBodyVarCollector> {
+public:
+  std::set<clang::ValueDecl *> AssignedVars;
+  std::set<clang::ValueDecl *> DeclaredVars;
+
+  bool VisitVarDecl(clang::VarDecl *VD) {
+    DeclaredVars.insert(VD);
+    return true;
+  }
+
+  bool VisitBinaryOperator(clang::BinaryOperator *BO) {
+    if (BO->isAssignmentOp()) {
+      if (auto *DRE = llvm::dyn_cast<clang::DeclRefExpr>(
+              BO->getLHS()->IgnoreParenImpCasts())) {
+        if (auto *VD = llvm::dyn_cast<clang::ValueDecl>(DRE->getDecl())) {
+          AssignedVars.insert(VD);
+        }
+      }
+    }
+    return true;
+  }
+
+  bool VisitUnaryOperator(clang::UnaryOperator *UO) {
+    if (UO->isIncrementDecrementOp()) {
+      if (auto *DRE = llvm::dyn_cast<clang::DeclRefExpr>(
+              UO->getSubExpr()->IgnoreParenImpCasts())) {
+        if (auto *VD = llvm::dyn_cast<clang::ValueDecl>(DRE->getDecl())) {
+          AssignedVars.insert(VD);
+        }
+      }
+    }
+    return true;
+  }
+
+  // Get the loop-carried variables: assigned in body but not declared in body
+  std::set<clang::ValueDecl *> getLoopCarriedVars() {
+    std::set<clang::ValueDecl *> Result;
+    for (auto *VD : AssignedVars) {
+      if (DeclaredVars.find(VD) == DeclaredVars.end()) {
+        Result.insert(VD);
+      }
+    }
+    return Result;
+  }
+};
+
 class CilkAnalyzeVisitor
     : public clang::RecursiveASTVisitor<CilkAnalyzeVisitor> {
   FunctionDecl *CurrF = nullptr;
@@ -94,15 +146,18 @@ public:
 
   bool VisitWhileStmt(WhileStmt *WS) {
 
+    bool SavedWhileCtx = WhileCtx;
+    bool SavedSyncInWhile = SyncInWhile;
     WhileCtx = true;
+    SyncInWhile = false;
     TraverseStmt(WS->getBody());
     if (SyncInWhile) {
       Tasks.insert(CurrF);
       WhileWithSync[CurrF].push_back(WS);
-      SyncInWhile = false;
     }
 
-    WhileCtx = false;
+    WhileCtx = SavedWhileCtx;
+    SyncInWhile = SavedSyncInWhile;
     return true;
   }
 
@@ -376,23 +431,57 @@ public:
     auto *temp = CurrB;
 
     CurrB = BodyB;
+    // Save and restore WhileCtx/SyncInWhile so that nested while
+    // loops do not clobber the outer loop's state. Without this,
+    // an inner while (without sync) would clear WhileCtx, causing
+    // the outer while's sync to not be detected.
+    bool SavedWhileCtx = WhileCtx;
+    bool SavedSyncInWhile = SyncInWhile;
     WhileCtx = true;
+    SyncInWhile = false;
     handleStmt(WS->getBody());
-    WhileCtx = false;
-    if (SyncInWhile) {
-      SyncInWhile = false;
-      // PANIC("Sync in while detected")
+    bool ThisSyncInWhile = SyncInWhile;
+    WhileCtx = SavedWhileCtx;
+    SyncInWhile = SavedSyncInWhile;
 
+    // Only the outermost while-with-sync gets converted to tail
+    // recursion targeting the root function (F->Info.RootFun).
+    // Nested whiles-with-sync are converted to tail recursion
+    // targeting a NEW helper function that handles just the inner
+    // loop, avoiding arg scrambling and wrong re-entry points.
+    if (ThisSyncInWhile && !SavedWhileCtx) {
+      // OUTERMOST while-with-sync: convert to if + self-spawn of root fn.
+
+      // 1. Promote ALL loop-carried variables to ARG.
       CondVarCollector CVC;
       CVC.TraverseStmt(WS->getCond());
       for (auto *VD : CVC.Vars) {
         auto It = VarLookup.find(VD);
         if (It != VarLookup.end()) {
-          // It->second->InWhile = true;
           It->second->DeclLoc = IRVarDecl::ARG;
         }
       }
 
+      LoopBodyVarCollector LBVC;
+      LBVC.TraverseStmt(WS->getBody());
+      auto LoopCarried = LBVC.getLoopCarriedVars();
+      for (auto *VD : LoopCarried) {
+        auto It = VarLookup.find(VD);
+        if (It != VarLookup.end()) {
+          It->second->DeclLoc = IRVarDecl::ARG;
+        }
+      }
+
+      // 1b. Silence initialization copies for promoted variables.
+      for (auto &S : *temp) {
+        if (auto *CS = dyn_cast<CopyIRStmt>(S.get())) {
+          if (CS->Dest->DeclLoc == IRVarDecl::ARG) {
+            CS->setSilent();
+          }
+        }
+      }
+
+      // 2. Replace the while with an if-statement on the same condition.
       IRExpr *CondIf = nullptr;
       CondIf = getExpr(WS->getCond());
       auto *IRS = new IfIRStmt(CondIf);
@@ -402,6 +491,7 @@ public:
       BranchB->Succs.insert(BodyB);
       BranchB->Succs.insert(JoinB);
 
+      // 3. Build the self-recursive spawn with ALL promoted args.
       IRFunRef FR(F->Info.RootFun);
       std::vector<IRExpr *> LoopArgs;
 
@@ -414,12 +504,67 @@ public:
       auto *SpawnLoop = new ISpawnIRExpr(FR, LoopArgs);
       pushIRStmt(new ExprWrapIRStmt(SpawnLoop));
 
-      // auto *SpawnLoop = new CallIRExpr(FR, LoopArgs);
+      // 4. Terminate the body with a return (void).
+      assert(!CurrB->Term);
+      auto *RetS = new ReturnIRStmt(nullptr);
+      CurrB->Term = (IRTerminatorStmt *)RetS;
 
-      // // auto SpawnedE = new ExprWrapIRStmt(SpawnLoop);
-      // if (SpawnLoop) {
-      //   HandleCilkSpawn(SpawnLoop);
-      // }
+    } else if (ThisSyncInWhile && SavedWhileCtx) {
+      // NESTED while-with-sync: also convert to if + self-spawn of
+      // the root function. The inner loop cannot stay as a LoopIRStmt
+      // because MakeExplicit will split its body at sync points,
+      // breaking the loop back-edge.
+      //
+      // We promote the inner loop's condition vars and loop-carried
+      // vars to ARG (same as outer while) so they are passed through
+      // the self-recursive spawn and preserved across iterations.
+
+      CondVarCollector InnerCVC;
+      InnerCVC.TraverseStmt(WS->getCond());
+      for (auto *VD : InnerCVC.Vars) {
+        auto It = VarLookup.find(VD);
+        if (It != VarLookup.end()) {
+          It->second->DeclLoc = IRVarDecl::ARG;
+        }
+      }
+
+      LoopBodyVarCollector InnerLBVC;
+      InnerLBVC.TraverseStmt(WS->getBody());
+      auto InnerLoopCarried = InnerLBVC.getLoopCarriedVars();
+      for (auto *VD : InnerLoopCarried) {
+        auto It = VarLookup.find(VD);
+        if (It != VarLookup.end()) {
+          It->second->DeclLoc = IRVarDecl::ARG;
+        }
+      }
+
+      // Replace the while with an if-statement.
+      IRExpr *CondIf = nullptr;
+      CondIf = getExpr(WS->getCond());
+      auto *IRS = new IfIRStmt(CondIf);
+      temp->Term = (IRTerminatorStmt *)IRS;
+      temp->Succs.remove(WhileB);
+      IRBasicBlock *BranchB = temp;
+      BranchB->Succs.insert(BodyB);
+      BranchB->Succs.insert(JoinB);
+
+      // Build self-recursive spawn targeting the root function.
+      IRFunRef FR(F->Info.RootFun);
+      std::vector<IRExpr *> LoopArgs;
+
+      for (auto &V : F->Vars) {
+        if (V.DeclLoc == IRVarDecl::ARG) {
+          LoopArgs.push_back(new IdentIRExpr(&V));
+        }
+      }
+
+      auto *SpawnLoop = new ISpawnIRExpr(FR, LoopArgs);
+      pushIRStmt(new ExprWrapIRStmt(SpawnLoop));
+
+      // Terminate the body.
+      assert(!CurrB->Term);
+      auto *RetS = new ReturnIRStmt(nullptr);
+      CurrB->Term = (IRTerminatorStmt *)RetS;
 
     } else {
       CurrB->Succs.insert(WhileB);
@@ -805,6 +950,22 @@ public:
         auto *SpawnDest = FunLookup[FR];
         Node->Fn = SpawnDest;
         SpawnDest->Info.IsTask = true;
+
+        // When a while-with-sync promotes locals to ARG, the target
+        // function has more ARGs than the original AST parameters.
+        // External callers (e.g. main calling fun(4)) only provide
+        // args for the original parameters. We pad with zero-valued
+        // initializers for the promoted locals so the closure is
+        // properly initialized on the first call.
+        size_t NumTargetArgs = 0;
+        for (auto &V : SpawnDest->Vars) {
+          if (V.DeclLoc == IRVarDecl::ARG)
+            NumTargetArgs++;
+        }
+        while (Node->Args.size() < NumTargetArgs) {
+          Node->Args.push_back(
+              std::unique_ptr<IRExpr>(new IntLiteralIRExpr(0)));
+        }
       }
     } else {
       llvm_unreachable("Expected an AST variable reference in ISpawnIRExpr");
