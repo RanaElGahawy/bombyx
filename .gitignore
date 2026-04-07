@@ -1,9 +1,27 @@
+# Ignore everything
 /*
-!/src
-!/support
-!/tests
-!/include
-!./CMakeLists.txt
-!./.gitignore
-!./.clang-format
-!./.vscode
+
+# Allow main project structure
+!/src/
+!/support/
+!/tests/
+!/include/
+
+# Allow important root files
+!CMakeLists.txt
+!.gitignore
+!.clang-format
+!.vscode/
+
+# Inside tests: ignore generated outputs
+tests/**/_out.txt
+tests/**/*.out
+
+# Ignore compiled binaries (no extension)
+tests/ex/*
+tests/im/*
+
+# But keep source + expected outputs
+!tests/**/*.cpp
+!tests/**/*.txt
+!tests/**/run_cilk_tests.sh
