@@ -3,8 +3,7 @@
 set -e  # stop on first error (remove if you want all tests to continue)
 
 CLANG="xcrun /opt/opencilk/bin/clang++"
-FLAGS="-fopencilk"
-
+FLAGS="-fopencilk -Wno-backend-plugin"
 BASE="/Users/ranaelgahawy/Desktop/bombyx/tests"
 
 echo "=== Running OpenCilk tests ==="

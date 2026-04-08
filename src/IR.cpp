@@ -797,3 +797,83 @@ void ScopedIRTraverser::traverse(IRFunction &F) {
     }
   }
 }
+
+void printFullIRProgram(llvm::raw_ostream &Out, IRProgram &P,
+                        clang::ASTContext &Context) {
+  IRPrintContext Ctx{
+      .ASTCtx = Context, .NewlineSymbol = "\n", .GraphVizEscapeChars = false};
+
+  Out << "========== IR Program ==========\n";
+
+  for (auto &FPtr : P) {
+    IRFunction *F = FPtr.get();
+    Out << "\nfunction " << F->getName() << " {\n";
+
+    Out << "  vars:\n";
+    for (auto &V : F->Vars) {
+      Out << "    ";
+      switch (V.DeclLoc) {
+      case IRVarDecl::ARG:
+        Out << "[arg] ";
+        break;
+      case IRVarDecl::LOCAL:
+        Out << "[local] ";
+        break;
+      default:
+        Out << "[var] ";
+        break;
+      }
+      Out << GetSym(V.Name) << "\n";
+    }
+
+    Out << "\n  blocks:\n";
+    for (auto &BPtr : *F) {
+      IRBasicBlock *B = BPtr.get();
+
+      Out << "  B" << B->getInd() << ":\n";
+
+      Out << "    preds: ";
+      bool firstPred = true;
+      B->iteratePreds([&](IRBasicBlock *Pred) {
+        if (!firstPred)
+          Out << ", ";
+        Out << "B" << Pred->getInd();
+        firstPred = false;
+      });
+      if (firstPred)
+        Out << "(none)";
+      Out << "\n";
+
+      int stmtNo = 1;
+      for (auto &S : *B) {
+        Out << "    " << stmtNo++ << ": ";
+        S->print(Out, Ctx);
+        Out << "\n";
+      }
+
+      if (B->Term) {
+        Out << "    T: ";
+        B->Term->print(Out, Ctx);
+        Out << "\n";
+      }
+
+      Out << "    succs: ";
+      if (B->Succs.empty()) {
+        Out << "(none)";
+      } else {
+        bool firstSucc = true;
+        for (auto *Succ : B->Succs) {
+          if (!firstSucc)
+            Out << ", ";
+          Out << "B" << Succ->getInd();
+          firstSucc = false;
+        }
+      }
+      Out << "\n\n";
+    }
+
+    Out << "}\n";
+  }
+
+  Out << "===============================\n";
+}

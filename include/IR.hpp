@@ -1126,3 +1126,6 @@ public:
 static void exprPrintId(IRPrintContext *C, llvm::raw_ostream &Out, IRExpr *E) {
   E->print(Out, *C);
 }
+
+void printFullIRProgram(llvm::raw_ostream &Out, IRProgram &P,
+                        clang::ASTContext &Context);

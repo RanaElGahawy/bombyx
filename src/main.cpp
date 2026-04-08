@@ -17,6 +17,7 @@
 #include "Cilk1EmuTarget.hpp"
 #include "CountSpawns.hpp"
 #include "DAE.hpp"
+#include "FlattenIR.hpp"
 #include "HardCilkTarget.hpp"
 #include "IR.hpp"
 #include "MakeExplicit.hpp"
@@ -63,6 +64,10 @@ public:
 
     std::vector<PassFn> Passes{
         [&](IRProgram &P) -> void { OpenCilk2IR(P, &Context, SM); },
+        [&](IRProgram &P) -> void {
+          FlattenIR(P);
+          printFullIRProgram(llvm::outs(), P, Context);
+        },
         [&](IRProgram &P) -> void { DAE(P); },
         [&](IRProgram &P) -> void { MakeExplicit(P); },
         [&](IRProgram &P) -> void { CountSpawns(P, Context); },
