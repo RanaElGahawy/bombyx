@@ -74,19 +74,19 @@ IRExpr *DRefIRExpr::clone() {
 }
 
 void AccessIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
-  assert(Struct);
-  Ctx.IdentCB(Out, Struct);
-  if (Arrow) {
-    Out << "->";
+  assert(Base);
+  if (auto *IE = llvm::dyn_cast<IdentIRExpr>(Base.get())) {
+    Ctx.IdentCB(Out, IE->Ident);
   } else {
-    Out << ".";
+    Ctx.ExprCB(&Ctx, Out, Base.get());
   }
+  Out << (Arrow ? "->" : ".");
   Out << Field;
 }
 
 IRExpr *AccessIRExpr::clone() {
-  assert(Struct);
-  return new AccessIRExpr(Struct, Field, Arrow);
+  assert(Base);
+  return new AccessIRExpr(llvm::dyn_cast<IRLvalExpr>(Base->clone()), Field, Arrow);
 }
 
 void IdentIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
@@ -376,6 +376,12 @@ void SyncIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
 }
 
 IRStmt *SyncIRStmt::clone() { return new SyncIRStmt(); }
+
+void BreakIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
+  Out << "break";
+}
+
+IRStmt *BreakIRStmt::clone() { return new BreakIRStmt(); }
 
 void ClosureDeclIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   Out << "cdef ";
@@ -729,6 +735,57 @@ IRBasicBlock *FindJoin(IRBasicBlock *Left, IRBasicBlock *Right) {
   return nullptr;
 }
 
+static IRBasicBlock *FindIfJoin(IRBasicBlock *ThenB, IRBasicBlock *ElseB) {
+  std::unordered_map<IRBasicBlock *, bool> ThenReachable;
+  std::unordered_map<IRBasicBlock *, bool> ElseReachable;
+  std::vector<IRBasicBlock *> WorkList;
+
+  WorkList.push_back(ThenB);
+  while (!WorkList.empty()) {
+    auto *B = WorkList.back();
+    WorkList.pop_back();
+    if (ThenReachable.find(B) != ThenReachable.end())
+      continue;
+    ThenReachable[B] = true;
+    for (auto *Succ : B->Succs) {
+      WorkList.push_back(Succ);
+    }
+  }
+
+  WorkList.push_back(ElseB);
+  while (!WorkList.empty()) {
+    auto *B = WorkList.back();
+    WorkList.pop_back();
+    if (ElseReachable.find(B) != ElseReachable.end())
+      continue;
+    ElseReachable[B] = true;
+    for (auto *Succ : B->Succs) {
+      WorkList.push_back(Succ);
+    }
+  }
+
+  for (auto &BPtr : *(ThenB->getParent())) {
+    auto *B = BPtr.get();
+    if (B == ThenB || B == ElseB)
+      continue;
+    if (ThenReachable.find(B) == ThenReachable.end() ||
+        ElseReachable.find(B) == ElseReachable.end()) {
+      continue;
+    }
+
+    bool PredFromThen = false;
+    bool PredFromElse = false;
+    B->iteratePreds([&](IRBasicBlock *Pred) {
+      PredFromThen |= (ThenReachable.find(Pred) != ThenReachable.end());
+      PredFromElse |= (ElseReachable.find(Pred) != ElseReachable.end());
+    });
+    if (PredFromThen && PredFromElse)
+      return B;
+  }
+
+  return nullptr;
+}
+
 void ScopedIRTraverser::traverse(IRFunction &F) {
   WorkList.push_back(WorkItem(F.getEntry()));
 
@@ -756,7 +813,7 @@ void ScopedIRTraverser::traverse(IRFunction &F) {
       if (B->Term && isa<IfIRStmt>(B->Term)) {
         auto *ThenB = B->Succs[0];
         auto *ElseB = B->Succs[1];
-        auto *JoinB = FindJoin(ThenB, ElseB);
+        auto *JoinB = FindIfJoin(ThenB, ElseB);
         assert(JoinB != ThenB);
         if (JoinB) {
           WorkList.push_back(WorkItem(JoinB));

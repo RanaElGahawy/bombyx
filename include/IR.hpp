@@ -180,14 +180,26 @@ public:
 };*/
 
 struct AccessIRExpr : IRLvalExpr {
-  IRVarRef Struct;
+  std::unique_ptr<IRLvalExpr> Base;
   std::string Field;
   bool Arrow;
 
 public:
-  AccessIRExpr(IRVarRef Struct, std::string Field, bool Arrow)
-      : Struct(Struct), Field(Field), Arrow(Arrow),
+  AccessIRExpr(IRLvalExpr *Base, std::string Field, bool Arrow)
+      : Base(Base), Field(Field), Arrow(Arrow),
         IRLvalExpr(EXK_LVAL_ACCESS) {}
+
+  // Convenience constructor for the common case of a simple variable base.
+  AccessIRExpr(IRVarRef Struct, std::string Field, bool Arrow)
+      : Base(new IdentIRExpr(Struct)), Field(Field), Arrow(Arrow),
+        IRLvalExpr(EXK_LVAL_ACCESS) {}
+
+  // Returns the base variable ref if the base is a simple ident, else nullptr.
+  IRVarRef getStructVarRef() const {
+    if (auto *IE = llvm::dyn_cast<IdentIRExpr>(Base.get()))
+      return IE->Ident;
+    return nullptr;
+  }
 
   static bool classof(const IRExpr *E) {
     return E->getKind() == EXK_LVAL_ACCESS;
@@ -455,6 +467,8 @@ public:
     STK_CLOSURE_DECL,
     STK_RETURN,
     STK_SYNC,
+    STK_BREAK,
+    STK_CONTINUE,
     STK_TERMINATOR_END,
     STK_ESPAWN,
     STK_WRAP,
@@ -577,6 +591,30 @@ public:
 
   static bool classof(const IRStmt *S) {
     return S->getKind() == IRStmt::STK_SYNC;
+  }
+
+  virtual void print(llvm::raw_ostream &Out, IRPrintContext &Ctx) override;
+  virtual IRStmt *clone() override;
+};
+
+struct BreakIRStmt : IRTerminatorStmt {
+public:
+  BreakIRStmt() : IRTerminatorStmt(STK_BREAK) {}
+
+  static bool classof(const IRStmt *S) {
+    return S->getKind() == IRStmt::STK_BREAK;
+  }
+
+  virtual void print(llvm::raw_ostream &Out, IRPrintContext &Ctx) override;
+  virtual IRStmt *clone() override;
+};
+
+struct ContinueIRStmt : IRTerminatorStmt {
+public:
+  ContinueIRStmt() : IRTerminatorStmt(STK_CONTINUE) {}
+
+  static bool classof(const IRStmt *S) {
+    return S->getKind() == IRStmt::STK_CONTINUE;
   }
 
   virtual void print(llvm::raw_ostream &Out, IRPrintContext &Ctx) override;
@@ -754,7 +792,7 @@ public:
     }
   }
   void VisitIdent(IdentIRExpr *Node) {}
-  void VisitAccess(AccessIRExpr *Node) {}
+  void VisitAccess(AccessIRExpr *Node) { Visit(Node->Base.get()); }
   void VisitIndex(IndexIRExpr *Node) {
     Visit(Node->Arr.get());
     Visit(Node->Ind.get());
@@ -809,6 +847,7 @@ public:
       return;
     }
     case IRStmt::STK_SYNC:
+    case IRStmt::STK_BREAK:
     case IRStmt::STK_SPAWN_NEXT: {
       return;
     }
@@ -1085,7 +1124,12 @@ public:
 
   void VisitIdent(IdentIRExpr *Node) { CB(Node->Ident, false); }
 
-  void VisitAccess(AccessIRExpr *Node) { CB(Node->Struct, false); }
+  void VisitAccess(AccessIRExpr *Node) {
+    if (auto *IE = llvm::dyn_cast<IdentIRExpr>(Node->Base.get()))
+      CB(IE->Ident, false);
+    else
+      Visit(Node->Base.get());
+  }
 };
 /*
 struct ExprIdentifierIterator {

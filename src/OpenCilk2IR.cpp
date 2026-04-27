@@ -242,6 +242,52 @@ private:
     }
   }
 
+  void handleArrayInitList(IRVarRef VR, QualType VarTy, InitListExpr *ILE) {
+    auto *ArrTy = dyn_cast<ConstantArrayType>(VarTy->getAsArrayTypeUnsafe());
+    if (!ArrTy) {
+      PANIC("unsupported: non-constant array initializer list");
+    }
+
+    if (!ILE->isSemanticForm() && ILE->getSemanticForm()) {
+      ILE = ILE->getSemanticForm();
+    }
+
+    const auto ElemTy = ArrTy->getElementType();
+    const uint64_t ElemCount = ArrTy->getSize().getZExtValue();
+
+    for (uint64_t I = 0; I < ElemCount; ++I) {
+      Expr *Init = nullptr;
+      if (I < ILE->getNumInits()) {
+        Init = ILE->getInit(I);
+      } else if (ILE->hasArrayFiller()) {
+        Init = ILE->getArrayFiller();
+      }
+
+      IRExpr *Src = Init ? getExpr(Init) : static_cast<IRExpr *>(new IntLiteralIRExpr(0));
+      auto *Dest =
+          new IndexIRExpr(new IdentIRExpr(VR), new IntLiteralIRExpr(I), ElemTy);
+      handleAssign(Dest, Src);
+    }
+  }
+
+  void handleVarInit(IRVarRef VR, VarDecl *VD) {
+    if (!VD->hasInit()) {
+      return;
+    }
+
+    Expr *Init = VD->getInit();
+    if (auto *ILE = dyn_cast<InitListExpr>(Init->IgnoreParenImpCasts())) {
+      if (VD->getType()->isArrayType()) {
+        handleArrayInitList(VR, VD->getType(), ILE);
+        return;
+      }
+    }
+
+    auto *IE = getExpr(Init);
+    auto *CopyS = new CopyIRStmt(VR, IE);
+    pushIRStmt((IRStmt *)CopyS);
+  }
+
 public:
   Stmt2IRVisitor(IRFunction *F,
                  std::unordered_map<ASTVarRef, IRVarRef> &VarLookup,
@@ -302,7 +348,7 @@ public:
   void VisitDeclStmt(DeclStmt *Node) {
     for (auto *D : Node->decls()) {
       IRVarRef VR;
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
         Sym VDS = PutSym(VD->getName().str());
         F->Vars.push_back(IRVarDecl{
             .Type = VD->getType(),
@@ -314,17 +360,7 @@ public:
       } else {
         llvm_unreachable("Unsupported non-named decl encountered");
       }
-
-      if (Node->child_begin() != Node->child_end()) {
-        Stmt *S = *Node->child_begin();
-        if (auto *E = dyn_cast<Expr>(S)) {
-          auto *IE = getExpr(E);
-          auto *CopyS = new CopyIRStmt(VR, IE);
-          pushIRStmt((IRStmt *)CopyS);
-        } else {
-          llvm_unreachable("Unsupported: RHS of DeclStmt is not an Expr");
-        }
-      }
+      handleVarInit(VR, cast<VarDecl>(D));
     }
   }
 
@@ -483,6 +519,11 @@ public:
     CurrB = JoinB;
   }
 
+  void VisitBreakStmt(BreakStmt *Node) {
+    assert(!CurrB->Term);
+    CurrB->Term = new BreakIRStmt();
+  }
+
   void VisitCilkSyncStmt(CilkSyncStmt *Node) {
     assert(!CurrB->Term);
     if (WhileCtx == true) {
@@ -519,11 +560,18 @@ public:
   }
 
   void VisitMemberExpr(MemberExpr *Node) {
-    IdentIRExpr *IE = dyn_cast<IdentIRExpr>(getExpr(Node->getBase()));
-    assert(IE);
+    IRExpr *BaseExpr = getExpr(Node->getBase());
+    auto *BaseLval = dyn_cast<IRLvalExpr>(BaseExpr);
+    if (!BaseLval) {
+      llvm::errs() << "MemberExpr base kind: "
+                   << Node->getBase()->getStmtClassName() << "\n";
+      llvm::errs() << "MemberExpr text: ";
+      Node->printPretty(llvm::errs(), nullptr, PrintingPolicy(LangOptions()));
+      llvm::errs() << "\n";
+      PANIC("unsupported: non-lvalue base in member expression");
+    }
     auto *AE = new AccessIRExpr(
-        IE->Ident, Node->getMemberDecl()->getName().str(), Node->isArrow());
-    delete IE;
+        BaseLval, Node->getMemberDecl()->getName().str(), Node->isArrow());
     ExprStack.push_back(AE);
   }
 
@@ -540,6 +588,10 @@ public:
   void VisitStringLiteral(StringLiteral *Node) {
     auto *LE = new ASTLiteralIRExpr(Node);
     ExprStack.push_back((IRExpr *)LE);
+  }
+
+  void VisitInitListExpr(InitListExpr *Node) {
+    ExprStack.push_back(new ASTLiteralIRExpr(Node));
   }
 
   void VisitBinaryOperator(BinaryOperator *Node) {
@@ -663,12 +715,18 @@ public:
     case clang::UO_Minus:
       Op = UnopIRExpr::UNOP_NEG;
       break;
-    case clang::UO_PreDec:  // Op =  UnopIRExpr::UNOP_PREDEC; break;
-    case clang::UO_PostDec: // Op =  UnopIRExpr::UNOP_POSTDEC; break;
-    case clang::UO_PreInc:  // Op =  UnopIRExpr::UNOP_PREINC; break;
+    case clang::UO_PreDec:
+      Op = UnopIRExpr::UNOP_PREDEC;
+      break;
+    case clang::UO_PostDec:
+      Op = UnopIRExpr::UNOP_POSTDEC;
+      break;
+    case clang::UO_PreInc:
+      Op = UnopIRExpr::UNOP_PREINC;
+      break;
     case clang::UO_PostInc:
-      PANIC("TODO: need to make increment/decrement lower to a statement");
-      break; // Op = UnopIRExpr::UNOP_POSTINC; break;
+      Op = UnopIRExpr::UNOP_POSTINC;
+      break;
     default: {
       llvm::errs() << "Unknown unary operator: "
                    << Node->getOpcodeStr(Node->getOpcode()) << "\n";
@@ -766,6 +824,30 @@ public:
   }
 };
 
+// Collects direct call targets in a function body that are not Tasks/TaskCallers
+// and have a definition — these are candidates for inlining into task IR.
+class InlinableCollector
+    : public clang::RecursiveASTVisitor<InlinableCollector> {
+  std::set<FunctionDecl *> const &Tasks;
+  std::set<FunctionDecl *> const &TaskCallers;
+
+public:
+  std::vector<FunctionDecl *> Found;
+
+  InlinableCollector(std::set<FunctionDecl *> const &Tasks,
+                     std::set<FunctionDecl *> const &TaskCallers)
+      : Tasks(Tasks), TaskCallers(TaskCallers) {}
+
+  bool VisitCallExpr(CallExpr *CE) {
+    auto *Callee = CE->getDirectCallee();
+    if (!Callee || !Callee->getBody()) return true;
+    if (Tasks.count(Callee) || TaskCallers.count(Callee)) return true;
+    if (GIgnoreFns.count(Callee->getName().str())) return true;
+    Found.push_back(Callee);
+    return true;
+  }
+};
+
 class Cilk2IRVisitor : public clang::RecursiveASTVisitor<Cilk2IRVisitor> {
 private:
   clang::ASTContext *Context;
@@ -773,20 +855,22 @@ private:
   std::set<FunctionDecl *> &Tasks;
   std::set<FunctionDecl *> &TaskCallers;
   std::unordered_map<FunctionDecl *, std::vector<WhileStmt *>> &WhileWithSync;
+  std::set<FunctionDecl *> &InlinableFns;
 
 public:
   FunLookupTy FunLookup;
   explicit Cilk2IRVisitor(
       clang::ASTContext *Context, IRProgram &P, std::set<FunctionDecl *> &Tasks,
       std::set<FunctionDecl *> &TaskCallers,
-      std::unordered_map<FunctionDecl *, std::vector<WhileStmt *>>
-          &WhileWithSync)
+      std::unordered_map<FunctionDecl *, std::vector<WhileStmt *>> &WhileWithSync,
+      std::set<FunctionDecl *> &InlinableFns)
       : Context(Context), P(P), Tasks(Tasks), TaskCallers(TaskCallers),
-        WhileWithSync(WhileWithSync) {}
+        WhileWithSync(WhileWithSync), InlinableFns(InlinableFns) {}
 
   bool VisitFunctionDecl(clang::FunctionDecl *Decl) {
     if (Tasks.find(Decl) == Tasks.end() &&
-        TaskCallers.find(Decl) == TaskCallers.end()) {
+        TaskCallers.find(Decl) == TaskCallers.end() &&
+        InlinableFns.find(Decl) == InlinableFns.end()) {
       return true;
     }
     if (Decl->getBody()) {
@@ -840,6 +924,18 @@ public:
       llvm_unreachable("Expected an AST variable reference in ISpawnIRExpr");
     }
   }
+
+  void VisitCall(CallIRExpr *Node) {
+    if (auto *VarRef = std::get_if<ASTVarRef>(&Node->Fn)) {
+      if (auto *FR = dyn_cast<FunctionDecl>(*VarRef)) {
+        auto It = FunLookup.find(FR);
+        if (It != FunLookup.end())
+          Node->Fn = It->second;
+      }
+    }
+    for (auto &Arg : Node->Args)
+      Visit(Arg.get());
+  }
 };
 
 void finalizeFunction(IRFunction *F, FunLookupTy &FunLookup) {
@@ -857,15 +953,15 @@ void finalizeFunction(IRFunction *F, FunLookupTy &FunLookup) {
 
 void OpenCilk2IR(IRProgram &P, clang::ASTContext *Context, SourceManager &SM) {
   CilkAnalyzeVisitor AVisitor;
-  Cilk2IRVisitor Visitor(Context, P, AVisitor.Tasks, AVisitor.TaskCallers,
-                         AVisitor.WhileWithSync);
-  // Only visit declarations declared in the input TU
+
+  // Pass 1: identify Tasks and TaskCallers
   auto Decls = Context->getTranslationUnitDecl()->decls();
   for (auto &Decl : Decls) {
     if (!SM.isInMainFile(Decl->getLocation()))
       continue;
     AVisitor.TraverseDecl(Decl);
   }
+
   DBG {
     llvm::outs() << "tasks\n";
     for (auto *Task : AVisitor.Tasks) {
@@ -877,15 +973,47 @@ void OpenCilk2IR(IRProgram &P, clang::ASTContext *Context, SourceManager &SM) {
     }
   }
 
+  // Pass 2: transitively collect inlinable functions — functions called
+  // (not spawned) from within Tasks/TaskCallers that need to appear in the IR.
+  std::set<FunctionDecl *> InlinableFns;
+  {
+    std::vector<FunctionDecl *> Worklist;
+    std::set<FunctionDecl *> Seen;
+    auto enqueue = [&](FunctionDecl *FD) {
+      if (Seen.insert(FD).second)
+        Worklist.push_back(FD);
+    };
+    for (auto *F : AVisitor.Tasks)
+      enqueue(F);
+    for (auto *F : AVisitor.TaskCallers)
+      enqueue(F);
+
+    while (!Worklist.empty()) {
+      FunctionDecl *FD = Worklist.back();
+      Worklist.pop_back();
+      if (!FD->getBody())
+        continue;
+      InlinableCollector IC(AVisitor.Tasks, AVisitor.TaskCallers);
+      IC.TraverseDecl(FD);
+      for (auto *Callee : IC.Found) {
+        if (InlinableFns.insert(Callee).second)
+          enqueue(Callee);
+      }
+    }
+  }
+
+  DBG {
+    llvm::outs() << "inlinables\n";
+    for (auto *F : InlinableFns)
+      llvm::outs() << F->getName() << "\n";
+  }
+
+  // Pass 3: convert Tasks, TaskCallers, and InlinableFns to IR
+  Cilk2IRVisitor Visitor(Context, P, AVisitor.Tasks, AVisitor.TaskCallers,
+                         AVisitor.WhileWithSync, InlinableFns);
   for (auto &Decl : Decls) {
-    // Ignore declarations out of the main translation unit.
-    //
-    // SourceManager::isInMainFile method takes into account locations
-    // expansion like macro expansion scenario and checks expansion
-    // location instead if spelling location if required.
     if (!SM.isInMainFile(Decl->getLocation()))
       continue;
-    AVisitor.TraverseDecl(Decl);
     Visitor.TraverseDecl(Decl);
   }
 

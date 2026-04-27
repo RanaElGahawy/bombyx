@@ -93,6 +93,7 @@ public:
             std::filesystem::path OutPath(OutFilename.str());
             std::filesystem::create_directories(OutPath);
             std::string AppName = OutPath.stem().string();
+            printFullIRProgram(llvm::errs(), P, Context);
             HardCilkTarget HT(P, AppName);
             std::string DescJsonName =
                 OutFilename.str() + "/" + AppName + "_descriptors.json";
