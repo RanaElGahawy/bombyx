@@ -5,6 +5,8 @@ THREAD(original);
 int main();
 THREAD(original_exit0);
 THREAD(original_reentry0);
+THREAD(original_reentry0_afterif0);
+THREAD(original_afterif1);
 THREAD(original_cont0);
 THREAD(original_cont1);
 THREAD(main_cont0);
@@ -21,9 +23,27 @@ CLOSURE_DEF(original,
     int n;
 );
 CLOSURE_DEF(original_exit0,
+    int n;
+    int i;
     int total;
+    int a;
+    int b;
 );
 CLOSURE_DEF(original_reentry0,
+    int n;
+    int i;
+    int total;
+    int a;
+    int b;
+);
+CLOSURE_DEF(original_reentry0_afterif0,
+    int n;
+    int i;
+    int total;
+    int a;
+    int b;
+);
+CLOSURE_DEF(original_afterif1,
     int n;
     int i;
     int total;
@@ -122,7 +142,11 @@ THREAD(original) {
         }
     } else {
         auto sp2c = std::make_shared<original_exit0_closure>(largs->k);
+        sp2c->n = largs->n;
+        sp2c->i = i;
         sp2c->total = total;
+        sp2c->a = a;
+        sp2c->b = b;
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
@@ -182,15 +206,18 @@ THREAD(original_reentry0) {
         }
     } else {
         auto sp2c = std::make_shared<original_exit0_closure>(largs->k);
+        sp2c->n = largs->n;
+        sp2c->i = largs->i;
         sp2c->total = largs->total;
+        sp2c->a = largs->a;
+        sp2c->b = largs->b;
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
     return;
 }
-THREAD(original_cont0) {
-    original_cont0_closure *largs = (original_cont0_closure*)(args.get());
-    largs->total = (largs->total + largs->b);
+THREAD(original_reentry0_afterif0) {
+    original_reentry0_afterif0_closure *largs = (original_reentry0_afterif0_closure*)(args.get());
     largs->total = (largs->total + 20);
     largs->i = (largs->i + 1);
     auto sp0c = std::make_shared<original_reentry0_closure>(largs->k);
@@ -203,12 +230,37 @@ THREAD(original_cont0) {
     return;
     return;
 }
-THREAD(original_cont1) {
-    original_cont1_closure *largs = (original_cont1_closure*)(args.get());
-    largs->total = (largs->total + largs->a);
+THREAD(original_afterif1) {
+    original_afterif1_closure *largs = (original_afterif1_closure*)(args.get());
     largs->total = (largs->total + 20);
     largs->i = (largs->i + 1);
     auto sp0c = std::make_shared<original_reentry0_closure>(largs->k);
+    sp0c->n = largs->n;
+    sp0c->i = largs->i;
+    sp0c->total = largs->total;
+    sp0c->a = largs->a;
+    sp0c->b = largs->b;
+    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
+    return;
+    return;
+}
+THREAD(original_cont0) {
+    original_cont0_closure *largs = (original_cont0_closure*)(args.get());
+    largs->total = (largs->total + largs->b);
+    auto sp0c = std::make_shared<original_afterif1_closure>(largs->k);
+    sp0c->n = largs->n;
+    sp0c->i = largs->i;
+    sp0c->total = largs->total;
+    sp0c->a = largs->a;
+    sp0c->b = largs->b;
+    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
+    return;
+    return;
+}
+THREAD(original_cont1) {
+    original_cont1_closure *largs = (original_cont1_closure*)(args.get());
+    largs->total = (largs->total + largs->a);
+    auto sp0c = std::make_shared<original_afterif1_closure>(largs->k);
     sp0c->n = largs->n;
     sp0c->i = largs->i;
     sp0c->total = largs->total;
@@ -227,9 +279,7 @@ THREAD(main_cont0) {
 THREAD(original_reentry0_cont0) {
     original_reentry0_cont0_closure *largs = (original_reentry0_cont0_closure*)(args.get());
     largs->total = (largs->total + largs->b);
-    largs->total = (largs->total + 20);
-    largs->i = (largs->i + 1);
-    auto sp0c = std::make_shared<original_reentry0_closure>(largs->k);
+    auto sp0c = std::make_shared<original_reentry0_afterif0_closure>(largs->k);
     sp0c->n = largs->n;
     sp0c->i = largs->i;
     sp0c->total = largs->total;
@@ -242,9 +292,7 @@ THREAD(original_reentry0_cont0) {
 THREAD(original_reentry0_cont1) {
     original_reentry0_cont1_closure *largs = (original_reentry0_cont1_closure*)(args.get());
     largs->total = (largs->total + largs->a);
-    largs->total = (largs->total + 20);
-    largs->i = (largs->i + 1);
-    auto sp0c = std::make_shared<original_reentry0_closure>(largs->k);
+    auto sp0c = std::make_shared<original_reentry0_afterif0_closure>(largs->k);
     sp0c->n = largs->n;
     sp0c->i = largs->i;
     sp0c->total = largs->total;

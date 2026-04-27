@@ -877,3 +877,145 @@ void printFullIRProgram(llvm::raw_ostream &Out, IRProgram &P,
 
   Out << "===============================\n";
 }
+
+void dumpIRProgramJSON(llvm::raw_ostream &Out, IRProgram &P,
+                       clang::ASTContext &Context) {
+  IRPrintContext Ctx{
+      .ASTCtx = Context, .NewlineSymbol = " ", .GraphVizEscapeChars = false};
+
+  // Helper to escape strings for JSON
+  auto escapeJSON = [](const std::string &S) -> std::string {
+    std::string Result;
+    for (char C : S) {
+      switch (C) {
+      case '"':
+        Result += "\\\"";
+        break;
+      case '\\':
+        Result += "\\\\";
+        break;
+      case '\n':
+        Result += "\\n";
+        break;
+      case '\r':
+        Result += "\\r";
+        break;
+      case '\t':
+        Result += "\\t";
+        break;
+      default:
+        Result += C;
+        break;
+      }
+    }
+    return Result;
+  };
+
+  // Helper to print an IR node to a string
+  auto printToString = [&](auto *Node) -> std::string {
+    std::string Buf;
+    llvm::raw_string_ostream SS(Buf);
+    Node->print(SS, Ctx);
+    SS.flush();
+    return escapeJSON(Buf);
+  };
+
+  Out << "{\n  \"functions\": [\n";
+
+  bool firstFunc = true;
+  for (auto &FPtr : P) {
+    IRFunction *F = FPtr.get();
+    if (!firstFunc)
+      Out << ",\n";
+    firstFunc = false;
+
+    Out << "    {\n";
+    Out << "      \"name\": \"" << escapeJSON(F->getName()) << "\",\n";
+
+    // Vars
+    Out << "      \"vars\": [\n";
+    bool firstVar = true;
+    for (auto &V : F->Vars) {
+      if (!firstVar)
+        Out << ",\n";
+      firstVar = false;
+
+      std::string Kind;
+      switch (V.DeclLoc) {
+      case IRVarDecl::ARG:
+        Kind = "arg";
+        break;
+      case IRVarDecl::LOCAL:
+        Kind = "local";
+        break;
+      default:
+        Kind = "var";
+        break;
+      }
+      Out << "        {\"name\": \"" << escapeJSON(GetSym(V.Name))
+          << "\", \"kind\": \"" << Kind << "\"}";
+    }
+    Out << "\n      ],\n";
+
+    // Blocks
+    Out << "      \"blocks\": [\n";
+    bool firstBlock = true;
+    for (auto &BPtr : *F) {
+      IRBasicBlock *B = BPtr.get();
+      if (!firstBlock)
+        Out << ",\n";
+      firstBlock = false;
+
+      Out << "        {\n";
+      Out << "          \"id\": \"B" << B->getInd() << "\",\n";
+
+      // Preds
+      Out << "          \"preds\": [";
+      bool firstPred = true;
+      B->iteratePreds([&](IRBasicBlock *Pred) {
+        if (!firstPred)
+          Out << ", ";
+        Out << "\"B" << Pred->getInd() << "\"";
+        firstPred = false;
+      });
+      Out << "],\n";
+
+      // Instructions
+      Out << "          \"instrs\": [";
+      bool firstInstr = true;
+      for (auto &S : *B) {
+        if (!firstInstr)
+          Out << ", ";
+        Out << "\"" << printToString(S.get()) << "\"";
+        firstInstr = false;
+      }
+      Out << "],\n";
+
+      // Terminator
+      Out << "          \"terminator\": ";
+      if (B->Term)
+        Out << "\"" << printToString(B->Term) << "\"";
+      else
+        Out << "null";
+      Out << ",\n";
+
+      // Succs
+      Out << "          \"succs\": [";
+      bool firstSucc = true;
+      for (auto *Succ : B->Succs) {
+        if (!firstSucc)
+          Out << ", ";
+        Out << "\"B" << Succ->getInd() << "\"";
+        firstSucc = false;
+      }
+      Out << "]\n";
+
+      Out << "        }";
+    }
+    Out << "\n      ]\n";
+
+    Out << "    }";
+  }
+
+  Out << "\n  ]\n}\n";
+}

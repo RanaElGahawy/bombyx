@@ -12,6 +12,31 @@ using namespace llvm;
 // Restructure Loops with Syncs    //
 ////////////////////////////////////
 
+static IRStmt *buildTailSpawnStmt(IRFunction *DstF,
+                                  const std::vector<IRVarRef> &CallerVars) {
+  std::vector<IRExpr *> Args;
+
+  for (auto &DstV : DstF->Vars) {
+    if (DstV.DeclLoc != IRVarDecl::ARG)
+      continue;
+
+    IRVarRef Match = nullptr;
+    for (auto *CV : CallerVars) {
+      if (CV->Name == DstV.Name && CV->Type == DstV.Type) {
+        Match = CV;
+        break;
+      }
+    }
+
+    assert(Match && "Missing argument when building tail spawn");
+    Args.push_back(new IdentIRExpr(Match));
+  }
+
+  auto *Spawn = new ISpawnIRExpr(DstF, Args);
+
+  return new ExprWrapIRStmt(Spawn);
+}
+
 // Check if any block reachable from Entry (within the loop body, i.e. not
 // crossing LoopHeader or AfterB) contains a SyncIRStmt terminator.
 static bool loopBodyContainsSync(IRBasicBlock *BodyEntry,
@@ -153,10 +178,10 @@ static IRStmt *buildSpawnStmt(IRFunction *DstF,
         break;
       }
     }
-    if (!found) {
-      // Fallback: use zero
-      Args.push_back(new IntLiteralIRExpr(0));
-    }
+    // if (!found) {
+    //   // Fallback: use zero
+    //   Args.push_back(new IntLiteralIRExpr(0));
+    // }
   }
   auto *Spawn = new ISpawnIRExpr(DstF, Args);
   return new ExprWrapIRStmt(Spawn);
@@ -288,7 +313,7 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   auto AfterBlocks = collectAfterLoopBlocks(AfterB, LoopHeader, &F);
 
   std::unordered_map<IRVarRef, IRVarRef> ExitRemap;
-  auto ExitNeeded = computeNeededVars(&F, AfterBlocks);
+  auto ExitNeeded = getAllVars(&F);
   std::string ExitName = F.getName() + "_exit" + std::to_string(LoopCounter);
   auto *ExitF = createTaskFunction(F.getParent(), ExitName, F.getReturnType(),
                                    ExitNeeded, ExitRemap);
@@ -331,6 +356,7 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   // "then" branch: clone the loop body blocks into ReentryF.
   // We need to clone (not move) because the original body stays in F
   // for the first iteration.
+  // TODO: remove this for the duplicate code, only generate the new function
   auto *ReentryBodyEntry = ReentryF->createBlock();
   ReentryEntry->Succs.insert(ReentryBodyEntry);
 
@@ -386,24 +412,47 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
       auto *CB = BlockCloneMap[OB];
       // Add spawn to ReentryF at the end of CB
       auto ReentryVars = getArgVars(ReentryF);
-      CB->pushStmtBack(buildSpawnStmt(ReentryF, ReentryVars));
+      CB->pushStmtBack(buildTailSpawnStmt(ReentryF, ReentryVars));
       if (!CB->Term) {
         CB->Term = new ReturnIRStmt(nullptr);
       }
     }
   }
 
-  // "else" branch: spawn fn_exit
+  {
+    std::set<IRBasicBlock *> HandledBackEdges;
+    for (auto *OB : OrigBodyBlocks) {
+      if (OB->Succs.contains(LoopHeader))
+        HandledBackEdges.insert(BlockCloneMap[OB]);
+    }
+    auto ReentryVars = getArgVars(ReentryF);
+    for (auto *OB : OrigBodyBlocks) {
+      auto *CB = BlockCloneMap[OB];
+      if (HandledBackEdges.count(CB))
+        continue;
+      if (!CB->Succs.empty())
+        continue;
+      if (CB->Term) {
+        auto *RS = dyn_cast<ReturnIRStmt>(CB->Term);
+        if (!RS)
+          continue;
+        if (RS->RetVal)
+          continue;
+        delete CB->Term;
+        CB->Term = nullptr;
+      }
+      CB->pushStmtBack(buildTailSpawnStmt(ReentryF, ReentryVars));
+      CB->Term = new ReturnIRStmt(nullptr);
+    }
+  }
   auto *ReentryElseB = ReentryF->createBlock();
   ReentryEntry->Succs.insert(ReentryElseB);
   {
     auto ReentryVars = getArgVars(ReentryF);
-    ReentryElseB->pushStmtBack(buildSpawnStmt(ExitF, ReentryVars));
+    ReentryElseB->pushStmtBack(buildTailSpawnStmt(ExitF, ReentryVars));
     ReentryElseB->Term = new ReturnIRStmt(nullptr);
   }
 
-  // === Step 4: Modify original function ===
-  // Convert LoopIRStmt → IfIRStmt
   auto *OrigCond = LoopTerm->Cond.release();
   delete LoopHeader->Term;
   LoopHeader->Term = new IfIRStmt(OrigCond);
@@ -416,34 +465,93 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   LoopHeader->Succs.insert(OrigElseB);
   {
     auto FVars = getAllVars(&F);
-    OrigElseB->pushStmtBack(buildSpawnStmt(ExitF, FVars));
+    OrigElseB->pushStmtBack(buildTailSpawnStmt(ExitF, FVars));
     OrigElseB->Term = new ReturnIRStmt(nullptr);
   }
 
-  // Replace back-edges in original body with spawns to fn_loop_reentry
   auto BackBlocks = findLoopBackBlocks(BodyB, LoopHeader, AfterB, &F);
   for (auto *BB : BackBlocks) {
     BB->Succs.remove(LoopHeader);
     auto FVars = getAllVars(&F);
-    BB->pushStmtBack(buildSpawnStmt(ReentryF, FVars));
+    BB->pushStmtBack(buildTailSpawnStmt(ReentryF, FVars));
     if (!BB->Term) {
       BB->Term = new ReturnIRStmt(nullptr);
     }
   }
 
-  // === Step 5: Clean up stale successor edges ===
-  // After moving blocks to fn_exit/fn_reentry, some blocks in F
-  // may still have successor edges pointing to moved blocks.
-  // Remove these to prevent later passes from following dangling edges.
-  for (auto &B : F) {
-    std::vector<IRBasicBlock *> ToRemove;
-    for (auto *Succ : B->Succs) {
-      if (Succ->getParent() != &F) {
-        ToRemove.push_back(Succ);
+  {
+    std::vector<IRBasicBlock *> AllBodyBlocks;
+    std::set<IRBasicBlock *> Seen;
+    std::set<IRBasicBlock *> Boundaries;
+    Boundaries.insert(LoopHeader);
+    Boundaries.insert(AfterB);
+    collectBlocks(BodyB, Boundaries, AllBodyBlocks, Seen, &F);
+
+    std::set<IRBasicBlock *> BackBlockSet(BackBlocks.begin(), BackBlocks.end());
+    auto FVars = getAllVars(&F);
+
+    for (auto *B : AllBodyBlocks) {
+      if (BackBlockSet.count(B))
+        continue;
+      if (!B->Succs.empty())
+        continue;
+      if (B->Term) {
+        if (B->Term) {
+          auto *RS = dyn_cast<ReturnIRStmt>(B->Term);
+          if (!RS)
+            continue;
+          if (RS->RetVal)
+            continue;
+          delete B->Term;
+          B->Term = nullptr;
+        }
       }
+      B->pushStmtBack(buildTailSpawnStmt(ReentryF, FVars));
+      B->Term = new ReturnIRStmt(nullptr);
     }
-    for (auto *S : ToRemove) {
-      B->Succs.remove(S);
+  }
+
+  {
+    std::vector<IRBasicBlock *> Snapshot;
+    for (auto &Bp : F) {
+      Snapshot.push_back(Bp.get());
+    }
+    for (auto *B : Snapshot) {
+      std::vector<IRBasicBlock *> Stale;
+      for (auto *Succ : B->Succs) {
+        if (Succ->getParent() != &F) {
+          Stale.push_back(Succ);
+        }
+      }
+      for (auto *S : Stale) {
+        IRFunction *DstF = S->getParent();
+        auto FVars = getAllVars(&F);
+
+        IRBasicBlock *Trampoline = F.createBlock();
+        Trampoline->pushStmtBack(buildTailSpawnStmt(DstF, FVars));
+        Trampoline->Term = new ReturnIRStmt(nullptr);
+
+        size_t slot = 0;
+        bool found = false;
+        for (auto *Succ : B->Succs) {
+          if (Succ == S) {
+            found = true;
+            break;
+          }
+          slot++;
+        }
+        assert(found);
+
+        if (slot == 0 && B->Succs.size() == 2) {
+          IRBasicBlock *Other = B->Succs[1];
+          B->Succs.clear();
+          B->Succs.insert(Trampoline);
+          B->Succs.insert(Other);
+        } else {
+          B->Succs.remove(S);
+          B->Succs.insert(Trampoline);
+        }
+      }
     }
   }
 
@@ -451,30 +559,380 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   return NewFunctions;
 }
 
-// Remove successor edges that point to blocks in a different function.
-// This can happen after restructuring moves blocks between functions.
-static void cleanStaleSuccessorEdges(IRProgram &P) {
-  for (auto &F : P) {
-    for (auto &B : *F) {
-      std::vector<IRBasicBlock *> ToRemove;
+//////////////////////////////////////
+// Restructure Ifs with Syncs      //
+////////////////////////////////////
+
+// Compute the set of blocks reachable from Start within F (forward walk),
+// excluding Start itself.
+static void forwardReachable(IRBasicBlock *Start, IRFunction *F,
+                             std::set<IRBasicBlock *> &Out) {
+  std::vector<IRBasicBlock *> WL;
+  for (auto *S : Start->Succs) {
+    WL.push_back(S);
+  }
+  while (!WL.empty()) {
+    auto *B = WL.back();
+    WL.pop_back();
+    if (Out.count(B))
+      continue;
+    if (B->getParent() != F)
+      continue;
+    Out.insert(B);
+    for (auto *S : B->Succs)
+      WL.push_back(S);
+  }
+}
+
+static IRBasicBlock *findIfMerge(IRBasicBlock *IfHeader, IRFunction *F) {
+  if (IfHeader->Succs.size() < 2)
+    return nullptr;
+  IRBasicBlock *ThenB = IfHeader->Succs[0];
+  IRBasicBlock *ElseB = IfHeader->Succs[1];
+
+  std::set<IRBasicBlock *> ThenReach;
+  ThenReach.insert(ThenB);
+  forwardReachable(ThenB, F, ThenReach);
+
+  // BFS from ElseB, return the first block already in ThenReach.
+  std::vector<IRBasicBlock *> WL;
+  std::set<IRBasicBlock *> Seen;
+  WL.push_back(ElseB);
+  while (!WL.empty()) {
+    auto *B = WL.back();
+    WL.pop_back();
+    if (Seen.count(B))
+      continue;
+    if (B->getParent() != F)
+      continue;
+    Seen.insert(B);
+    if (ThenReach.count(B))
+      return B;
+    for (auto *S : B->Succs)
+      WL.push_back(S);
+  }
+  return nullptr;
+}
+
+static bool branchContainsSync(IRBasicBlock *Start, IRBasicBlock *Stop,
+                               IRFunction *F) {
+  std::vector<IRBasicBlock *> WL;
+  std::set<IRBasicBlock *> Seen;
+  WL.push_back(Start);
+  while (!WL.empty()) {
+    auto *B = WL.back();
+    WL.pop_back();
+    if (B == Stop || Seen.count(B))
+      continue;
+    if (B->getParent() != F)
+      continue;
+    Seen.insert(B);
+    if (B->Term && isa<SyncIRStmt>(B->Term))
+      return true;
+    for (auto *S : B->Succs)
+      WL.push_back(S);
+  }
+  return false;
+}
+
+static void collectBranchBlocks(IRBasicBlock *Start, IRBasicBlock *Merge,
+                                IRFunction *F,
+                                std::vector<IRBasicBlock *> &Out) {
+  std::set<IRBasicBlock *> Seen;
+  std::vector<IRBasicBlock *> WL;
+  WL.push_back(Start);
+  while (!WL.empty()) {
+    auto *B = WL.back();
+    WL.pop_back();
+    if (B == Merge || Seen.count(B))
+      continue;
+    if (B->getParent() != F)
+      continue;
+    Seen.insert(B);
+    Out.push_back(B);
+    for (auto *S : B->Succs)
+      WL.push_back(S);
+  }
+}
+
+static std::vector<IRBasicBlock *>
+findBranchExitBlocks(const std::vector<IRBasicBlock *> &BranchBlocks,
+                     IRBasicBlock *Merge) {
+  std::vector<IRBasicBlock *> Result;
+  for (auto *B : BranchBlocks) {
+    if (B->Succs.contains(Merge)) {
+      Result.push_back(B);
+    }
+  }
+  return Result;
+}
+
+// Restructure the first if-with-sync found in F.
+static std::vector<IRFunction *> restructureIfsWithSync(IRFunction &F) {
+  static int IfCounter = 0;
+  std::vector<IRFunction *> NewFunctions;
+
+  // Step 1: find an if-with-sync.
+  IRBasicBlock *IfHeader = nullptr;
+  IRBasicBlock *Merge = nullptr;
+  for (auto &B : F) {
+    if (!(B->Term && isa<IfIRStmt>(B->Term)))
+      continue;
+    if (B->Succs.size() < 2)
+      continue;
+    IRBasicBlock *ThenB = B->Succs[0];
+    IRBasicBlock *ElseB = B->Succs[1];
+
+    IRBasicBlock *M = findIfMerge(B.get(), &F);
+    if (!M)
+      continue; // branches don't merge (both return); nothing to extract.
+
+    bool thenHasSync = branchContainsSync(ThenB, M, &F);
+    bool elseHasSync = branchContainsSync(ElseB, M, &F);
+    if (!thenHasSync && !elseHasSync)
+      continue;
+
+    if (M == B.get())
+      continue;
+
+    IfHeader = B.get();
+    Merge = M;
+    break;
+  }
+
+  if (!IfHeader)
+    return NewFunctions;
+
+  INFO {
+    llvm::outs() << "Restructuring if-with-sync in " << F.getName() << " at BB"
+                 << IfHeader->getInd() << " (merge=BB" << Merge->getInd()
+                 << ")\n";
+  }
+
+  // Step 2: collect after-if blocks (merge and everything past it).
+  std::vector<IRBasicBlock *> AfterIfBlocks;
+  {
+    std::set<IRBasicBlock *> Boundaries; // none; stop only at function boundary
+    std::set<IRBasicBlock *> Seen;
+    collectBlocks(Merge, Boundaries, AfterIfBlocks, Seen, &F);
+  }
+
+  // Step 3: find the exit points of each branch (blocks that currently
+  // flow to Merge).
+  std::vector<IRBasicBlock *> ThenBranchBlocks;
+  std::vector<IRBasicBlock *> ElseBranchBlocks;
+  collectBranchBlocks(IfHeader->Succs[0], Merge, &F, ThenBranchBlocks);
+  collectBranchBlocks(IfHeader->Succs[1], Merge, &F, ElseBranchBlocks);
+
+  auto ThenExits = findBranchExitBlocks(ThenBranchBlocks, Merge);
+  auto ElseExits = findBranchExitBlocks(ElseBranchBlocks, Merge);
+
+  // Special case: ThenB or ElseB is itself the merge (i.e. one branch
+  // is "empty" and the if has no effective else body). Then IfHeader
+  // itself is the "exit" for that branch. We need the IfHeader's Succs
+  // updated directly.
+  bool ThenIsMerge = (IfHeader->Succs[0] == Merge);
+  bool ElseIsMerge = (IfHeader->Succs[1] == Merge);
+
+  // Step 4: create fn_afterif_k with all of F's vars as args.
+  auto AllVars = getAllVars(&F);
+  std::unordered_map<IRVarRef, IRVarRef> AfterIfRemap;
+  std::string AfterIfName =
+      F.getName() + "_afterif" + std::to_string(IfCounter);
+  auto *AfterIfF = createTaskFunction(F.getParent(), AfterIfName,
+                                      F.getReturnType(), AllVars, AfterIfRemap);
+  NewFunctions.push_back(AfterIfF);
+
+  // Move after-if blocks to AfterIfF and remap vars.
+  moveAndRemapBlocks(AfterIfBlocks, &F, AfterIfF, AfterIfRemap);
+
+  // Step 5: redirect each branch's exit to spawn AfterIfF + return.
+  auto FVars = getAllVars(&F);
+  auto makeAfterIfStub = [&]() {
+    auto *Stub = F.createBlock();
+    Stub->pushStmtBack(buildTailSpawnStmt(AfterIfF, FVars));
+    Stub->Term = new ReturnIRStmt(nullptr);
+    return Stub;
+  };
+
+  auto redirectExit = [&](IRBasicBlock *B) {
+    B->Succs.remove(Merge);
+
+    if (B->Term && isa<SyncIRStmt>(B->Term)) {
+      B->Succs.insert(makeAfterIfStub());
+      return;
+    }
+
+    B->pushStmtBack(buildTailSpawnStmt(AfterIfF, FVars));
+    if (!B->Term) {
+      B->Term = new ReturnIRStmt(nullptr);
+    }
+  };
+
+  for (auto *B : ThenExits)
+    redirectExit(B);
+  for (auto *B : ElseExits)
+    redirectExit(B);
+
+  auto redirectDeadEnds = [&](const std::vector<IRBasicBlock *> &BranchBlocks,
+                              const std::vector<IRBasicBlock *> &Exits) {
+    std::set<IRBasicBlock *> AlreadyHandled(Exits.begin(), Exits.end());
+    for (auto *B : BranchBlocks) {
+      // llvm::errs() << "  checking BB" << B->getInd()
+      //              << " succs=" << B->Succs.size()
+      //              << " term=" << (B->Term ? B->Term->getKind() : -1) <<
+      //              "\n";
+      if (AlreadyHandled.count(B))
+        continue;
+      if (!B->Succs.empty())
+        continue;
+
+      if (B->Term) {
+        if (isa<SyncIRStmt>(B->Term)) {
+          B->Succs.insert(makeAfterIfStub());
+          continue;
+        }
+
+        auto *RS = dyn_cast<ReturnIRStmt>(B->Term);
+        if (!RS)
+          continue;
+        if (RS->RetVal)
+          continue;
+
+        delete B->Term;
+        B->Term = nullptr;
+      }
+      B->pushStmtBack(buildTailSpawnStmt(AfterIfF, FVars));
+      B->Term = new ReturnIRStmt(nullptr);
+    }
+  };
+  redirectDeadEnds(ThenBranchBlocks, ThenExits);
+  redirectDeadEnds(ElseBranchBlocks, ElseExits);
+
+  // Handle the "empty branch" case: branch target IS the merge.
+
+  if (ThenIsMerge) {
+    auto *StubB = F.createBlock();
+    IRBasicBlock *ElseTarget = nullptr;
+    for (auto *S : IfHeader->Succs) {
+      if (S != Merge) {
+        ElseTarget = S;
+        break;
+      }
+    }
+    while (!IfHeader->Succs.empty()) {
+      IfHeader->Succs.remove(*IfHeader->Succs.begin());
+    }
+    IfHeader->Succs.insert(StubB);
+    if (ElseTarget)
+      IfHeader->Succs.insert(ElseTarget);
+    StubB->pushStmtBack(buildTailSpawnStmt(AfterIfF, FVars));
+    StubB->Term = new ReturnIRStmt(nullptr);
+  }
+  if (ElseIsMerge) {
+    auto *StubB = F.createBlock();
+    IfHeader->Succs.remove(Merge);
+    IfHeader->Succs.insert(StubB);
+    StubB->pushStmtBack(buildTailSpawnStmt(AfterIfF, FVars));
+    StubB->Term = new ReturnIRStmt(nullptr);
+  }
+
+  // Step 6: clean up any stale successor edges in F.
+  {
+    std::vector<IRBasicBlock *> Snapshot;
+    for (auto &Bp : F) {
+      Snapshot.push_back(Bp.get());
+    }
+    for (auto *B : Snapshot) {
+      std::vector<IRBasicBlock *> Stale;
       for (auto *Succ : B->Succs) {
-        if (Succ->getParent() != F.get()) {
-          ToRemove.push_back(Succ);
+        if (Succ->getParent() != &F)
+          Stale.push_back(Succ);
+      }
+      for (auto *S : Stale) {
+        IRFunction *DstF = S->getParent();
+        auto FVarsLocal = getAllVars(&F);
+
+        IRBasicBlock *Trampoline = F.createBlock();
+        Trampoline->pushStmtBack(buildTailSpawnStmt(DstF, FVarsLocal));
+        Trampoline->Term = new ReturnIRStmt(nullptr);
+
+        size_t slot = 0;
+        bool found = false;
+        for (auto *Succ : B->Succs) {
+          if (Succ == S) {
+            found = true;
+            break;
+          }
+          slot++;
+        }
+        assert(found);
+
+        if (slot == 0 && B->Succs.size() == 2) {
+          IRBasicBlock *Other = B->Succs[1];
+          B->Succs.clear();
+          B->Succs.insert(Trampoline);
+          B->Succs.insert(Other);
+        } else {
+          B->Succs.remove(S);
+          B->Succs.insert(Trampoline);
         }
       }
-      for (auto *S : ToRemove) {
-        B->Succs.remove(S);
+    }
+  }
+
+  IfCounter++;
+  return NewFunctions;
+}
+
+// Redirect successor edges that point to blocks in a different function.
+static void cleanStaleSuccessorEdges(IRProgram &P) {
+  for (auto &F : P) {
+    std::vector<IRBasicBlock *> Snapshot;
+    for (auto &Bp : *F) {
+      Snapshot.push_back(Bp.get());
+    }
+    for (auto *B : Snapshot) {
+      std::vector<IRBasicBlock *> Stale;
+      for (auto *Succ : B->Succs) {
+        if (Succ->getParent() != F.get()) {
+          Stale.push_back(Succ);
+        }
+      }
+      for (auto *S : Stale) {
+        IRFunction *DstF = S->getParent();
+        auto FVars = getAllVars(F.get());
+
+        IRBasicBlock *Trampoline = F->createBlock();
+        Trampoline->pushStmtBack(buildTailSpawnStmt(DstF, FVars));
+        Trampoline->Term = new ReturnIRStmt(nullptr);
+
+        size_t slot = 0;
+        bool found = false;
+        for (auto *Succ : B->Succs) {
+          if (Succ == S) {
+            found = true;
+            break;
+          }
+          slot++;
+        }
+        assert(found);
+
+        if (slot == 0 && B->Succs.size() == 2) {
+          IRBasicBlock *Other = B->Succs[1];
+          B->Succs.clear();
+          B->Succs.insert(Trampoline);
+          B->Succs.insert(Other);
+        } else {
+          B->Succs.remove(S);
+          B->Succs.insert(Trampoline);
+        }
       }
     }
   }
 }
 
 void FlattenIR(IRProgram &P) {
-  // Restructure loops whose bodies contain syncs into separate task
-  // functions (fn_reentry, fn_exit) with explicit spawn/return instead
-  // of back-edges. Process iteratively: restructuring creates new
-  // functions that may themselves contain loops with syncs (e.g.,
-  // fn_loop_reentry for nested loops).
   std::vector<IRFunction *> WorkList;
   for (auto &F : P) {
     WorkList.push_back(F.get());
@@ -483,19 +941,23 @@ void FlattenIR(IRProgram &P) {
   while (!WorkList.empty()) {
     auto *F = WorkList.back();
     WorkList.pop_back();
-    auto NewFuncs = restructureLoopsWithSync(*F);
-    if (!NewFuncs.empty()) {
-      // This function had a loop restructured. It may have more
-      // loops-with-syncs, so re-add it to the worklist.
+
+    auto LoopNewFuncs = restructureLoopsWithSync(*F);
+    if (!LoopNewFuncs.empty()) {
       WorkList.push_back(F);
+      for (auto *NF : LoopNewFuncs)
+        WorkList.push_back(NF);
+      continue;
     }
-    for (auto *NF : NewFuncs) {
-      WorkList.push_back(NF);
+
+    auto IfNewFuncs = restructureIfsWithSync(*F);
+    if (!IfNewFuncs.empty()) {
+      WorkList.push_back(F);
+      for (auto *NF : IfNewFuncs)
+        WorkList.push_back(NF);
+      continue;
     }
   }
 
-  // Clean up ALL stale successor edges across ALL functions.
-  // After restructuring, some functions may have successor edges pointing
-  // to blocks that were moved to other functions.
   cleanStaleSuccessorEdges(P);
 }

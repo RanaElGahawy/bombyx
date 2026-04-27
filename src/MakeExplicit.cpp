@@ -252,8 +252,77 @@ public:
             assert(succBb);
             assert(PathLookup.find(succBb) != PathLookup.end());
             assert(PathLookup[succBb] > 0);
-            delete B->Term;
+
             SpawnNextDest = ContFuns[PathLookup[succBb] - 1].F;
+
+            succBb->iteratePreds([&](IRBasicBlock *Pred) {
+              if (Pred == B)
+                return;
+
+              if (PathLookup.find(Pred) == PathLookup.end())
+                return;
+
+              if (PathLookup[Pred] >= PathLookup[succBb])
+                return;
+
+              if (!Pred->Term ||
+                  (isa<ReturnIRStmt>(Pred->Term) &&
+                   !dyn_cast<ReturnIRStmt>(Pred->Term)->RetVal)) {
+                if (Pred->Term) {
+                  delete Pred->Term;
+                  Pred->Term = nullptr;
+                }
+                Pred->Succs.remove(succBb);
+                Pred->Term = new SpawnNextIRStmt(SpawnNextDest);
+                return;
+              }
+
+              if (auto *RS = dyn_cast<ReturnIRStmt>(Pred->Term)) {
+                if (RS->RetVal) {
+                  Pred->Succs.remove(succBb);
+                  return;
+                }
+              }
+
+              if (isa<SyncIRStmt>(Pred->Term)) {
+                return;
+              }
+
+              IRBasicBlock *Trampoline = Pred->getParent()->createBlock();
+              Trampoline->Term = new SpawnNextIRStmt(SpawnNextDest);
+
+              size_t slot = 0;
+              bool found = false;
+              for (auto *S : Pred->Succs) {
+                if (S == succBb) {
+                  found = true;
+                  break;
+                }
+                slot++;
+              }
+              assert(found);
+
+              if (slot == 0 && Pred->Succs.size() == 2) {
+                IRBasicBlock *Other = Pred->Succs[1];
+                Pred->Succs.clear();
+                Pred->Succs.insert(Trampoline);
+                Pred->Succs.insert(Other);
+              } else {
+                Pred->Succs.remove(succBb);
+                Pred->Succs.insert(Trampoline);
+              }
+
+              int PredPath = PathLookup[Pred];
+              PathLookup[Trampoline] = PredPath;
+
+              if (PredPath == p && p > 0 &&
+                  Trampoline->getParent() != ContFuns[p - 1].F) {
+                Trampoline->getParent()->moveBlock(Trampoline,
+                                                   ContFuns[p - 1].F);
+              }
+            });
+
+            delete B->Term;
             B->Term = new SpawnNextIRStmt(SpawnNextDest);
             B->Succs.clear();
           }
@@ -263,9 +332,6 @@ public:
           auto &CF = ContFuns[p - 1];
           auto RemapCB = [&](auto &VR, bool lhs) {
             if (Remap.find(VR) == Remap.end()) {
-              // Variable not found in remap — it was referenced in a
-              // statement (e.g., a spawn to fn_exit/fn_reentry) but
-              // not detected by analyzePath. Add it as an ARG.
               CF.F->Vars.push_back(IRVarDecl{
                   .Type = VR->Type,
                   .Name = VR->Name,

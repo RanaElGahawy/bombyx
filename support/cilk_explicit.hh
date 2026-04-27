@@ -1,12 +1,11 @@
 #pragma once
 #include <assert.h>
+#include <cilk/cilk.h>
 #include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <type_traits>
 #include <vector>
-
-#include <cilk/cilk.h>
 
 struct closure;
 class spawn_write_dest;
@@ -21,9 +20,11 @@ public:
   closure *cls;
   void *ret;
 
+  cont() : mySN(nullptr), cls(nullptr), ret(nullptr) {}
   void init(spawn_write_dest *mySN1, closure *cls1) {
     mySN = mySN1;
     cls = cls1;
+    ret = nullptr;
   }
 
   spawn_write_dest *getSN() const { return mySN; };
@@ -32,7 +33,6 @@ public:
 class closure {
 public:
   cont k;
-  int jc;
 
   virtual task_fn_t getTask() { return nullptr; };
   closure(cont k) : k(k) {}
@@ -40,13 +40,13 @@ public:
 
 class spawn_write_dest {
 public:
-  std::vector<closure *> toSpawn;
-  int *jc;
+  std::vector<std::shared_ptr<closure>> toSpawn;
+  int jc;
 
-  void put_spawn(closure *C) {
-    toSpawn.push_back(C);
-    (*jc)++;
-  }
+  spawn_write_dest() : jc(0) {}
+
+  void child_done() { jc--; }
+  void put_spawn() { jc++; }
 };
 
 void taskSpawn(task_fn_t fn, std::shared_ptr<closure> cls) { fn(cls); }
@@ -55,55 +55,51 @@ template <class C> class spawn_next : public spawn_write_dest {
 public:
   std::shared_ptr<C> cls;
 
-  spawn_next(C incls) {
+  spawn_next(const C &incls) {
     static_assert(std::is_base_of<closure, C>::value,
                   "spawn next parameter should be derived from closure.");
     C *cls_temp = new C(incls);
-    cls_temp->jc = 0;
-    jc = &(cls_temp->jc);
     cls = std::shared_ptr<C>(cls_temp);
   }
 
   ~spawn_next() {
-    for (closure *spawnCls : toSpawn) {
-      cilk_spawn taskSpawn(spawnCls->getTask(),
-                           std::shared_ptr<closure>(spawnCls));
+
+    for (auto &sp : toSpawn) {
+      cilk_spawn taskSpawn(sp->getTask(), sp);
     }
     cilk_sync;
-    assert(cls->jc == 0);
-    // for (closure *spawnCls : toSpawn) {
-    //     delete spawnCls;
-    // }
+
     cilk_spawn taskSpawn(cls->getTask(), cls);
   }
 };
 
 template <class C> class spawn {
 public:
-  spawn(C cls) {
+  spawn(const C &cls) {
     static_assert(std::is_base_of<closure, C>::value,
-                  "spawn next parameter should be derived from closure.");
-    if (cls.k.ret) {
-      assert((cls.k).getSN());
-      C *newCls = new C(cls);
-      ((cls.k).getSN())->put_spawn((closure *)newCls);
-    } else {
+                  "spawn parameter must derive from closure");
+
+    auto *sn = cls.k.getSN();
+    if (!sn) {
       printf("unsupported\n");
       exit(1);
     }
+
+    auto newCls = std::make_shared<C>(cls);
+    sn->put_spawn();
+    sn->toSpawn.push_back(newCls);
   }
 };
 
 #define SEND_ARGUMENT(k, n)                                                    \
   {                                                                            \
-    if (k.ret) {                                                               \
+    if ((k).ret)                                                               \
       *((typeof(n) *)((k).ret)) = (n);                                         \
-    }                                                                          \
-    if (k.cls) {                                                               \
-      ((k).cls)->jc--;                                                         \
-    }                                                                          \
+    if ((k).getSN())                                                           \
+      (k).getSN()->child_done();                                               \
     return;                                                                    \
   }
+
 #define SN_BIND(sn, k, field)                                                  \
   {                                                                            \
     assert(sn.cls);                                                            \
@@ -120,6 +116,7 @@ public:
   {                                                                            \
     assert(sn.cls);                                                            \
     (k)->init(&sn, sn.cls.get());                                              \
+    (k)->ret = nullptr;                                                        \
   }
 #define THREAD(fn_name) void fn_name(std::shared_ptr<closure> args)
 #define CLOSURE_DEF(name, ...)                                                 \

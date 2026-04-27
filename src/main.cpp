@@ -63,14 +63,24 @@ public:
     }
 
     std::vector<PassFn> Passes{
-        [&](IRProgram &P) -> void { OpenCilk2IR(P, &Context, SM); },
+        [&](IRProgram &P) -> void {
+          OpenCilk2IR(P, &Context, SM);
+          // printFullIRProgram(llvm::outs(), P, Context);
+        },
         [&](IRProgram &P) -> void {
           FlattenIR(P);
-          printFullIRProgram(llvm::outs(), P, Context);
+          // printFullIRProgram(llvm::outs(), P, Context);
+          // dumpIRProgramJSON(llvm::outs(), P, Context);
         },
         [&](IRProgram &P) -> void { DAE(P); },
-        [&](IRProgram &P) -> void { MakeExplicit(P); },
-        [&](IRProgram &P) -> void { CountSpawns(P, Context); },
+        [&](IRProgram &P) -> void {
+          MakeExplicit(P);
+          // dumpIRProgramJSON(llvm::outs(), P, Context);
+        },
+        [&](IRProgram &P) -> void {
+          CountSpawns(P, Context);
+          // dumpIRProgramJSON(llvm::outs(), P, Context);
+        },
         [&](IRProgram &P) -> void {
           switch (GOpts.Target) {
           case ConvertOpts::TG_CILK1EMU: {

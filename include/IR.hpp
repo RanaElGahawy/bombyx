@@ -1129,3 +1129,6 @@ static void exprPrintId(IRPrintContext *C, llvm::raw_ostream &Out, IRExpr *E) {
 
 void printFullIRProgram(llvm::raw_ostream &Out, IRProgram &P,
                         clang::ASTContext &Context);
+
+void dumpIRProgramJSON(llvm::raw_ostream &Out, IRProgram &P,
+                       clang::ASTContext &Context);

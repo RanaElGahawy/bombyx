@@ -15,7 +15,11 @@ CLOSURE_DEF(fun,
     int rounds;
 );
 CLOSURE_DEF(fun_exit0,
+    int rounds;
+    int iter;
     int total;
+    int a;
+    int b;
 );
 CLOSURE_DEF(fun_reentry0,
     int rounds;
@@ -82,7 +86,11 @@ THREAD(fun) {
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<fun_exit0_closure>(largs->k);
+        sp2c->rounds = largs->rounds;
+        sp2c->iter = iter;
         sp2c->total = total;
+        sp2c->a = a;
+        sp2c->b = b;
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
@@ -129,7 +137,11 @@ THREAD(fun_reentry0) {
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<fun_exit0_closure>(largs->k);
+        sp2c->rounds = largs->rounds;
+        sp2c->iter = largs->iter;
         sp2c->total = largs->total;
+        sp2c->a = largs->a;
+        sp2c->b = largs->b;
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }

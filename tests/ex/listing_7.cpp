@@ -1,6 +1,7 @@
 #include "cilk_explicit.hh"
 THREAD(fun);
 int main();
+THREAD(fun_afterif0);
 THREAD(fun_cont0);
 THREAD(fun_cont1);
 THREAD(main_cont0);
@@ -8,12 +9,21 @@ THREAD(main_cont0);
 CLOSURE_DEF(fun,
     long n;
 );
+CLOSURE_DEF(fun_afterif0,
+    long n;
+    long w;
+    long x;
+    long y;
+    long f;
+    long h;
+);
 CLOSURE_DEF(fun_cont0,
     long n;
     long x;
     long y;
 );
 CLOSURE_DEF(fun_cont1,
+    long n;
     long x;
     long y;
     long f;
@@ -32,6 +42,8 @@ THREAD(fun) {
     long w;
     long x;
     long y;
+    long f;
+    long h;
     fun_closure *largs = (fun_closure*)(args.get());
     w = 14;
     if ((largs->n > 2)) {
@@ -52,10 +64,15 @@ THREAD(fun) {
         ((fun_cont0_closure*)SN_fun_cont0.cls.get())->n = largs->n;
         // Original sync was here
     } else {
-        w = (w + 40);
-        w = (w * 10);
-        w = (w - 6);
-        SEND_ARGUMENT(largs->k, w);
+        auto sp2c = std::make_shared<fun_afterif0_closure>(largs->k);
+        sp2c->n = largs->n;
+        sp2c->w = w;
+        sp2c->x = x;
+        sp2c->y = y;
+        sp2c->f = f;
+        sp2c->h = h;
+        cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
+        return;
     }
     return;
 }
@@ -71,6 +88,14 @@ int main() {
 
     // Original sync was here
     return 0;
+}
+THREAD(fun_afterif0) {
+    fun_afterif0_closure *largs = (fun_afterif0_closure*)(args.get());
+    largs->w = (largs->w + 40);
+    largs->w = (largs->w * 10);
+    largs->w = (largs->w - 6);
+    SEND_ARGUMENT(largs->k, largs->w);
+    return;
 }
 THREAD(fun_cont0) {
     long f;
@@ -92,6 +117,7 @@ THREAD(fun_cont0) {
 
     ((fun_cont1_closure*)SN_fun_cont1.cls.get())->y = largs->y;
     ((fun_cont1_closure*)SN_fun_cont1.cls.get())->x = largs->x;
+    ((fun_cont1_closure*)SN_fun_cont1.cls.get())->n = largs->n;
     // Original sync was here
     return;
 }
@@ -101,10 +127,15 @@ THREAD(fun_cont1) {
     largs->x = (3 + largs->x);
     largs->y = (largs->y + 6);
     w = (((largs->x + largs->y) + largs->f) + largs->h);
-    w = (w + 40);
-    w = (w * 10);
-    w = (w - 6);
-    SEND_ARGUMENT(largs->k, w);
+    auto sp0c = std::make_shared<fun_afterif0_closure>(largs->k);
+    sp0c->n = largs->n;
+    sp0c->w = w;
+    sp0c->x = largs->x;
+    sp0c->y = largs->y;
+    sp0c->f = largs->f;
+    sp0c->h = largs->h;
+    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
+    return;
     return;
 }
 THREAD(main_cont0) {

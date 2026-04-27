@@ -13,8 +13,8 @@
         "-t",
         "cilk1emu",
         "-v",
-        "Bombyx_OpenCilk_Examples/pageRank/main.cpp",
-        "${workspaceFolder}/build/pageRank"
+        "${workspaceFolder}/tests/im/test_1.cpp",
+        "${workspaceFolder}/tests/ex/test_1.cpp"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",

@@ -6,7 +6,7 @@
 !/support/
 !/tests/
 !/include/
-
+!/visualize
 # Allow root files
 !CMakeLists.txt
 !.gitignore
@@ -17,37 +17,10 @@
 /tests/ex/*
 /tests/im/*
 
-# Re-allow only what you want to keep
+# # Re-allow only what you want to keep
 !/tests/ex/*.cpp
-!/tests/ex/*.txt
+!/tests/ex/*.c
 !/tests/ex/*.sh
 !/tests/im/*.cpp
-!/tests/im/*.txt
 !/tests/im/*.sh
 
-# But ignore generated output txt files again
-/tests/ex/*_out.txt
-/tests/im/*_out.txt
-/tests/ex/out.txt
-/tests/im/out.txt
-
-# Ignore compiled binaries with no extension
-/tests/ex/fib
-/tests/ex/listing_7
-/tests/ex/listing_8
-/tests/ex/listing_9
-/tests/ex/listing_10
-/tests/ex/listing_11
-/tests/ex/listing_13
-/tests/ex/nq
-/tests/ex/nqueens
-
-/tests/im/fib
-/tests/im/listing_7
-/tests/im/listing_8
-/tests/im/listing_9
-/tests/im/listing_10
-/tests/im/listing_11
-/tests/im/listing_13
-/tests/im/nq
-/tests/im/nqueens
