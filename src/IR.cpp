@@ -5,6 +5,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include <deque>
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/StmtCilk.h>
@@ -86,7 +87,8 @@ void AccessIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
 
 IRExpr *AccessIRExpr::clone() {
   assert(Base);
-  return new AccessIRExpr(llvm::dyn_cast<IRLvalExpr>(Base->clone()), Field, Arrow);
+  return new AccessIRExpr(llvm::dyn_cast<IRLvalExpr>(Base->clone()), Field,
+                          Arrow);
 }
 
 void IdentIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
@@ -250,20 +252,21 @@ IRExpr *CastIRExpr::clone() { return new CastIRExpr(CastType, E->clone()); }
 void LoopIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   if (Inc || Init) {
     Out << "for (";
+    if (Init) {
+      Init->print(Out, Ctx);
+    }
+    Out << ";";
+    Ctx.ExprCB(&Ctx, Out, Cond.get());
+    Out << ";";
+    if (Inc) {
+      Inc->print(Out, Ctx);
+    }
+    Out << ")";
   } else {
     Out << "while (";
+    Ctx.ExprCB(&Ctx, Out, Cond.get());
+    Out << ")";
   }
-
-  if (Init) {
-    Init->print(Out, Ctx);
-  }
-  Out << ";";
-  Ctx.ExprCB(&Ctx, Out, Cond.get());
-  Out << ";";
-  if (Inc) {
-    Inc->print(Out, Ctx);
-  }
-  Out << ")";
 }
 
 IRStmt *LoopIRStmt::clone() {
@@ -736,51 +739,73 @@ IRBasicBlock *FindJoin(IRBasicBlock *Left, IRBasicBlock *Right) {
 }
 
 static IRBasicBlock *FindIfJoin(IRBasicBlock *ThenB, IRBasicBlock *ElseB) {
+  // Mark all blocks reachable from ThenB.
   std::unordered_map<IRBasicBlock *, bool> ThenReachable;
-  std::unordered_map<IRBasicBlock *, bool> ElseReachable;
-  std::vector<IRBasicBlock *> WorkList;
-
-  WorkList.push_back(ThenB);
-  while (!WorkList.empty()) {
-    auto *B = WorkList.back();
-    WorkList.pop_back();
+  std::vector<IRBasicBlock *> WL;
+  WL.push_back(ThenB);
+  while (!WL.empty()) {
+    auto *B = WL.back();
+    WL.pop_back();
     if (ThenReachable.find(B) != ThenReachable.end())
       continue;
     ThenReachable[B] = true;
-    for (auto *Succ : B->Succs) {
-      WorkList.push_back(Succ);
-    }
+    for (auto *S : B->Succs)
+      WL.push_back(S);
   }
 
-  WorkList.push_back(ElseB);
-  while (!WorkList.empty()) {
-    auto *B = WorkList.back();
-    WorkList.pop_back();
+  // Mark all blocks reachable from ElseB.
+  std::unordered_map<IRBasicBlock *, bool> ElseReachable;
+  WL.push_back(ElseB);
+  while (!WL.empty()) {
+    auto *B = WL.back();
+    WL.pop_back();
     if (ElseReachable.find(B) != ElseReachable.end())
       continue;
     ElseReachable[B] = true;
-    for (auto *Succ : B->Succs) {
-      WorkList.push_back(Succ);
+    for (auto *S : B->Succs)
+      WL.push_back(S);
+  }
+
+  std::unordered_map<IRBasicBlock *, bool> BfsSeen;
+  std::deque<IRBasicBlock *> Q;
+  Q.push_back(ThenB);
+  BfsSeen[ThenB] = true;
+  while (!Q.empty()) {
+    auto *B = Q.front();
+    Q.pop_front();
+    if (B != ThenB && B != ElseB &&
+        ElseReachable.find(B) != ElseReachable.end()) {
+      return B;
+    }
+    if (B == ElseB && ThenReachable.find(B) != ThenReachable.end()) {
+      return B; // ElseB is the merge: ThenB falls through to ElseB.
+    }
+    for (auto *S : B->Succs) {
+      if (BfsSeen.find(S) == BfsSeen.end()) {
+        BfsSeen[S] = true;
+        Q.push_back(S);
+      }
     }
   }
 
-  for (auto &BPtr : *(ThenB->getParent())) {
-    auto *B = BPtr.get();
-    if (B == ThenB || B == ElseB)
-      continue;
-    if (ThenReachable.find(B) == ThenReachable.end() ||
-        ElseReachable.find(B) == ElseReachable.end()) {
-      continue;
-    }
-
-    bool PredFromThen = false;
-    bool PredFromElse = false;
-    B->iteratePreds([&](IRBasicBlock *Pred) {
-      PredFromThen |= (ThenReachable.find(Pred) != ThenReachable.end());
-      PredFromElse |= (ElseReachable.find(Pred) != ElseReachable.end());
-    });
-    if (PredFromThen && PredFromElse)
+  // Nothing found via ThenB → BFS from ElseB.
+  Q.clear();
+  BfsSeen.clear();
+  Q.push_back(ElseB);
+  BfsSeen[ElseB] = true;
+  while (!Q.empty()) {
+    auto *B = Q.front();
+    Q.pop_front();
+    if (B != ThenB && B != ElseB &&
+        ThenReachable.find(B) != ThenReachable.end()) {
       return B;
+    }
+    for (auto *S : B->Succs) {
+      if (BfsSeen.find(S) == BfsSeen.end()) {
+        BfsSeen[S] = true;
+        Q.push_back(S);
+      }
+    }
   }
 
   return nullptr;

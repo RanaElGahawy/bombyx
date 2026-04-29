@@ -28,13 +28,15 @@ void printFunDecl(IRFunction *F, llvm::raw_ostream &out, clang::ASTContext &C) {
     out << F->Info.RootFun->getReturnType().getAsString();
     out << " " << F->Info.RootFun->getName() << "(";
     bool first = true;
-    for (auto &ArgDecl : F->Info.RootFun->parameters()) {
-      if (!first) {
+    for (auto &Var : F->Vars) {
+      if (Var.DeclLoc != IRVarDecl::ARG)
+        continue;
+      if (!first)
         out << ", ";
-      } else {
+      else
         first = false;
-      }
-      ArgDecl->print(out, 0);
+      Var.Type.print(out, C.getPrintingPolicy());
+      out << " " << GetSym(Var.Name);
     }
     out << ")";
   } else {
@@ -423,19 +425,10 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
                        .IdentCB = [&](llvm::raw_ostream &Out, IRVarRef VR) {
                          switch (VR->DeclLoc) {
                          case IRVarDecl::ARG: {
-
-                           std::string name = GetSym(VR->Name);
-
-                           if (!F->Info.IsTask) {
-                             if (!name.empty() && name.back() == '0') {
-                               name.pop_back();
-                             }
-                           }
-
                            if (F->Info.IsTask) {
-                             Out << "largs->" << name;
+                             Out << "largs->" << GetSym(VR->Name);
                            } else {
-                             Out << name;
+                             Out << GetSym(VR->Name);
                            }
                            break;
                          }

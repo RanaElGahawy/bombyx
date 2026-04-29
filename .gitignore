@@ -23,4 +23,5 @@
 !/tests/ex/*.sh
 !/tests/im/*.cpp
 !/tests/im/*.sh
+!/tests/im/*.c
 
