@@ -4,7 +4,7 @@ set -e  # stop on first error (remove if you want all tests to continue)
 
 CLANG="xcrun /opt/opencilk/bin/clang++"
 FLAGS="-fopencilk -Wno-backend-plugin -Wno-parentheses-equality"
-BASE="/Users/ranaelgahawy/Desktop/bombyx/tests"
+BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "=== Running OpenCilk tests ==="
 
@@ -14,7 +14,7 @@ run_test () {
   echo ">> $NAME"
 
   $CLANG $NAME.cpp $FLAGS -o $NAME
-  ./$NAME > ${NAME}.txt || echo "⚠️ $NAME crashed"
+  ./$NAME > ${NAME}.txt
 
   diff "$BASE/ex/${NAME}.txt" "$BASE/im/${NAME}.txt" || echo "❌ $NAME output differs"
 }
