@@ -239,40 +239,18 @@ collectAfterLoopBlocks(IRBasicBlock *AfterB, IRBasicBlock *LoopHeader,
   return Result;
 }
 
-// Find all blocks that would loop back to the LoopHeader.
-// These are blocks in the loop body whose Succs contain LoopHeader.
-static std::vector<IRBasicBlock *> findLoopBackBlocks(IRBasicBlock *BodyEntry,
-                                                      IRBasicBlock *LoopHeader,
-                                                      IRBasicBlock *AfterB,
-                                                      IRFunction *F) {
-  std::vector<IRBasicBlock *> AllBody;
-  std::set<IRBasicBlock *> Seen;
-  std::set<IRBasicBlock *> Boundaries;
-  Boundaries.insert(LoopHeader);
-  Boundaries.insert(AfterB);
-  collectBlocks(BodyEntry, Boundaries, AllBody, Seen, F);
-
-  std::vector<IRBasicBlock *> BackBlocks;
-  for (auto *B : AllBody) {
-    if (B->Succs.contains(LoopHeader)) {
-      BackBlocks.push_back(B);
-    }
-  }
-  return BackBlocks;
-}
-
 // The main restructuring pass for a single function.
 // Finds the OUTERMOST loop with sync and restructures it.
 // Returns a list of newly created functions that also need processing.
 // Only processes ONE loop per call — the caller iterates until no more remain.
 //
 // We process OUTERMOST first so that:
-// 1. The outer while's back-edge blocks are replaced with spawns to
-//    fn_reentry BEFORE inner loops are restructured.
-// 2. The cloned body in fn_reentry still has inner loops as LoopIRStmt,
-//    which get restructured in subsequent iterations.
-// 3. Both the original and cloned inner loops get their own independent
-//    fn_exit/fn_reentry chains
+// 1. The outer while's body is moved into fn_reentry BEFORE inner loops
+//    are restructured; subsequent iterations of the worklist then see those
+//    inner loops inside fn_reentry and handle them there.
+// 2. Each loop's body lives in exactly one place (its own fn_reentry),
+//    so no code is duplicated and inner loops are restructured exactly
+//    once, in the function that now owns them.
 static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   static int LoopCounter = 0;
   std::vector<IRFunction *> NewFunctions;
@@ -323,9 +301,8 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   moveAndRemapBlocks(AfterBlocks, &F, ExitF, ExitRemap);
 
   // === Step 3: Create fn_loop_reentry (loop re-entry) ===
-  // fn_loop_reentry re-checks the condition.
-  // If true: re-enters the loop body (same structure as original).
-  // If false: spawns fn_exit.
+  // fn_loop_reentry checks the condition and runs ALL iterations of
+  // the loop.
   //
   // We need ALL vars from the parent function because the loop body
   // and all continuations may need them.
@@ -336,31 +313,15 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
                                       F.getReturnType(), AllVars, ReentryRemap);
   NewFunctions.push_back(ReentryF);
 
-  // Build the reentry function body: clone the loop condition check
-  // and the entire loop body structure.
-  auto *ReentryEntry = ReentryF->createBlock();
-
-  // Clone the loop condition
   auto *LoopTerm = dyn_cast<LoopIRStmt>(LoopHeader->Term);
   assert(LoopTerm);
-  auto *ReentryCondExpr = LoopTerm->Cond->clone();
-  // Remap the condition to reentry vars
+  auto *ReentryCondExpr = LoopTerm->Cond.release();
   ExprIdentifierVisitor _rc(ReentryCondExpr, [&](auto &VR, bool lhs) {
     if (ReentryRemap.find(VR) != ReentryRemap.end())
       VR = ReentryRemap[VR];
   });
 
-  auto *ReentryIf = new IfIRStmt(ReentryCondExpr);
-  ReentryEntry->Term = (IRTerminatorStmt *)ReentryIf;
-
-  // "then" branch: clone the loop body blocks into ReentryF.
-  // We need to clone (not move) because the original body stays in F
-  // for the first iteration.
-  // TODO: remove this for the duplicate code, only generate the new function
-  auto *ReentryBodyEntry = ReentryF->createBlock();
-  ReentryEntry->Succs.insert(ReentryBodyEntry);
-
-  // Clone all loop body blocks
+  auto *ReentryEntry = ReentryF->createBlock();
   std::vector<IRBasicBlock *> OrigBodyBlocks;
   {
     std::set<IRBasicBlock *> Boundaries;
@@ -370,145 +331,60 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
     collectBlocks(BodyB, Boundaries, OrigBodyBlocks, Seen, &F);
   }
 
-  // Create cloned blocks in ReentryF and set up mapping
-  std::unordered_map<IRBasicBlock *, IRBasicBlock *> BlockCloneMap;
-  BlockCloneMap[BodyB] = ReentryBodyEntry;
+  moveAndRemapBlocks(OrigBodyBlocks, &F, ReentryF, ReentryRemap);
 
-  for (auto *OB : OrigBodyBlocks) {
-    if (OB == BodyB) {
-      // BodyB maps to ReentryBodyEntry (already created)
-      OB->clone(ReentryBodyEntry);
+  auto *ReentryIf = new IfIRStmt(ReentryCondExpr);
+  ReentryEntry->Term = (IRTerminatorStmt *)ReentryIf;
+  ReentryEntry->Succs.insert(BodyB);
+
+  auto ReentryArgVars = getArgVars(ReentryF);
+  std::set<IRBasicBlock *> HandledBackEdges;
+  for (auto *B : OrigBodyBlocks) {
+    if (B->Succs.contains(LoopHeader)) {
+      B->Succs.remove(LoopHeader);
+      B->pushStmtBack(buildTailSpawnStmt(ReentryF, ReentryArgVars));
+      if (!B->Term) {
+        B->Term = new ReturnIRStmt(nullptr);
+      }
+      HandledBackEdges.insert(B);
+    }
+  }
+  for (auto *B : OrigBodyBlocks) {
+    if (HandledBackEdges.count(B))
       continue;
-    }
-    auto *CB = ReentryF->createBlock();
-    OB->clone(CB);
-    BlockCloneMap[OB] = CB;
-  }
-
-  // Fix successors in cloned blocks
-  for (auto *OB : OrigBodyBlocks) {
-    auto *CB = BlockCloneMap[OB];
-    for (auto *Succ : OB->Succs) {
-      if (Succ == LoopHeader) {
-        // Back-edge: don't add (will be replaced with spawn to ReentryF)
+    if (!B->Succs.empty())
+      continue;
+    if (B->Term) {
+      auto *RS = dyn_cast<ReturnIRStmt>(B->Term);
+      if (!RS)
         continue;
-      }
-      if (BlockCloneMap.count(Succ)) {
-        CB->Succs.insert(BlockCloneMap[Succ]);
-      }
-      // Succs pointing to AfterB will be handled below
-    }
-  }
-
-  // Remap vars in cloned blocks
-  for (auto *OB : OrigBodyBlocks) {
-    auto *CB = BlockCloneMap[OB];
-    remapBlock(CB, ReentryRemap);
-  }
-
-  // Handle back-edges in cloned blocks: replace with spawn to ReentryF
-  for (auto *OB : OrigBodyBlocks) {
-    if (OB->Succs.contains(LoopHeader)) {
-      auto *CB = BlockCloneMap[OB];
-      // Add spawn to ReentryF at the end of CB
-      auto ReentryVars = getArgVars(ReentryF);
-      CB->pushStmtBack(buildTailSpawnStmt(ReentryF, ReentryVars));
-      if (!CB->Term) {
-        CB->Term = new ReturnIRStmt(nullptr);
-      }
-    }
-  }
-
-  {
-    std::set<IRBasicBlock *> HandledBackEdges;
-    for (auto *OB : OrigBodyBlocks) {
-      if (OB->Succs.contains(LoopHeader))
-        HandledBackEdges.insert(BlockCloneMap[OB]);
-    }
-    auto ReentryVars = getArgVars(ReentryF);
-    for (auto *OB : OrigBodyBlocks) {
-      auto *CB = BlockCloneMap[OB];
-      if (HandledBackEdges.count(CB))
+      if (RS->RetVal)
         continue;
-      if (!CB->Succs.empty())
-        continue;
-      if (CB->Term) {
-        auto *RS = dyn_cast<ReturnIRStmt>(CB->Term);
-        if (!RS)
-          continue;
-        if (RS->RetVal)
-          continue;
-        delete CB->Term;
-        CB->Term = nullptr;
-      }
-      CB->pushStmtBack(buildTailSpawnStmt(ReentryF, ReentryVars));
-      CB->Term = new ReturnIRStmt(nullptr);
+      delete B->Term;
+      B->Term = nullptr;
     }
+    B->pushStmtBack(buildTailSpawnStmt(ReentryF, ReentryArgVars));
+    B->Term = new ReturnIRStmt(nullptr);
   }
+
+  // "else" successor of ReentryEntry: spawn ExitF to leave the loop.
   auto *ReentryElseB = ReentryF->createBlock();
   ReentryEntry->Succs.insert(ReentryElseB);
   {
-    auto ReentryVars = getArgVars(ReentryF);
-    ReentryElseB->pushStmtBack(buildTailSpawnStmt(ExitF, ReentryVars));
+    ReentryElseB->pushStmtBack(buildTailSpawnStmt(ExitF, ReentryArgVars));
     ReentryElseB->Term = new ReturnIRStmt(nullptr);
   }
 
-  auto *OrigCond = LoopTerm->Cond.release();
+  // === Step 4: Replace LoopHeader in F with a stub that spawns ReentryF
+  while (!LoopHeader->Succs.empty()) {
+    LoopHeader->Succs.remove(*LoopHeader->Succs.begin());
+  }
   delete LoopHeader->Term;
-  LoopHeader->Term = new IfIRStmt(OrigCond);
-
-  // The "then" successor (BodyB) stays in F.
-  // The "else" successor was AfterB, but AfterB has been moved to ExitF.
-  // Replace with a new block that spawns fn_exit.
-  LoopHeader->Succs.remove(AfterB);
-  auto *OrigElseB = F.createBlock();
-  LoopHeader->Succs.insert(OrigElseB);
+  LoopHeader->Term = nullptr;
   {
     auto FVars = getAllVars(&F);
-    OrigElseB->pushStmtBack(buildTailSpawnStmt(ExitF, FVars));
-    OrigElseB->Term = new ReturnIRStmt(nullptr);
-  }
-
-  auto BackBlocks = findLoopBackBlocks(BodyB, LoopHeader, AfterB, &F);
-  for (auto *BB : BackBlocks) {
-    BB->Succs.remove(LoopHeader);
-    auto FVars = getAllVars(&F);
-    BB->pushStmtBack(buildTailSpawnStmt(ReentryF, FVars));
-    if (!BB->Term) {
-      BB->Term = new ReturnIRStmt(nullptr);
-    }
-  }
-
-  {
-    std::vector<IRBasicBlock *> AllBodyBlocks;
-    std::set<IRBasicBlock *> Seen;
-    std::set<IRBasicBlock *> Boundaries;
-    Boundaries.insert(LoopHeader);
-    Boundaries.insert(AfterB);
-    collectBlocks(BodyB, Boundaries, AllBodyBlocks, Seen, &F);
-
-    std::set<IRBasicBlock *> BackBlockSet(BackBlocks.begin(), BackBlocks.end());
-    auto FVars = getAllVars(&F);
-
-    for (auto *B : AllBodyBlocks) {
-      if (BackBlockSet.count(B))
-        continue;
-      if (!B->Succs.empty())
-        continue;
-      if (B->Term) {
-        if (B->Term) {
-          auto *RS = dyn_cast<ReturnIRStmt>(B->Term);
-          if (!RS)
-            continue;
-          if (RS->RetVal)
-            continue;
-          delete B->Term;
-          B->Term = nullptr;
-        }
-      }
-      B->pushStmtBack(buildTailSpawnStmt(ReentryF, FVars));
-      B->Term = new ReturnIRStmt(nullptr);
-    }
+    LoopHeader->pushStmtBack(buildTailSpawnStmt(ReentryF, FVars));
+    LoopHeader->Term = new ReturnIRStmt(nullptr);
   }
 
   {

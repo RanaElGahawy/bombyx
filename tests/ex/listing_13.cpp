@@ -6,9 +6,6 @@ int main();
 THREAD(original_exit0);
 THREAD(original_reentry0);
 THREAD(original_reentry0_afterif0);
-THREAD(original_afterif1);
-THREAD(original_cont0);
-THREAD(original_cont1);
 THREAD(main_cont0);
 THREAD(original_reentry0_cont0);
 THREAD(original_reentry0_cont1);
@@ -37,27 +34,6 @@ CLOSURE_DEF(original_reentry0,
     int b;
 );
 CLOSURE_DEF(original_reentry0_afterif0,
-    int n;
-    int i;
-    int total;
-    int a;
-    int b;
-);
-CLOSURE_DEF(original_afterif1,
-    int n;
-    int i;
-    int total;
-    int a;
-    int b;
-);
-CLOSURE_DEF(original_cont0,
-    int n;
-    int i;
-    int total;
-    int a;
-    int b;
-);
-CLOSURE_DEF(original_cont1,
     int n;
     int i;
     int total;
@@ -109,47 +85,14 @@ THREAD(original) {
     i = 0;
     total = 0;
     total = (total + 5);
-    if ((i < largs->n)) {
-        total = (total + 10);
-        if (((i % 2) == 0)) {
-            total = (total + 1);
-            original_cont1_closure SN_original_cont1c(largs->k);
-            spawn_next<original_cont1_closure> SN_original_cont1(SN_original_cont1c);
-            cont sp0k;
-            SN_BIND(SN_original_cont1, &sp0k, a);
-            f_closure sp0c(sp0k);
-            sp0c.x = i;
-            spawn<f_closure> sp0(sp0c);
-
-            ((original_cont1_closure*)SN_original_cont1.cls.get())->total = total;
-            ((original_cont1_closure*)SN_original_cont1.cls.get())->i = i;
-            ((original_cont1_closure*)SN_original_cont1.cls.get())->n = largs->n;
-            // Original sync was here
-        } else {
-            total = (total + 2);
-            original_cont0_closure SN_original_cont0c(largs->k);
-            spawn_next<original_cont0_closure> SN_original_cont0(SN_original_cont0c);
-            cont sp1k;
-            SN_BIND(SN_original_cont0, &sp1k, b);
-            g_closure sp1c(sp1k);
-            sp1c.x0 = i;
-            spawn<g_closure> sp1(sp1c);
-
-            ((original_cont0_closure*)SN_original_cont0.cls.get())->total = total;
-            ((original_cont0_closure*)SN_original_cont0.cls.get())->i = i;
-            ((original_cont0_closure*)SN_original_cont0.cls.get())->n = largs->n;
-            // Original sync was here
-        }
-    } else {
-        auto sp2c = std::make_shared<original_exit0_closure>(largs->k);
-        sp2c->n = largs->n;
-        sp2c->i = i;
-        sp2c->total = total;
-        sp2c->a = a;
-        sp2c->b = b;
-        cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
-        return;
-    }
+    auto sp0c = std::make_shared<original_reentry0_closure>(largs->k);
+    sp0c->n = largs->n;
+    sp0c->i = i;
+    sp0c->total = total;
+    sp0c->a = a;
+    sp0c->b = b;
+    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
+    return;
     return;
 }
 int main() {
@@ -221,46 +164,6 @@ THREAD(original_reentry0_afterif0) {
     largs->total = (largs->total + 20);
     largs->i = (largs->i + 1);
     auto sp0c = std::make_shared<original_reentry0_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->i = largs->i;
-    sp0c->total = largs->total;
-    sp0c->a = largs->a;
-    sp0c->b = largs->b;
-    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
-    return;
-}
-THREAD(original_afterif1) {
-    original_afterif1_closure *largs = (original_afterif1_closure*)(args.get());
-    largs->total = (largs->total + 20);
-    largs->i = (largs->i + 1);
-    auto sp0c = std::make_shared<original_reentry0_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->i = largs->i;
-    sp0c->total = largs->total;
-    sp0c->a = largs->a;
-    sp0c->b = largs->b;
-    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
-    return;
-}
-THREAD(original_cont0) {
-    original_cont0_closure *largs = (original_cont0_closure*)(args.get());
-    largs->total = (largs->total + largs->b);
-    auto sp0c = std::make_shared<original_afterif1_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->i = largs->i;
-    sp0c->total = largs->total;
-    sp0c->a = largs->a;
-    sp0c->b = largs->b;
-    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
-    return;
-}
-THREAD(original_cont1) {
-    original_cont1_closure *largs = (original_cont1_closure*)(args.get());
-    largs->total = (largs->total + largs->a);
-    auto sp0c = std::make_shared<original_afterif1_closure>(largs->k);
     sp0c->n = largs->n;
     sp0c->i = largs->i;
     sp0c->total = largs->total;

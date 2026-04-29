@@ -166,9 +166,9 @@ THREAD(fun_cont0) {
     spawn<fun_closure> sp1(sp1c);
 
     ((fun_cont1_closure*)SN_fun_cont1.cls.get())->z = largs->z;
+    ((fun_cont1_closure*)SN_fun_cont1.cls.get())->n0 = largs->n0;
     ((fun_cont1_closure*)SN_fun_cont1.cls.get())->y = largs->y;
     ((fun_cont1_closure*)SN_fun_cont1.cls.get())->x = largs->x;
-    ((fun_cont1_closure*)SN_fun_cont1.cls.get())->n0 = largs->n0;
     // Original sync was here
     return;
 }

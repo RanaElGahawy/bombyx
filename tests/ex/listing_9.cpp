@@ -4,7 +4,6 @@ THREAD(fun);
 int main();
 THREAD(fun_exit0);
 THREAD(fun_reentry0);
-THREAD(fun_cont0);
 THREAD(main_cont0);
 THREAD(fun_reentry0_cont0);
 
@@ -22,13 +21,6 @@ CLOSURE_DEF(fun_exit0,
     int b;
 );
 CLOSURE_DEF(fun_reentry0,
-    int rounds;
-    int iter;
-    int total;
-    int a;
-    int b;
-);
-CLOSURE_DEF(fun_cont0,
     int rounds;
     int iter;
     int total;
@@ -65,35 +57,14 @@ THREAD(fun) {
     fun_closure *largs = (fun_closure*)(args.get());
     iter = 0;
     total = 0;
-    if ((iter < largs->rounds)) {
-        fun_cont0_closure SN_fun_cont0c(largs->k);
-        spawn_next<fun_cont0_closure> SN_fun_cont0(SN_fun_cont0c);
-        cont sp0k;
-        SN_BIND(SN_fun_cont0, &sp0k, a);
-        worker_closure sp0c(sp0k);
-        sp0c.x = iter;
-        spawn<worker_closure> sp0(sp0c);
-
-        cont sp1k;
-        SN_BIND(SN_fun_cont0, &sp1k, b);
-        worker_closure sp1c(sp1k);
-        sp1c.x = (iter + 10);
-        spawn<worker_closure> sp1(sp1c);
-
-        ((fun_cont0_closure*)SN_fun_cont0.cls.get())->total = total;
-        ((fun_cont0_closure*)SN_fun_cont0.cls.get())->iter = iter;
-        ((fun_cont0_closure*)SN_fun_cont0.cls.get())->rounds = largs->rounds;
-        // Original sync was here
-    } else {
-        auto sp2c = std::make_shared<fun_exit0_closure>(largs->k);
-        sp2c->rounds = largs->rounds;
-        sp2c->iter = iter;
-        sp2c->total = total;
-        sp2c->a = a;
-        sp2c->b = b;
-        cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
-        return;
-    }
+    auto sp0c = std::make_shared<fun_reentry0_closure>(largs->k);
+    sp0c->rounds = largs->rounds;
+    sp0c->iter = iter;
+    sp0c->total = total;
+    sp0c->a = a;
+    sp0c->b = b;
+    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
+    return;
     return;
 }
 int main() {
@@ -131,8 +102,8 @@ THREAD(fun_reentry0) {
         sp1c.x = (largs->iter + 10);
         spawn<worker_closure> sp1(sp1c);
 
-        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->total = largs->total;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->iter = largs->iter;
+        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->total = largs->total;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->rounds = largs->rounds;
         // Original sync was here
     } else {
@@ -145,21 +116,6 @@ THREAD(fun_reentry0) {
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
-    return;
-}
-THREAD(fun_cont0) {
-    fun_cont0_closure *largs = (fun_cont0_closure*)(args.get());
-    largs->total = (largs->total + largs->a);
-    largs->total = (largs->total + largs->b);
-    largs->iter = (largs->iter + 1);
-    auto sp0c = std::make_shared<fun_reentry0_closure>(largs->k);
-    sp0c->rounds = largs->rounds;
-    sp0c->iter = largs->iter;
-    sp0c->total = largs->total;
-    sp0c->a = largs->a;
-    sp0c->b = largs->b;
-    cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }
 THREAD(main_cont0) {

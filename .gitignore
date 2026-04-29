@@ -17,6 +17,9 @@
 /tests/ex/*
 /tests/im/*
 
+/tests/ex copy
+/visualize/ir.json
+/visualize/output.png
 # # Re-allow only what you want to keep
 !/tests/ex/*.cpp
 !/tests/ex/*.c
