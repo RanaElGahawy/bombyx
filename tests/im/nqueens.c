@@ -132,14 +132,14 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-  gettimeofday(&t2, 0);
-  unsigned long long runtime_ms = (todval(&t2) - todval(&t1)) / 1000;
+  // gettimeofday(&t2, 0);
+  // unsigned long long runtime_ms = (todval(&t2) - todval(&t1)) / 1000;
   // printf("%f\n", runtime_ms / 1000.0);
 
   if (res == 0) {
-    fprintf(stderr, "No solution found.\n");
+    printf("No solution found.\n");
   } else {
-    fprintf(stderr, "Total number of solutions : %d\n", res);
+    printf("Total number of solutions : %d\n", res);
   }
 
   return 0;

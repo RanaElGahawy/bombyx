@@ -9,6 +9,7 @@
 #include "clang/AST/ASTFwd.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprCilk.h"
 #include "clang/AST/OperationKinds.h"
 #include "clang/AST/Stmt.h"
@@ -263,7 +264,8 @@ private:
         Init = ILE->getArrayFiller();
       }
 
-      IRExpr *Src = Init ? getExpr(Init) : static_cast<IRExpr *>(new IntLiteralIRExpr(0));
+      IRExpr *Src =
+          Init ? getExpr(Init) : static_cast<IRExpr *>(new IntLiteralIRExpr(0));
       auto *Dest =
           new IndexIRExpr(new IdentIRExpr(VR), new IntLiteralIRExpr(I), ElemTy);
       handleAssign(Dest, Src);
@@ -275,17 +277,36 @@ private:
       return;
     }
 
-    Expr *Init = VD->getInit();
-    if (auto *ILE = dyn_cast<InitListExpr>(Init->IgnoreParenImpCasts())) {
+    Expr *Init = VD->getInit()->IgnoreParenImpCasts();
+
+    if (auto *CE = llvm::dyn_cast<clang::CXXConstructExpr>(Init)) {
+      if (CE->getNumArgs() == 0)
+        return;
+      if (CE->getNumArgs() == 1)
+        Init = CE->getArg(0)->IgnoreParenImpCasts();
+    }
+
+    if (auto *ILE = llvm::dyn_cast<InitListExpr>(Init)) {
       if (VD->getType()->isArrayType()) {
         handleArrayInitList(VR, VD->getType(), ILE);
         return;
       }
+
+      if (auto *RD = VD->getType()->getAsRecordDecl()) {
+        auto FieldIt = RD->field_begin();
+        for (unsigned I = 0; I < ILE->getNumInits(); ++I, ++FieldIt) {
+          if (FieldIt == RD->field_end())
+            break;
+          IRExpr *Src = getExpr(ILE->getInit(I));
+          auto *Dest = new AccessIRExpr(VR, FieldIt->getName().str(), false);
+          handleAssign(Dest, Src);
+        }
+        return;
+      }
     }
 
-    auto *IE = getExpr(Init);
-    auto *CopyS = new CopyIRStmt(VR, IE);
-    pushIRStmt((IRStmt *)CopyS);
+    auto *IE = getExpr(VD->getInit());
+    pushIRStmt(new CopyIRStmt(VR, IE));
   }
 
 public:
@@ -594,6 +615,21 @@ public:
     ExprStack.push_back(new ASTLiteralIRExpr(Node));
   }
 
+  void VisitCXXConstructExpr(clang::CXXConstructExpr *Node) {
+    if (Node->getNumArgs() == 0) {
+      ExprStack.push_back(new ASTLiteralIRExpr(Node));
+      return;
+    }
+
+    if (Node->isElidable() && Node->getNumArgs() == 1) {
+      ExprStack.push_back(getExpr(Node->getArg(0)));
+      return;
+    }
+    llvm::errs() << "Unsupported CXXConstructExpr with " << Node->getNumArgs()
+                 << " args\n";
+    llvm_unreachable("Unsupported CXXConstructExpr");
+  }
+
   void VisitBinaryOperator(BinaryOperator *Node) {
     IRExpr *Left = getExpr(Node->getLHS());
     IRExpr *Right = getExpr(Node->getRHS());
@@ -824,8 +860,9 @@ public:
   }
 };
 
-// Collects direct call targets in a function body that are not Tasks/TaskCallers
-// and have a definition — these are candidates for inlining into task IR.
+// Collects direct call targets in a function body that are not
+// Tasks/TaskCallers and have a definition — these are candidates for inlining
+// into task IR.
 class InlinableCollector
     : public clang::RecursiveASTVisitor<InlinableCollector> {
   std::set<FunctionDecl *> const &Tasks;
@@ -840,9 +877,12 @@ public:
 
   bool VisitCallExpr(CallExpr *CE) {
     auto *Callee = CE->getDirectCallee();
-    if (!Callee || !Callee->getBody()) return true;
-    if (Tasks.count(Callee) || TaskCallers.count(Callee)) return true;
-    if (GIgnoreFns.count(Callee->getName().str())) return true;
+    if (!Callee || !Callee->getBody())
+      return true;
+    if (Tasks.count(Callee) || TaskCallers.count(Callee))
+      return true;
+    if (GIgnoreFns.count(Callee->getName().str()))
+      return true;
     Found.push_back(Callee);
     return true;
   }
@@ -862,7 +902,8 @@ public:
   explicit Cilk2IRVisitor(
       clang::ASTContext *Context, IRProgram &P, std::set<FunctionDecl *> &Tasks,
       std::set<FunctionDecl *> &TaskCallers,
-      std::unordered_map<FunctionDecl *, std::vector<WhileStmt *>> &WhileWithSync,
+      std::unordered_map<FunctionDecl *, std::vector<WhileStmt *>>
+          &WhileWithSync,
       std::set<FunctionDecl *> &InlinableFns)
       : Context(Context), P(P), Tasks(Tasks), TaskCallers(TaskCallers),
         WhileWithSync(WhileWithSync), InlinableFns(InlinableFns) {}

@@ -33,6 +33,8 @@ echo ">> test2"
 $BOMBYX "$BASE/tests/im/test_2.cpp" "$BASE/tests/ex/test_2.cpp"
 echo ">> test3"
 $BOMBYX "$BASE/tests/im/test_3.cpp" "$BASE/tests/ex/test_3.cpp"
+echo ">> test4"
+$BOMBYX "$BASE/tests/im/test_4.cpp" "$BASE/tests/ex/test_4.cpp"
 echo ">> Pagerank"
 $BOMBYX "$BASE/Bombyx_OpenCilk_Examples/pageRank/main.cpp" \
         "$BASE/Bombyx_OpenCilk_Examples/pageRank/build/main.cpp"
