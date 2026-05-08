@@ -63,4 +63,8 @@ $CLANGCPP test_4.cpp $FLAGS -o test_4
 echo ">> test5"
 $CLANGCPP test_5.cpp $FLAGS -o test_5
 ./test_5> test_5.txt
+
+echo ">> test6"
+$CLANGCPP test_6.cpp $FLAGS -o test_6
+./test_6> test_6.txt
 echo "✅ Done"

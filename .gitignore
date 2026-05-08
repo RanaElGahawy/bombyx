@@ -28,6 +28,5 @@
 !/tests/im/*.cpp
 !/tests/im/*.sh
 !/tests/im/*.c
-tests/im/test_6.cpp
 tests/im/test_7.cpp
 tests/im/test_8.cpp

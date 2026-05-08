@@ -17,13 +17,6 @@ CLOSURE_DEF(sum_pair, Pair p;);
 CLOSURE_DEF(dot_product, Pair a; Pair b;);
 CLOSURE_DEF(dot_product_cont0, int s1; int s2;);
 CLOSURE_DEF(main_cont0, int result;);
-// struct_test_2.cpp
-// EXPECTED: PASS (likely)
-// Tests: struct value type declared locally, dot-member access,
-//        struct passed by value to spawned function.
-// Risk: struct-typed CopyIRStmt — depends on whether codegen handles
-//       struct-sized copies. If codegen assumes scalar types this may
-//       silently produce wrong code rather than crashing.
 
 THREAD(sum_pair) {
   sum_pair_closure *largs = (sum_pair_closure *)(args.get());

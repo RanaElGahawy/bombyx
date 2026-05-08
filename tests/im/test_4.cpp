@@ -1,10 +1,3 @@
-// struct_test_1.cpp
-// EXPECTED: PASS
-// Tests: struct declaration, pointer passing, arrow member access, spawn + sync
-// All operations are C-style — no constructors, no methods, no assignment.
-// This should work fine since AccessIRExpr handles '->' and member decls
-// are tracked through QualType.
-
 #include <cilk/cilk.h>
 
 struct Node {

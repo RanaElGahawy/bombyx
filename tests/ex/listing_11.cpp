@@ -230,11 +230,11 @@ THREAD(original_reentry0_exit1) {
     original_reentry0_exit1_cont0_closure SN_original_reentry0_exit1_cont0c(largs->k);
     spawn_next<original_reentry0_exit1_cont0_closure> SN_original_reentry0_exit1_cont0(SN_original_reentry0_exit1_cont0c);
     ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->inner_sum = largs->inner_sum;
-    ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->m = largs->m;
     ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->j = largs->j;
+    ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->m = largs->m;
     ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->i = largs->i;
-    ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->x1 = largs->x1;
     ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->total = largs->total;
+    ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->x1 = largs->x1;
     ((original_reentry0_exit1_cont0_closure*)SN_original_reentry0_exit1_cont0.cls.get())->n = largs->n;
     // Original sync was here
     return;
@@ -252,14 +252,14 @@ THREAD(original_reentry0_reentry1) {
         spawn<f_closure> sp0(sp0c);
 
         largs->inner_sum = (largs->inner_sum + 2);
+        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->inner_sum = largs->inner_sum;
+        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->j = largs->j;
         ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->z = largs->z;
         ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->y = largs->y;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->inner_sum = largs->inner_sum;
         ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->i = largs->i;
         ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->total = largs->total;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->n = largs->n;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->j = largs->j;
         ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->m = largs->m;
+        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->n = largs->n;
         // Original sync was here
     } else {
         auto sp1c = std::make_shared<original_reentry0_exit1_closure>(largs->k);
@@ -320,8 +320,8 @@ THREAD(original_reentry0_exit1_cont0) {
         ((original_reentry0_exit1_cont2_closure*)SN_original_reentry0_exit1_cont2.cls.get())->inner_sum = largs->inner_sum;
         ((original_reentry0_exit1_cont2_closure*)SN_original_reentry0_exit1_cont2.cls.get())->i = largs->i;
         ((original_reentry0_exit1_cont2_closure*)SN_original_reentry0_exit1_cont2.cls.get())->total = largs->total;
-        ((original_reentry0_exit1_cont2_closure*)SN_original_reentry0_exit1_cont2.cls.get())->j = largs->j;
         ((original_reentry0_exit1_cont2_closure*)SN_original_reentry0_exit1_cont2.cls.get())->m = largs->m;
+        ((original_reentry0_exit1_cont2_closure*)SN_original_reentry0_exit1_cont2.cls.get())->j = largs->j;
         ((original_reentry0_exit1_cont2_closure*)SN_original_reentry0_exit1_cont2.cls.get())->n = largs->n;
         // Original sync was here
     } else {
@@ -338,8 +338,8 @@ THREAD(original_reentry0_exit1_cont0) {
         ((original_reentry0_exit1_cont1_closure*)SN_original_reentry0_exit1_cont1.cls.get())->inner_sum = largs->inner_sum;
         ((original_reentry0_exit1_cont1_closure*)SN_original_reentry0_exit1_cont1.cls.get())->i = largs->i;
         ((original_reentry0_exit1_cont1_closure*)SN_original_reentry0_exit1_cont1.cls.get())->total = largs->total;
-        ((original_reentry0_exit1_cont1_closure*)SN_original_reentry0_exit1_cont1.cls.get())->j = largs->j;
         ((original_reentry0_exit1_cont1_closure*)SN_original_reentry0_exit1_cont1.cls.get())->m = largs->m;
+        ((original_reentry0_exit1_cont1_closure*)SN_original_reentry0_exit1_cont1.cls.get())->j = largs->j;
         ((original_reentry0_exit1_cont1_closure*)SN_original_reentry0_exit1_cont1.cls.get())->n = largs->n;
         // Original sync was here
     }

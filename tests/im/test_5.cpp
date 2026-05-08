@@ -1,11 +1,3 @@
-// struct_test_2.cpp
-// EXPECTED: PASS (likely)
-// Tests: struct value type declared locally, dot-member access,
-//        struct passed by value to spawned function.
-// Risk: struct-typed CopyIRStmt — depends on whether codegen handles
-//       struct-sized copies. If codegen assumes scalar types this may
-//       silently produce wrong code rather than crashing.
-
 #include <cilk/cilk.h>
 #include <stdio.h>
 

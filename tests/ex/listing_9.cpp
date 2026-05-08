@@ -102,8 +102,8 @@ THREAD(fun_reentry0) {
         sp1c.x = (largs->iter + 10);
         spawn<worker_closure> sp1(sp1c);
 
-        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->iter = largs->iter;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->total = largs->total;
+        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->iter = largs->iter;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->rounds = largs->rounds;
         // Original sync was here
     } else {
