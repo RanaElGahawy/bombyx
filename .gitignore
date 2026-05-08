@@ -24,7 +24,7 @@
 !/tests/ex/*.cpp
 !/tests/ex/*.c
 !/tests/ex/*.sh
+!/tests/ex/*hh
 !/tests/im/*.cpp
 !/tests/im/*.sh
 !/tests/im/*.c
-

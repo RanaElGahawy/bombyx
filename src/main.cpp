@@ -87,6 +87,23 @@ public:
             llvm::raw_fd_ostream Cilk1Out(OutFilename, EC,
                                           llvm::sys::fs::OF_Text);
             PrintCilk1Emu(P, Cilk1Out, Context, CI);
+            std::filesystem::path OutDir =
+                std::filesystem::path(OutFilename.str()).parent_path();
+            if (OutDir.empty())
+              OutDir = ".";
+
+            std::filesystem::path Src =
+                std::filesystem::path("support") / "cilk_explicit.hh";
+            std::filesystem::path Dest = OutDir / "cilk_explicit.hh";
+
+            std::error_code CopyEC;
+            std::filesystem::copy_file(
+                Src, Dest, std::filesystem::copy_options::overwrite_existing,
+                CopyEC);
+            if (CopyEC) {
+              llvm::errs() << "warning: could not copy cilk_explicit.hh to "
+                           << Dest.string() << ": " << CopyEC.message() << "\n";
+            }
             break;
           };
           case ConvertOpts::TG_HARDCILK: {
