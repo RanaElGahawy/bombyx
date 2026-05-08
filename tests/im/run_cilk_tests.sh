@@ -55,4 +55,12 @@ $CLANGCPP test_2.cpp $FLAGS -o test_2
 echo ">> test3"
 $CLANGCPP test_3.cpp $FLAGS -o test_3
 ./test_3> test_3.txt
+
+echo ">> test4"
+$CLANGCPP test_4.cpp $FLAGS -o test_4
+./test_4> test_4.txt
+
+echo ">> test5"
+$CLANGCPP test_5.cpp $FLAGS -o test_5
+./test_5> test_5.txt
 echo "✅ Done"

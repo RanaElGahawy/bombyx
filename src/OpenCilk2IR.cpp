@@ -625,6 +625,13 @@ public:
       ExprStack.push_back(getExpr(Node->getArg(0)));
       return;
     }
+
+    if (Node->getConstructor()->isCopyConstructor() &&
+        Node->getNumArgs() == 1) {
+      ExprStack.push_back(getExpr(Node->getArg(0)));
+      return;
+    }
+
     llvm::errs() << "Unsupported CXXConstructExpr with " << Node->getNumArgs()
                  << " args\n";
     llvm_unreachable("Unsupported CXXConstructExpr");

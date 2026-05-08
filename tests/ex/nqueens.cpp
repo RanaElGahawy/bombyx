@@ -1,5 +1,4 @@
 #include "cilk_explicit.hh"
-unsigned long long todval(struct timeval * tp);
 int ok(int n, char * a);
 THREAD(nqueens);
 int main(int argc, char ** argv);
@@ -18,8 +17,6 @@ CLOSURE_DEF(nqueens_cont0,
 );
 CLOSURE_DEF(main_cont0,
     int res;
-    struct timeval t1;
-    struct timeval t2;
 );
 #include <stdint.h>
 #include <stdio.h>
@@ -39,7 +36,9 @@ CLOSURE_DEF(main_cont0,
 
 pthread_attr_t *mutex;
 
-
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+}
 
 // int * count;
 
@@ -67,9 +66,6 @@ pthread_attr_t *mutex;
 
 
 
-unsigned long long todval(struct timeval * tp) {
-    return (((tp->tv_sec * 1000) * 1000) + tp->tv_usec);
-}
 int ok(int n, char * a) {
     int i;
     int j;
@@ -144,7 +140,6 @@ int main(int argc, char ** argv) {
     sp0c.a0 = a1;
     spawn<nqueens_closure> sp0(sp0c);
 
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
     // Original sync was here
     return 0;
 }
@@ -158,14 +153,11 @@ THREAD(nqueens_cont0) {
     return;
 }
 THREAD(main_cont0) {
-    unsigned long long runtime_ms;
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
-    gettimeofday(&(largs->t2),0);
-    runtime_ms = ((todval(&(largs->t2)) - todval(&(largs->t1))) / 1000);
     if ((largs->res == 0)) {
-        fprintf(__stderrp,"No solution found.\n");
+        printf("No solution found.\n");
     } else {
-        fprintf(__stderrp,"Total number of solutions : %d\n",largs->res);
+        printf("Total number of solutions : %d\n",largs->res);
     }
     SEND_ARGUMENT(largs->k, 0);
     return;
