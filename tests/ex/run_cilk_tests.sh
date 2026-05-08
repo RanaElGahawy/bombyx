@@ -35,5 +35,6 @@ run_test "test_3"
 run_test "test_4"
 run_test "test_5"
 run_test "test_6"
+run_test "test_7"
 
 echo "✅ Done"

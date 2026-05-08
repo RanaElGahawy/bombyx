@@ -6,7 +6,6 @@ struct Pair {
   int x;
   int y;
 };
-
 THREAD(sum_pair);
 THREAD(dot_product);
 int main();

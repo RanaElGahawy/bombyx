@@ -82,8 +82,25 @@ void printLocals(IRFunction *F, clang::ASTContext &C, llvm::raw_ostream &Out) {
   for (auto &Local : F->Vars) {
     if (Local.DeclLoc == IRVarDecl::LOCAL) {
       Out << TAB;
-      Local.Type.print(Out, C.getPrintingPolicy());
-      Out << " " << GetSym(Local.Name) << ";\n";
+      clang::QualType Ty = Local.Type;
+      std::string Name = GetSym(Local.Name);
+      // can we used it? it removes const, volatile, and restrict
+      // otherwise we need more complicated code
+      Ty = Ty.getUnqualifiedType();
+      if (Ty->isArrayType()) {
+        auto *AT = llvm::dyn_cast<clang::ConstantArrayType>(
+            Ty->getAsArrayTypeUnsafe());
+        if (AT) {
+          AT->getElementType().print(Out, C.getPrintingPolicy());
+          Out << " " << Name << "[" << AT->getSize().getZExtValue() << "];\n";
+        } else {
+          Ty.print(Out, C.getPrintingPolicy());
+          Out << " " << Name << ";\n";
+        }
+      } else {
+        Ty.print(Out, C.getPrintingPolicy());
+        Out << " " << Name << ";\n";
+      }
     }
   }
 }
@@ -401,7 +418,8 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
     }
   }
 
-  // 2. Print the original source file with the original root functions removed.
+  // 2. Print the original source file with the original root functions
+  // removed.
   printOriginalSource(P, out, C, CI);
   out << "\n";
 
