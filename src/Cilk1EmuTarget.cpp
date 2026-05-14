@@ -400,12 +400,67 @@ public:
   Cilk1EmuPrinter(llvm::raw_ostream &Out, IRPrintContext &C) : Out(Out), C(C) {}
 };
 
+void printOriginalSourceSplit(IRProgram &P, llvm::raw_ostream &OutA,
+                              llvm::raw_ostream &OutB, clang::ASTContext &C,
+                              clang::CompilerInstance &CI) {
+  SourceManager &SM = CI.getSourceManager();
+  Rewriter R;
+  R.setSourceMgr(SM, CI.getLangOpts());
+
+  // Remove task functions
+  for (auto &F : P) {
+    if (F->Info.RootFun)
+      R.RemoveText(F->Info.RootFun->getSourceRange());
+  }
+
+  // Find the start location of the first function definition in the main file
+  SourceLocation FirstFnLoc = SourceLocation();
+  for (auto *D : C.getTranslationUnitDecl()->decls()) {
+    if (!SM.isInMainFile(D->getLocation()))
+      continue;
+    if (auto *FD = llvm::dyn_cast<clang::FunctionDecl>(D)) {
+      if (FD->getBody()) {
+        SourceLocation Loc = FD->getBeginLoc();
+        if (FirstFnLoc.isInvalid() ||
+            SM.isBeforeInTranslationUnit(Loc, FirstFnLoc))
+          FirstFnLoc = Loc;
+      }
+    }
+  }
+
+  // Get the full rewritten buffer
+  const RewriteBuffer &Buf = R.getEditBuffer(SM.getMainFileID());
+  std::string FullSource;
+  llvm::raw_string_ostream SS(FullSource);
+  Buf.write(SS);
+  SS.flush();
+
+  if (FirstFnLoc.isInvalid()) {
+    // No functions — dump everything to A
+    OutA << FullSource;
+    return;
+  }
+
+  // Convert SourceLocation to offset in the original buffer
+  unsigned SplitOffset = SM.getFileOffset(FirstFnLoc);
+
+  // Part A: everything before the first function
+  OutA << FullSource.substr(0, SplitOffset);
+
+  // Part B: everything from the first function onward
+  OutB << FullSource.substr(SplitOffset);
+}
+
 void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
                    clang::CompilerInstance &CI) {
 
   // 1. Print forward declarations of each function, include Cilk1 emulation
   // file.
   out << "#include \"cilk_explicit.hh\"\n";
+
+  std::string PartB;
+  llvm::raw_string_ostream PartBStream(PartB);
+  printOriginalSourceSplit(P, out, PartBStream, C, CI);
 
   for (auto &F : P) {
     printFunDecl(F.get(), out, C);
@@ -420,9 +475,8 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
 
   // 2. Print the original source file with the original root functions
   // removed.
-  printOriginalSource(P, out, C, CI);
+  out << PartBStream.str();
   out << "\n";
-
   // 3. Print the implementation of each function.
   for (auto &F : P) {
 

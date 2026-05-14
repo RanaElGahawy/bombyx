@@ -1,4 +1,7 @@
 #include "cilk_explicit.hh"
+#include <cilk/cilk.h>
+#include <stdio.h>
+
 THREAD(worker);
 THREAD(fun);
 int main();
@@ -146,9 +149,6 @@ CLOSURE_DEF(fun_exit0_reentry1_cont0,
     unsigned long long z0;
     unsigned long long y0;
 );
-#include <cilk/cilk.h>
-#include <stdio.h>
-
 
 
 

@@ -1,4 +1,22 @@
 #include "cilk_explicit.hh"
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+
+#include <cilk/cilk.h>
+
+#if CILKSAN
+#include "cilksan.h"
+#endif
+
+#ifdef SERIAL
+#include <cilk/cilk_stub.h>
+#endif
+
+pthread_attr_t *mutex;
+
 int ok(int n, char * a);
 THREAD(nqueens);
 int main(int argc, char ** argv);
@@ -18,24 +36,6 @@ CLOSURE_DEF(nqueens_cont0,
 CLOSURE_DEF(main_cont0,
     int res;
 );
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/time.h>
-
-#include <cilk/cilk.h>
-
-#if CILKSAN
-#include "cilksan.h"
-#endif
-
-#ifdef SERIAL
-#include <cilk/cilk_stub.h>
-#endif
-
-pthread_attr_t *mutex;
-
 unsigned long long todval(struct timeval *tp) {
   return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }

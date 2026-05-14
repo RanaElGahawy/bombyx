@@ -1,4 +1,7 @@
 #include "cilk_explicit.hh"
+#include <cilk/cilk.h>
+#include <stdio.h>
+
 THREAD(square);
 THREAD(cube);
 THREAD(compute);
@@ -444,9 +447,6 @@ CLOSURE_DEF(compute_reentry3_reentry4_cont0,
     unsigned long long q0;
     unsigned long long x;
 );
-#include <cilk/cilk.h>
-#include <stdio.h>
-
 
 
 

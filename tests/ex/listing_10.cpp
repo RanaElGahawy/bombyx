@@ -1,4 +1,7 @@
 #include "cilk_explicit.hh"
+#include <cilk/cilk.h>
+#include <stdio.h>
+
 THREAD(original);
 int main();
 THREAD(original_cont0);
@@ -14,9 +17,6 @@ CLOSURE_DEF(original_cont0,
 CLOSURE_DEF(main_cont0,
     int res;
 );
-#include <cilk/cilk.h>
-#include <stdio.h>
-
 
 
 

@@ -41,15 +41,17 @@ echo ">> test6"
 $BOMBYX "$BASE/tests/im/test_6.cpp" "$BASE/tests/ex/test_6.cpp"
 echo ">> test7"
 $BOMBYX "$BASE/tests/im/test_7.cpp" "$BASE/tests/ex/test_7.cpp"
+echo ">> test8"
+$BOMBYX "$BASE/tests/im/test_8.cpp" "$BASE/tests/ex/test_8.cpp"
 echo ">> Pagerank"
 $BOMBYX "$BASE/Bombyx_OpenCilk_Examples/pageRank/main.cpp" \
-        "$BASE/Bombyx_OpenCilk_Examples/pageRank/build/main.cpp"
+        "$BASE/Bombyx_OpenCilk_Examples/pageRank/output/main.cpp"
 echo ">> Randomwalk"
 $BOMBYX "$BASE/Bombyx_OpenCilk_Examples/randomWalk/main.cpp" \
-        "$BASE/Bombyx_OpenCilk_Examples/randomWalk/build/main.cpp"
+        "$BASE/Bombyx_OpenCilk_Examples/randomWalk/output/main.cpp"
 echo ">> TriangleCount"
 $BOMBYX "$BASE/Bombyx_OpenCilk_Examples/triangleCount/main.cpp" \
-        "$BASE/Bombyx_OpenCilk_Examples/triangleCount/build/main.cpp"
+        "$BASE/Bombyx_OpenCilk_Examples/triangleCount/output/main.cpp"
 echo ">> BarnesHut"
 $BOMBYX "$BASE/Bombyx_OpenCilk_Examples/barnes-hut/main.cpp" \
         "$BASE/Bombyx_OpenCilk_Examples/barnes-hut//output/main.cpp"

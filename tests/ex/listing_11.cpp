@@ -1,4 +1,7 @@
 #include "cilk_explicit.hh"
+#include <cilk/cilk.h>
+#include <stdio.h>
+
 THREAD(f);
 THREAD(g);
 THREAD(original);
@@ -124,9 +127,6 @@ CLOSURE_DEF(original_reentry0_reentry1_cont0,
     int y;
     int z;
 );
-#include <cilk/cilk.h>
-#include <stdio.h>
-
 
 
 
