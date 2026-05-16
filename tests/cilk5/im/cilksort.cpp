@@ -67,10 +67,6 @@
 #include "cilksan.h"
 #endif
 
-unsigned long long todval(struct timeval *tp) {
-  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
-}
-
 #ifndef RAND_MAX
 #define RAND_MAX 32767
 #endif
@@ -84,6 +80,10 @@ typedef long ELM;
 #define INSERTIONSIZE 20
 
 static unsigned long rand_nxt = 0;
+
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+}
 
 static inline unsigned long my_rand(void) {
 

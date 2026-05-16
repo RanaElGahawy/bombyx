@@ -19,16 +19,28 @@ const std::string &GetSym(Sym S) { return GSymTable.Table[S]; }
 
 Sym PutSym(std::string Name) {
   int NameCnt = -1;
-  if (GSymTable.DupCnt.find(Name) != GSymTable.DupCnt.end()) {
-    NameCnt = GSymTable.DupCnt[Name];
+  auto It = GSymTable.DupCnt.find(Name);
+  if (It != GSymTable.DupCnt.end())
+    NameCnt = (int)It->second;
+
+  if (NameCnt < 0) {
+    GSymTable.DupCnt[Name] = 0;
+    GSymTable.Table.push_back(Name);
+  } else {
+    // Find a free name that doesn't collide with others
+    std::string Candidate;
+    int Ctr = NameCnt;
+    do {
+      Candidate = Name + std::to_string(Ctr++);
+    } while (GSymTable.DupCnt.count(Candidate) ||
+             GSymTable.Reserved.count(Candidate));
+    GSymTable.DupCnt[Name] = Ctr;
+    GSymTable.Table.push_back(Candidate);
   }
-  GSymTable.DupCnt[Name] = NameCnt + 1;
-  if (NameCnt >= 0) {
-    Name += std::to_string(NameCnt);
-  }
-  GSymTable.Table.push_back(Name);
   return GSymTable.Table.size() - 1;
 }
+
+void ReserveName(const std::string &Name) { GSymTable.Reserved.insert(Name); }
 
 /////////////
 // IRExpr //
@@ -366,8 +378,7 @@ struct VarRenamePrinterHelper : clang::PrinterHelper {
     if (auto *Lambda = llvm::dyn_cast<clang::LambdaExpr>(E)) {
       bool AnyRenamed = false;
       for (const auto &Cap : Lambda->captures()) {
-        if (Cap.capturesVariable() &&
-            Renames.count(Cap.getCapturedVar()) > 0) {
+        if (Cap.capturesVariable() && Renames.count(Cap.getCapturedVar()) > 0) {
           AnyRenamed = true;
           break;
         }
@@ -439,7 +450,8 @@ void ASTLiteralIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   if (Ctx.VarRenames.empty()) {
     Lit->printPretty(Out, nullptr, Ctx.ASTCtx.getPrintingPolicy());
   } else {
-    VarRenamePrinterHelper Helper(Ctx.VarRenames, Ctx.ASTCtx.getPrintingPolicy());
+    VarRenamePrinterHelper Helper(Ctx.VarRenames,
+                                  Ctx.ASTCtx.getPrintingPolicy());
     Lit->printPretty(Out, &Helper, Ctx.ASTCtx.getPrintingPolicy());
   }
 }

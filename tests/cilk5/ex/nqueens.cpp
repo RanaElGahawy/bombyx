@@ -111,8 +111,8 @@ THREAD(nqueens) {
 
             }
         }
-        ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->count = count;
         ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->solNum = solNum;
+        ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->count = count;
         ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->n0 = largs->n0;
         // Original sync was here
     }

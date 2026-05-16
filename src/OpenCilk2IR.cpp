@@ -855,10 +855,16 @@ public:
                Node->getOpcode() <= clang::BO_OrAssign) {
       assert(!ExprCtx);
       auto *DI = dyn_cast<IdentIRExpr>(Left);
-      assert(DI);
-      auto *LeftC = new IdentIRExpr(DI->Ident);
-      BinopIRExpr *BE = new BinopIRExpr(Op, LeftC, Right);
-      handleAssign(Left, (IRExpr *)BE);
+      if (!DI) {
+        // compound assignment opaquely so VarRenamePrinterHelper
+        delete Left;
+        delete Right;
+        pushIRStmt(new ExprWrapIRStmt(new ASTLiteralIRExpr(Node)));
+      } else {
+        auto *LeftC = new IdentIRExpr(DI->Ident);
+        BinopIRExpr *BE = new BinopIRExpr(Op, LeftC, Right);
+        handleAssign(Left, (IRExpr *)BE);
+      }
     } else {
       BinopIRExpr *BE = new BinopIRExpr(Op, Left, Right);
       ExprStack.push_back((IRExpr *)BE);
@@ -1217,6 +1223,35 @@ void OpenCilk2IR(IRProgram &P, clang::ASTContext *Context, SourceManager &SM) {
     llvm::outs() << "inlinables\n";
     for (auto *F : InlinableFns)
       llvm::outs() << F->getName() << "\n";
+  }
+
+  // reserve all real local variable names so that PutSym's never collides with
+  // an existing name
+  {
+    struct VarNameCollector : clang::RecursiveASTVisitor<VarNameCollector> {
+      bool VisitVarDecl(clang::VarDecl *VD) {
+        ReserveName(VD->getName().str());
+        return true;
+      }
+    } VNC;
+    for (auto *FD : AVisitor.Tasks) {
+      for (auto *P : FD->parameters())
+        ReserveName(P->getName().str());
+      if (FD->getBody())
+        VNC.TraverseStmt(FD->getBody());
+    }
+    for (auto *FD : AVisitor.TaskCallers) {
+      for (auto *P : FD->parameters())
+        ReserveName(P->getName().str());
+      if (FD->getBody())
+        VNC.TraverseStmt(FD->getBody());
+    }
+    for (auto *FD : InlinableFns) {
+      for (auto *P : FD->parameters())
+        ReserveName(P->getName().str());
+      if (FD->getBody())
+        VNC.TraverseStmt(FD->getBody());
+    }
   }
 
   // Pass 3: convert Tasks, TaskCallers, and InlinableFns to IR

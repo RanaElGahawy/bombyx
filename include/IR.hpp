@@ -7,6 +7,7 @@
 #include <memory>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "clang/AST/Decl.h"
@@ -33,11 +34,13 @@ typedef int Sym;
 struct SymTable {
   std::vector<std::string> Table;
   std::unordered_map<std::string, size_t> DupCnt;
+  std::unordered_set<std::string> Reserved;
 };
 
 extern SymTable GSymTable;
 extern const std::string &GetSym(Sym S);
 extern Sym PutSym(std::string Name);
+extern void ReserveName(const std::string &Name);
 
 struct IRVarDecl {
   IRType Type;
