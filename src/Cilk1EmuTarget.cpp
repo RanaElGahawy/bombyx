@@ -36,8 +36,7 @@ void printFunDecl(IRFunction *F, llvm::raw_ostream &out, clang::ASTContext &C) {
         out << ", ";
       else
         first = false;
-      Var.Type.print(out, C.getPrintingPolicy());
-      out << " " << GetSym(Var.Name);
+      Var.Type.print(out, C.getPrintingPolicy(), GetSym(Var.Name));
     }
     out << ")";
   } else {
@@ -51,8 +50,8 @@ void printClosureDecl(IRFunction *F, llvm::raw_ostream &out,
   for (auto &Var : F->Vars) {
     if (Var.DeclLoc == IRVarDecl::ARG) {
       out << TAB;
-      Var.Type.print(out, C.getPrintingPolicy());
-      out << " " << GetSym(Var.Name) << ";\n";
+      Var.Type.print(out, C.getPrintingPolicy(), GetSym(Var.Name));
+      out << ";\n";
     }
   }
   out << ");\n";
@@ -95,12 +94,11 @@ void printLocals(IRFunction *F, clang::ASTContext &C, llvm::raw_ostream &Out) {
           AT->getElementType().print(Out, C.getPrintingPolicy());
           Out << " " << Name << "[" << AT->getSize().getZExtValue() << "];\n";
         } else {
-          Ty.print(Out, C.getPrintingPolicy());
-          Out << " " << Name << ";\n";
+          Ty.print(Out, C.getPrintingPolicy(), Name);
+          Out << ";\n";
         }
       } else {
-        Ty.print(Out, C.getPrintingPolicy());
-        Out << " " << Name;
+        Ty.print(Out, C.getPrintingPolicy(), Name);
         // Emit constructor-initialization args if the original decl used them.
         if (Local.ASTDecl && Local.ASTDecl->hasInit()) {
           auto *Init = Local.ASTDecl->getInit()->IgnoreParenImpCasts();

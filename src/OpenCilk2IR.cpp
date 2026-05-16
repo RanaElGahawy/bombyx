@@ -91,6 +91,13 @@ public:
   }
 };
 
+// Return the definition FunctionDecl if available, otherwise the decl itself.
+static clang::FunctionDecl *toDefinition(clang::FunctionDecl *FD) {
+  if (auto *Def = FD->getDefinition())
+    return Def;
+  return FD;
+}
+
 class CilkAnalyzeVisitor
     : public clang::RecursiveASTVisitor<CilkAnalyzeVisitor> {
   FunctionDecl *CurrF = nullptr;
@@ -108,13 +115,13 @@ public:
     if (GIgnoreFns.find(Decl->getName().str()) != GIgnoreFns.end()) {
       return false;
     }
-    CurrF = Decl;
+    CurrF = toDefinition(Decl);
     return true;
   }
 
   void HandleSpawn(CallExpr *Expr) {
     if (Expr->getDirectCallee()) {
-      Tasks.insert(Expr->getDirectCallee());
+      Tasks.insert(toDefinition(Expr->getDirectCallee()));
       TaskCallers.insert(CurrF);
     } else {
       PANIC("cannot deduce destination of spawn");
@@ -122,7 +129,8 @@ public:
   }
 
   bool VisitCallExpr(CallExpr *Expr) {
-    if (Tasks.find(Expr->getDirectCallee()) != Tasks.end()) {
+    auto *Callee = Expr->getDirectCallee();
+    if (Callee && Tasks.find(toDefinition(Callee)) != Tasks.end()) {
       HandleSpawn(Expr);
     }
     return true;
@@ -928,9 +936,10 @@ public:
       IndexIRExpr *IE = new IndexIRExpr(ArrLval, Ind, ArrType);
       ExprStack.push_back((IRExpr *)IE);
     } else {
-      llvm::errs()
-          << "Unsupported: non-lvalue used for array subscript expression.";
-      llvm_unreachable("Non-lvalue used for array subscript");
+      // Emit the whole subscript expression opaquely
+      // VarRenamePrinterHelper will rename any tracked variables inside.
+      delete Arr;
+      ExprStack.push_back(new ASTLiteralIRExpr(Node));
     }
   }
 
@@ -965,7 +974,8 @@ public:
 
     // the first function has cilk_spawn but the second doesn't
     // (implicit cilk spawn, so we are adding a sync)
-    if (!SpawnCtx & Tasks.find(Node->getDirectCallee()) != Tasks.end()) {
+    if (!SpawnCtx && Node->getDirectCallee() &&
+        Tasks.find(toDefinition(Node->getDirectCallee())) != Tasks.end()) {
       auto *SpawnedE = ExprStack.back();
       ExprStack.pop_back();
       HandleCilkSpawn(SpawnedE);
@@ -1054,6 +1064,7 @@ public:
       return true;
     if (!Callee->getDeclName().isIdentifier())
       return true;
+    Callee = toDefinition(Callee);
     if (Tasks.count(Callee) || TaskCallers.count(Callee))
       return true;
     if (GIgnoreFns.count(Callee->getName().str()))
@@ -1089,7 +1100,8 @@ public:
         InlinableFns.find(Decl) == InlinableFns.end()) {
       return true;
     }
-    if (Decl->getBody()) {
+    // Only process the actual definition, not a forward declaration.
+    if (Decl->doesThisDeclarationHaveABody()) {
       IRFunction *F =
           P.createFunc(Decl->getName().str(), Decl->getDeclaredReturnType());
       F->Info.RootFun = Decl;
@@ -1107,9 +1119,14 @@ public:
       Stmt2IRVisitor sv(F, VarLookup, Tasks);
       sv.Visit(Decl->getBody());
 
-      FunLookup[Decl] = F;
-    } else if (Tasks.find(Decl) != Tasks.end()) {
-      PANIC("unsupported: forward declaration of task function");
+      // Register all redeclarations (forward decls + definition) so that
+      // FinalizeVisitor can find the IRFunction regardless of which decl
+      // pointer appears at a call/spawn site.
+      for (auto *RD : Decl->redecls())
+        FunLookup[RD] = F;
+    } else if (Tasks.find(Decl) != Tasks.end() && !Decl->getBody()) {
+      PANIC("unsupported: forward declaration of task function with no "
+            "definition");
     }
     return true;
   }

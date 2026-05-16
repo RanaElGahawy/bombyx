@@ -10,21 +10,21 @@
 #include "cilksan.h"
 #endif
 
-unsigned long long todval(struct timeval * tp);
-int ok(int n, char * a);
+unsigned long long todval(struct timeval *tp);
+int ok(int n, char *a);
 THREAD(nqueens);
-int main(int argc, char ** argv);
+int main(int argc, char **argv);
 THREAD(nqueens_cont0);
 THREAD(main_cont0);
 
 CLOSURE_DEF(nqueens,
     int n0;
     int j0;
-    char * a0;
+    char *a0;
 );
 CLOSURE_DEF(nqueens_cont0,
     int n0;
-    int * count;
+    int *count;
     int solNum;
 );
 CLOSURE_DEF(main_cont0,
@@ -62,10 +62,10 @@ CLOSURE_DEF(main_cont0,
 
 
 
-unsigned long long todval(struct timeval * tp) {
+unsigned long long todval(struct timeval *tp) {
     return (((tp->tv_sec * 1000) * 1000) + tp->tv_usec);
 }
-int ok(int n, char * a) {
+int ok(int n, char *a) {
     int i;
     int j;
     char p;
@@ -83,9 +83,9 @@ int ok(int n, char * a) {
     return 1;
 }
 THREAD(nqueens) {
-    char * b;
+    char *b;
     int i0;
-    int * count;
+    int *count;
     int solNum;
     nqueens_closure *largs = (nqueens_closure*)(args.get());
     solNum = 0;
@@ -118,9 +118,9 @@ THREAD(nqueens) {
     }
     return;
 }
-int main(int argc, char ** argv) {
+int main(int argc, char **argv) {
     int n1;
-    char * a1;
+    char *a1;
     int res;
     struct timeval t1;
     n1 = 13;

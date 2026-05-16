@@ -18,5 +18,11 @@ printf "\n >> matmul \n"
 xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality matmul.cpp getoptions.c -o matmul
 ./matmul -n 1000 -c
 printf "\n >> rectmul \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality -Wdeprecated rectmul.cpp getoptions.c -o rectmul
+xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality -Wdeprecated -Wunneeded-internal-declaration rectmul.cpp getoptions.c -o rectmul
 ./rectmul -benchmark long -c
+printf "\n >> rectmulred \n"
+xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality rectmulred.cpp getoptions.c -o rectmulred
+./rectmulred -benchmark long -c
+printf "\n >> lu \n"
+xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality lu.cpp  getoptions.c -o lu
+./lu -n 1024 -c

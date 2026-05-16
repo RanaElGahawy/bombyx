@@ -25,9 +25,9 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-unsigned long long todval(struct timeval * tp);
+unsigned long long todval(struct timeval *tp);
 THREAD(fib);
-int main(int argc, char ** argv);
+int main(int argc, char **argv);
 THREAD(fib_cont0);
 THREAD(fib_cont1);
 THREAD(main_cont0);
@@ -57,7 +57,7 @@ CLOSURE_DEF(main_cont0,
 
 
 
-unsigned long long todval(struct timeval * tp) {
+unsigned long long todval(struct timeval *tp) {
     return (((tp->tv_sec * 1000) * 1000) + tp->tv_usec);
 }
 THREAD(fib) {
@@ -85,7 +85,7 @@ THREAD(fib) {
     }
     return;
 }
-int main(int argc, char ** argv) {
+int main(int argc, char **argv) {
     int n0;
     int result;
     struct timeval t1;

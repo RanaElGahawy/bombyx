@@ -37,18 +37,18 @@
 #include <sys/time.h>
 #include "getoptions.h"
 
-unsigned long long todval(struct timeval * tp);
+unsigned long long todval(struct timeval *tp);
 int cilk_rand();
-void init_vec(float * V, int n);
-double maxerror_vec(float * V1, float * V2, int n0);
-void zero(float * A, int n2);
-void init(float * A0, int n3);
-double maxerror(float * A1, float * B, int n4);
-void iter_matmul(float * A2, float * B0, float * C, int n5);
+void init_vec(float *V, int n);
+double maxerror_vec(float *V1, float *V2, int n0);
+void zero(float *A, int n2);
+void init(float *A0, int n3);
+double maxerror(float *A1, float *B, int n4);
+void iter_matmul(float *A2, float *B0, float *C, int n5);
 THREAD(rec_matmulAdd);
 THREAD(rec_matmul);
-void mat_vec_mul(float * A5, float * R, float * P, int m2, int n8, int ld1, int add);
-int main(int argc, char ** argv);
+void mat_vec_mul(float *A5, float *R, float *P, int m2, int n8, int ld1, int add);
+int main(int argc, char **argv);
 THREAD(rec_matmulAdd_cont0);
 THREAD(rec_matmulAdd_cont1);
 THREAD(rec_matmulAdd_cont2);
@@ -60,18 +60,18 @@ THREAD(rec_matmul_cont3);
 THREAD(main_cont0);
 
 CLOSURE_DEF(rec_matmulAdd,
-    float * A3;
-    float * B1;
-    float * C0;
+    float *A3;
+    float *B1;
+    float *C0;
     int m;
     int n6;
     int p;
     int ld;
 );
 CLOSURE_DEF(rec_matmul,
-    float * A4;
-    float * B2;
-    float * C1;
+    float *A4;
+    float *B2;
+    float *C1;
     int m0;
     int n7;
     int p0;
@@ -80,9 +80,9 @@ CLOSURE_DEF(rec_matmul,
 CLOSURE_DEF(rec_matmulAdd_cont0,
 );
 CLOSURE_DEF(rec_matmulAdd_cont1,
-    float * A3;
-    float * B1;
-    float * C0;
+    float *A3;
+    float *B1;
+    float *C0;
     int m;
     int n6;
     int p;
@@ -96,9 +96,9 @@ CLOSURE_DEF(rec_matmulAdd_cont3,
 CLOSURE_DEF(rec_matmul_cont0,
 );
 CLOSURE_DEF(rec_matmul_cont1,
-    float * A4;
-    float * B2;
-    float * C1;
+    float *A4;
+    float *B2;
+    float *C1;
     int m0;
     int n7;
     int p0;
@@ -113,13 +113,13 @@ CLOSURE_DEF(main_cont0,
     int n9;
     int check;
     int rand_check;
-    float * A6;
-    float * B3;
-    float * C3;
-    float * R0;
-    float * P1;
-    float * P2;
-    float * C2;
+    float *A6;
+    float *B3;
+    float *C3;
+    float *R0;
+    float *P1;
+    float *P2;
+    float *C2;
     struct timeval t1;
     struct timeval t2;
 );
@@ -217,7 +217,7 @@ int opt_types[] = {INTARG, BOOLARG, BOOLARG, BOOLARG, 0};
 
 
 
-unsigned long long todval(struct timeval * tp) {
+unsigned long long todval(struct timeval *tp) {
     return (((tp->tv_sec * 1000) * 1000) + tp->tv_usec);
 }
 int cilk_rand() {
@@ -226,13 +226,13 @@ int cilk_rand() {
     result = ((rand_nxt >> 16) % (((unsigned int) 2147483647) + 1));
     return result;
 }
-void init_vec(float * V, int n) {
+void init_vec(float *V, int n) {
     int i;
     for (i = 0;(i < n);(i++)) {
         V[i] = ((float) cilk_rand());
     }
 }
-double maxerror_vec(float * V1, float * V2, int n0) {
+double maxerror_vec(float *V1, float *V2, int n0) {
     int i0;
     double err;
     double diff;
@@ -248,7 +248,7 @@ double maxerror_vec(float * V1, float * V2, int n0) {
     }
     return err;
 }
-void zero(float * A, int n2) {
+void zero(float *A, int n2) {
     int i1;
     int j;
     for (i1 = 0;(i1 < n2);(i1++)) {
@@ -257,7 +257,7 @@ void zero(float * A, int n2) {
         }
     }
 }
-void init(float * A0, int n3) {
+void init(float *A0, int n3) {
     int i2;
     int j0;
     for (i2 = 0;(i2 < n3);(i2++)) {
@@ -266,7 +266,7 @@ void init(float * A0, int n3) {
         }
     }
 }
-double maxerror(float * A1, float * B, int n4) {
+double maxerror(float *A1, float *B, int n4) {
     int i3;
     int j1;
     double error;
@@ -285,7 +285,7 @@ double maxerror(float * A1, float * B, int n4) {
     }
     return error;
 }
-void iter_matmul(float * A2, float * B0, float * C, int n5) {
+void iter_matmul(float *A2, float *B0, float *C, int n5) {
     int i4;
     int j2;
     int k;
@@ -520,7 +520,7 @@ THREAD(rec_matmul) {
     }
     return;
 }
-void mat_vec_mul(float * A5, float * R, float * P, int m2, int n8, int ld1, int add) {
+void mat_vec_mul(float *A5, float *R, float *P, int m2, int n8, int ld1, int add) {
     int i7;
     int j5;
     float c2;
@@ -557,18 +557,18 @@ void mat_vec_mul(float * A5, float * R, float * P, int m2, int n8, int ld1, int 
         }
     }
 }
-int main(int argc, char ** argv) {
+int main(int argc, char **argv) {
     int n9;
     int check;
     int rand_check;
     int help;
-    float * A6;
-    float * B3;
-    float * C3;
-    float * R0;
-    float * P1;
-    float * P2;
-    float * C2;
+    float *A6;
+    float *B3;
+    float *C3;
+    float *R0;
+    float *P1;
+    float *P2;
+    float *C2;
     struct timeval t1;
     n9 = 1024;
     check = 0;

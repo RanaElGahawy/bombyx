@@ -49,17 +49,10 @@ typedef block *pblock;
 // apparently register storage specifier is deprecated
 #define register
 
-/*
-double min;
-double max;
-int count;
-double sum;
-*/
-
 unsigned long long todval(struct timeval *tp);
 long long mult_add_block(block *A, block *B, block *R);
 long long multiply_block(block *A0, block *B0, block *R0);
-int check_block(block *R1, DTYPE v);
+void check_block(block *R1, DTYPE v, int *errorf);
 THREAD(check_matrix);
 long long add_block(block *T, block *R3);
 THREAD(add_matrix);
@@ -99,6 +92,7 @@ CLOSURE_DEF(check_matrix,
     long y;
     long o;
     DTYPE v0;
+    int *errorf0;
 );
 CLOSURE_DEF(add_matrix,
     block *T0;
@@ -135,7 +129,6 @@ CLOSURE_DEF(run_afterif0,
     block *A2;
     block *B2;
     block *R8;
-    long long flops3;
     struct timeval t1;
     struct timeval t2;
     unsigned long long runtime_ms;
@@ -151,10 +144,6 @@ CLOSURE_DEF(multiply_matrix_afterif1,
     block *R7;
     long orr0;
     int add;
-    long long _tmp;
-    long long flops2;
-    long long _tmp10;
-    long long _tmp20;
 );
 CLOSURE_DEF(multiply_matrix_afterif2,
     block *A1;
@@ -167,10 +156,6 @@ CLOSURE_DEF(multiply_matrix_afterif2,
     block *R7;
     long orr0;
     int add;
-    long long _tmp;
-    long long flops2;
-    long long _tmp10;
-    long long _tmp20;
 );
 CLOSURE_DEF(init_matrix_afterif3,
     block *R6;
@@ -186,9 +171,6 @@ CLOSURE_DEF(add_matrix_afterif4,
     long orr;
     long x0;
     long y0;
-    long long flops1;
-    long long _tmp1;
-    long long _tmp2;
 );
 CLOSURE_DEF(check_matrix_afterif5,
     block *R2;
@@ -196,10 +178,9 @@ CLOSURE_DEF(check_matrix_afterif5,
     long y;
     long o;
     DTYPE v0;
+    int *errorf0;
     int a;
     int b;
-    int tmp;
-    int _tmp3;
 );
 CLOSURE_DEF(check_matrix_cont0,
     block *R2;
@@ -207,10 +188,9 @@ CLOSURE_DEF(check_matrix_cont0,
     long y;
     long o;
     DTYPE v0;
+    int *errorf0;
     int a;
     int b;
-    int tmp;
-    int _tmp3;
 );
 CLOSURE_DEF(check_matrix_cont1,
     block *R2;
@@ -218,10 +198,9 @@ CLOSURE_DEF(check_matrix_cont1,
     long y;
     long o;
     DTYPE v0;
+    int *errorf0;
     int a;
     int b;
-    int tmp;
-    int _tmp3;
 );
 CLOSURE_DEF(check_matrix_cont2,
     block *R2;
@@ -229,10 +208,9 @@ CLOSURE_DEF(check_matrix_cont2,
     long y;
     long o;
     DTYPE v0;
+    int *errorf0;
     int a;
     int b;
-    int tmp;
-    int _tmp3;
 );
 CLOSURE_DEF(check_matrix_cont3,
     block *R2;
@@ -240,10 +218,9 @@ CLOSURE_DEF(check_matrix_cont3,
     long y;
     long o;
     DTYPE v0;
+    int *errorf0;
     int a;
     int b;
-    int tmp;
-    int _tmp3;
 );
 CLOSURE_DEF(add_matrix_cont0,
     block *T0;
@@ -252,9 +229,6 @@ CLOSURE_DEF(add_matrix_cont0,
     long orr;
     long x0;
     long y0;
-    long long flops1;
-    long long _tmp1;
-    long long _tmp2;
 );
 CLOSURE_DEF(add_matrix_cont1,
     block *T0;
@@ -263,9 +237,6 @@ CLOSURE_DEF(add_matrix_cont1,
     long orr;
     long x0;
     long y0;
-    long long flops1;
-    long long _tmp1;
-    long long _tmp2;
 );
 CLOSURE_DEF(init_matrix_cont0,
     block *R6;
@@ -292,10 +263,6 @@ CLOSURE_DEF(multiply_matrix_cont0,
     block *R7;
     long orr0;
     int add;
-    long long _tmp;
-    long long flops2;
-    long long _tmp10;
-    long long _tmp20;
 );
 CLOSURE_DEF(multiply_matrix_cont1,
     block *A1;
@@ -308,9 +275,6 @@ CLOSURE_DEF(multiply_matrix_cont1,
     block *R7;
     long orr0;
     int add;
-    long long _tmp;
-    long long flops2;
-    long long _tmp10;
 );
 CLOSURE_DEF(multiply_matrix_cont2,
     block *A1;
@@ -323,10 +287,6 @@ CLOSURE_DEF(multiply_matrix_cont2,
     block *R7;
     long orr0;
     int add;
-    long long _tmp;
-    long long flops2;
-    long long _tmp10;
-    long long _tmp20;
 );
 CLOSURE_DEF(multiply_matrix_cont3,
     block *A1;
@@ -339,10 +299,6 @@ CLOSURE_DEF(multiply_matrix_cont3,
     block *R7;
     long orr0;
     int add;
-    long long _tmp;
-    long long flops2;
-    long long _tmp10;
-    long long _tmp20;
 );
 CLOSURE_DEF(run_cont0,
     long x3;
@@ -374,7 +330,6 @@ CLOSURE_DEF(run_cont2,
     block *A2;
     block *B2;
     block *R8;
-    long long flops3;
     struct timeval t1;
     struct timeval t2;
 );
@@ -386,21 +341,24 @@ CLOSURE_DEF(run_cont3,
     block *A2;
     block *B2;
     block *R8;
-    long long flops3;
     struct timeval t1;
     struct timeval t2;
     unsigned long long runtime_ms;
 );
 CLOSURE_DEF(multiply_matrix_afterif1_cont0,
-    long long _tmp10;
-    long long _tmp20;
 );
 CLOSURE_DEF(init_matrix_afterif3_cont0,
 );
 CLOSURE_DEF(add_matrix_afterif4_cont0,
-    long long _tmp1;
-    long long _tmp2;
 );
+
+
+/*
+double min;
+double max;
+int count;
+double sum;
+*/
 
 /* compute R = R+AB, where R,A,B are BLOCK_EDGE x BLOCK_EDGE matricies
  */
@@ -705,7 +663,7 @@ long long multiply_block(block *A0, block *B0, block *R0) {
     }
     return flops0;
 }
-int check_block(block *R1, DTYPE v) {
+void check_block(block *R1, DTYPE v, int *errorf) {
     int i1;
     int error;
     error = 0;
@@ -717,77 +675,84 @@ int check_block(block *R1, DTYPE v) {
             (error++);
         }
     }
-    return error;
+    *errorf += error;
 }
 THREAD(check_matrix) {
     int a;
     int b;
-    int tmp;
     check_matrix_closure *largs = (check_matrix_closure*)(args.get());
     a = 0;
     b = 0;
     if (((largs->x * largs->y) == 1)) {
-        tmp = check_block(largs->R2,largs->v0);
-        SEND_ARGUMENT(largs->k, tmp);
+        check_block(largs->R2,largs->v0,largs->errorf0);
+        SEND_ARGUMENT(largs->k, 0);
     } else {
         if ((largs->x > largs->y)) {
             check_matrix_cont2_closure SN_check_matrix_cont2c(largs->k);
             spawn_next<check_matrix_cont2_closure> SN_check_matrix_cont2(SN_check_matrix_cont2c);
             cont sp0k;
-            SN_BIND(SN_check_matrix_cont2, &sp0k, a);
+            SN_BIND_VOID(SN_check_matrix_cont2, &sp0k);
             check_matrix_closure sp0c(sp0k);
             sp0c.R2 = largs->R2;
             sp0c.x = (largs->x / 2);
             sp0c.y = largs->y;
             sp0c.o = largs->o;
             sp0c.v0 = largs->v0;
+            sp0c.errorf0 = largs->errorf0;
             spawn<check_matrix_closure> sp0(sp0c);
 
             cont sp1k;
-            SN_BIND(SN_check_matrix_cont2, &sp1k, b);
+            SN_BIND_VOID(SN_check_matrix_cont2, &sp1k);
             check_matrix_closure sp1c(sp1k);
             sp1c.R2 = (largs->R2 + ((largs->x / 2) * largs->o));
             sp1c.x = ((largs->x + 1) / 2);
             sp1c.y = largs->y;
             sp1c.o = largs->o;
             sp1c.v0 = largs->v0;
+            sp1c.errorf0 = largs->errorf0;
             spawn<check_matrix_closure> sp1(sp1c);
 
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->tmp = tmp;
+            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->b = b;
+            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->a = a;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->v0 = largs->v0;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->o = largs->o;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->y = largs->y;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->x = largs->x;
+            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->errorf0 = largs->errorf0;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->R2 = largs->R2;
             // Original sync was here
         } else {
             check_matrix_cont0_closure SN_check_matrix_cont0c(largs->k);
             spawn_next<check_matrix_cont0_closure> SN_check_matrix_cont0(SN_check_matrix_cont0c);
             cont sp2k;
-            SN_BIND(SN_check_matrix_cont0, &sp2k, a);
+            SN_BIND_VOID(SN_check_matrix_cont0, &sp2k);
             check_matrix_closure sp2c(sp2k);
             sp2c.R2 = largs->R2;
             sp2c.x = largs->x;
             sp2c.y = (largs->y / 2);
             sp2c.o = largs->o;
             sp2c.v0 = largs->v0;
+            sp2c.errorf0 = largs->errorf0;
             spawn<check_matrix_closure> sp2(sp2c);
 
             cont sp3k;
-            SN_BIND(SN_check_matrix_cont0, &sp3k, b);
+            SN_BIND_VOID(SN_check_matrix_cont0, &sp3k);
             check_matrix_closure sp3c(sp3k);
             sp3c.R2 = (largs->R2 + (largs->y / 2));
             sp3c.x = largs->x;
             sp3c.y = ((largs->y + 1) / 2);
             sp3c.o = largs->o;
             sp3c.v0 = largs->v0;
+            sp3c.errorf0 = largs->errorf0;
             spawn<check_matrix_closure> sp3(sp3c);
 
-            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->tmp = tmp;
+            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->b = b;
+            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->a = a;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->v0 = largs->v0;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->o = largs->o;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->y = largs->y;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->x = largs->x;
+            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->errorf0 = largs->errorf0;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->R2 = largs->R2;
             // Original sync was here
         }
@@ -805,22 +770,16 @@ long long add_block(block *T, block *R3) {
     return (16 * 16);
 }
 THREAD(add_matrix) {
-    long long flops1;
-    long long _tmp1;
-    long long _tmp2;
     add_matrix_closure *largs = (add_matrix_closure*)(args.get());
-    flops1 = 0LL;
     if (((largs->x0 + largs->y0) == 2)) {
-        flops1 = add_block(largs->T0,largs->R4);
-        SEND_ARGUMENT(largs->k, flops1);
+        add_block(largs->T0,largs->R4);
+        SEND_ARGUMENT(largs->k, 0);
     } else {
-        _tmp1 = 0LL;
-        _tmp2 = 0LL;
         if ((largs->x0 > largs->y0)) {
             add_matrix_cont1_closure SN_add_matrix_cont1c(largs->k);
             spawn_next<add_matrix_cont1_closure> SN_add_matrix_cont1(SN_add_matrix_cont1c);
             cont sp0k;
-            SN_BIND(SN_add_matrix_cont1, &sp0k, _tmp1);
+            SN_BIND_VOID(SN_add_matrix_cont1, &sp0k);
             add_matrix_closure sp0c(sp0k);
             sp0c.T0 = largs->T0;
             sp0c.ot = largs->ot;
@@ -831,7 +790,7 @@ THREAD(add_matrix) {
             spawn<add_matrix_closure> sp0(sp0c);
 
             cont sp1k;
-            SN_BIND(SN_add_matrix_cont1, &sp1k, _tmp2);
+            SN_BIND_VOID(SN_add_matrix_cont1, &sp1k);
             add_matrix_closure sp1c(sp1k);
             sp1c.T0 = (largs->T0 + ((largs->x0 / 2) * largs->ot));
             sp1c.ot = largs->ot;
@@ -841,11 +800,10 @@ THREAD(add_matrix) {
             sp1c.y0 = largs->y0;
             spawn<add_matrix_closure> sp1(sp1c);
 
-            ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->flops1 = flops1;
-            ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->orr = largs->orr;
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->y0 = largs->y0;
-            ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->x0 = largs->x0;
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->R4 = largs->R4;
+            ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->orr = largs->orr;
+            ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->x0 = largs->x0;
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->ot = largs->ot;
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->T0 = largs->T0;
             // Original sync was here
@@ -853,7 +811,7 @@ THREAD(add_matrix) {
             add_matrix_cont0_closure SN_add_matrix_cont0c(largs->k);
             spawn_next<add_matrix_cont0_closure> SN_add_matrix_cont0(SN_add_matrix_cont0c);
             cont sp2k;
-            SN_BIND(SN_add_matrix_cont0, &sp2k, _tmp1);
+            SN_BIND_VOID(SN_add_matrix_cont0, &sp2k);
             add_matrix_closure sp2c(sp2k);
             sp2c.T0 = largs->T0;
             sp2c.ot = largs->ot;
@@ -864,7 +822,7 @@ THREAD(add_matrix) {
             spawn<add_matrix_closure> sp2(sp2c);
 
             cont sp3k;
-            SN_BIND(SN_add_matrix_cont0, &sp3k, _tmp2);
+            SN_BIND_VOID(SN_add_matrix_cont0, &sp3k);
             add_matrix_closure sp3c(sp3k);
             sp3c.T0 = (largs->T0 + (largs->y0 / 2));
             sp3c.ot = largs->ot;
@@ -874,11 +832,10 @@ THREAD(add_matrix) {
             sp3c.y0 = ((largs->y0 + 1) / 2);
             spawn<add_matrix_closure> sp3(sp3c);
 
-            ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->flops1 = flops1;
-            ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->orr = largs->orr;
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->y0 = largs->y0;
-            ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->x0 = largs->x0;
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->R4 = largs->R4;
+            ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->orr = largs->orr;
+            ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->x0 = largs->x0;
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->ot = largs->ot;
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->T0 = largs->T0;
             // Original sync was here
@@ -961,28 +918,20 @@ THREAD(init_matrix) {
     return;
 }
 THREAD(multiply_matrix) {
-    long long _tmp;
-    long long flops2;
-    long long _tmp10;
-    long long _tmp20;
     multiply_matrix_closure *largs = (multiply_matrix_closure*)(args.get());
     if ((((largs->x2 + largs->y2) + largs->z) == 3)) {
-        _tmp = 0LL;
         if (largs->add) {
-            _tmp = mult_add_block(largs->A1,largs->B1,largs->R7);
+            mult_add_block(largs->A1,largs->B1,largs->R7);
         } else {
-            _tmp = multiply_block(largs->A1,largs->B1,largs->R7);
+            multiply_block(largs->A1,largs->B1,largs->R7);
         }
-        SEND_ARGUMENT(largs->k, _tmp);
+        SEND_ARGUMENT(largs->k, 0);
     } else {
-        flops2 = 0LL;
-        _tmp10 = 0LL;
-        _tmp20 = 0LL;
         if (((largs->x2 >= largs->y2) && (largs->x2 >= largs->z))) {
             multiply_matrix_cont3_closure SN_multiply_matrix_cont3c(largs->k);
             spawn_next<multiply_matrix_cont3_closure> SN_multiply_matrix_cont3(SN_multiply_matrix_cont3c);
             cont sp0k;
-            SN_BIND(SN_multiply_matrix_cont3, &sp0k, _tmp10);
+            SN_BIND_VOID(SN_multiply_matrix_cont3, &sp0k);
             multiply_matrix_closure sp0c(sp0k);
             sp0c.A1 = largs->A1;
             sp0c.oa = largs->oa;
@@ -997,7 +946,7 @@ THREAD(multiply_matrix) {
             spawn<multiply_matrix_closure> sp0(sp0c);
 
             cont sp1k;
-            SN_BIND(SN_multiply_matrix_cont3, &sp1k, _tmp20);
+            SN_BIND_VOID(SN_multiply_matrix_cont3, &sp1k);
             multiply_matrix_closure sp1c(sp1k);
             sp1c.A1 = (largs->A1 + ((largs->x2 / 2) * largs->oa));
             sp1c.oa = largs->oa;
@@ -1011,17 +960,15 @@ THREAD(multiply_matrix) {
             sp1c.add = largs->add;
             spawn<multiply_matrix_closure> sp1(sp1c);
 
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->flops2 = flops2;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->add = largs->add;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->orr0 = largs->orr0;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->z = largs->z;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->B1 = largs->B1;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->oa = largs->oa;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->x2 = largs->x2;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->ob = largs->ob;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->_tmp = _tmp;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->R7 = largs->R7;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->y2 = largs->y2;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->x2 = largs->x2;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->add = largs->add;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->B1 = largs->B1;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->ob = largs->ob;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->z = largs->z;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->oa = largs->oa;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->A1 = largs->A1;
             // Original sync was here
         } else {
@@ -1029,7 +976,7 @@ THREAD(multiply_matrix) {
                 multiply_matrix_cont1_closure SN_multiply_matrix_cont1c(largs->k);
                 spawn_next<multiply_matrix_cont1_closure> SN_multiply_matrix_cont1(SN_multiply_matrix_cont1c);
                 cont sp2k;
-                SN_BIND(SN_multiply_matrix_cont1, &sp2k, _tmp10);
+                SN_BIND_VOID(SN_multiply_matrix_cont1, &sp2k);
                 multiply_matrix_closure sp2c(sp2k);
                 sp2c.A1 = (largs->A1 + (largs->y2 / 2));
                 sp2c.oa = largs->oa;
@@ -1043,24 +990,22 @@ THREAD(multiply_matrix) {
                 sp2c.add = largs->add;
                 spawn<multiply_matrix_closure> sp2(sp2c);
 
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->flops2 = flops2;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->add = largs->add;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->orr0 = largs->orr0;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->z = largs->z;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->B1 = largs->B1;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->oa = largs->oa;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->x2 = largs->x2;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->ob = largs->ob;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->_tmp = _tmp;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->R7 = largs->R7;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->y2 = largs->y2;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->x2 = largs->x2;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->add = largs->add;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->B1 = largs->B1;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->ob = largs->ob;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->z = largs->z;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->oa = largs->oa;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->A1 = largs->A1;
                 // Original sync was here
             } else {
                 multiply_matrix_cont0_closure SN_multiply_matrix_cont0c(largs->k);
                 spawn_next<multiply_matrix_cont0_closure> SN_multiply_matrix_cont0(SN_multiply_matrix_cont0c);
                 cont sp3k;
-                SN_BIND(SN_multiply_matrix_cont0, &sp3k, _tmp10);
+                SN_BIND_VOID(SN_multiply_matrix_cont0, &sp3k);
                 multiply_matrix_closure sp3c(sp3k);
                 sp3c.A1 = largs->A1;
                 sp3c.oa = largs->oa;
@@ -1075,7 +1020,7 @@ THREAD(multiply_matrix) {
                 spawn<multiply_matrix_closure> sp3(sp3c);
 
                 cont sp4k;
-                SN_BIND(SN_multiply_matrix_cont0, &sp4k, _tmp20);
+                SN_BIND_VOID(SN_multiply_matrix_cont0, &sp4k);
                 multiply_matrix_closure sp4c(sp4k);
                 sp4c.A1 = largs->A1;
                 sp4c.oa = largs->oa;
@@ -1089,17 +1034,15 @@ THREAD(multiply_matrix) {
                 sp4c.add = largs->add;
                 spawn<multiply_matrix_closure> sp4(sp4c);
 
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->flops2 = flops2;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->add = largs->add;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->orr0 = largs->orr0;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->z = largs->z;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->B1 = largs->B1;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->oa = largs->oa;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->x2 = largs->x2;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->ob = largs->ob;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->_tmp = _tmp;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->R7 = largs->R7;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->y2 = largs->y2;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->x2 = largs->x2;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->add = largs->add;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->B1 = largs->B1;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->ob = largs->ob;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->z = largs->z;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->oa = largs->oa;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->A1 = largs->A1;
                 // Original sync was here
             }
@@ -1146,10 +1089,10 @@ int run(long x3, long y3, long z0, int check) {
     sp2c.v2 = 0.;
     spawn<init_matrix_closure> sp2(sp2c);
 
+    ((run_cont0_closure*)SN_run_cont0.cls.get())->R8 = R8;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->B2 = B2;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->A2 = A2;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->check = check;
-    ((run_cont0_closure*)SN_run_cont0.cls.get())->R8 = R8;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->z0 = z0;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->y3 = y3;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->x3 = x3;
@@ -1166,7 +1109,6 @@ THREAD(run_afterif0) {
         fprintf(__stderrp,"Options: x = %ld\n",(16 * largs->x3));
         fprintf(__stderrp,"         y = %ld\n",(16 * largs->y3));
         fprintf(__stderrp,"         z = %ld\n\n",(16 * largs->z0));
-        fprintf(__stderrp,"flops      = %lld\n",largs->flops3);
     }
     free(largs->A2);
     free(largs->B2);
@@ -1178,8 +1120,6 @@ THREAD(multiply_matrix_afterif1) {
     multiply_matrix_afterif1_closure *largs = (multiply_matrix_afterif1_closure*)(args.get());
     multiply_matrix_afterif1_cont0_closure SN_multiply_matrix_afterif1_cont0c(largs->k);
     spawn_next<multiply_matrix_afterif1_cont0_closure> SN_multiply_matrix_afterif1_cont0(SN_multiply_matrix_afterif1_cont0c);
-    ((multiply_matrix_afterif1_cont0_closure*)SN_multiply_matrix_afterif1_cont0.cls.get())->_tmp20 = largs->_tmp20;
-    ((multiply_matrix_afterif1_cont0_closure*)SN_multiply_matrix_afterif1_cont0.cls.get())->_tmp10 = largs->_tmp10;
     // Original sync was here
     return;
 }
@@ -1196,10 +1136,6 @@ THREAD(multiply_matrix_afterif2) {
     sp0c->R7 = largs->R7;
     sp0c->orr0 = largs->orr0;
     sp0c->add = largs->add;
-    sp0c->_tmp = largs->_tmp;
-    sp0c->flops2 = largs->flops2;
-    sp0c->_tmp10 = largs->_tmp10;
-    sp0c->_tmp20 = largs->_tmp20;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
     return;
@@ -1215,30 +1151,25 @@ THREAD(add_matrix_afterif4) {
     add_matrix_afterif4_closure *largs = (add_matrix_afterif4_closure*)(args.get());
     add_matrix_afterif4_cont0_closure SN_add_matrix_afterif4_cont0c(largs->k);
     spawn_next<add_matrix_afterif4_cont0_closure> SN_add_matrix_afterif4_cont0(SN_add_matrix_afterif4_cont0c);
-    ((add_matrix_afterif4_cont0_closure*)SN_add_matrix_afterif4_cont0.cls.get())->_tmp2 = largs->_tmp2;
-    ((add_matrix_afterif4_cont0_closure*)SN_add_matrix_afterif4_cont0.cls.get())->_tmp1 = largs->_tmp1;
     // Original sync was here
     return;
 }
 THREAD(check_matrix_afterif5) {
     check_matrix_afterif5_closure *largs = (check_matrix_afterif5_closure*)(args.get());
-    largs->_tmp3 = (largs->a + largs->b);
-    SEND_ARGUMENT(largs->k, largs->_tmp3);
     return;
 }
 THREAD(check_matrix_cont0) {
     check_matrix_cont0_closure *largs = (check_matrix_cont0_closure*)(args.get());
     check_matrix_cont1_closure SN_check_matrix_cont1c(largs->k);
     spawn_next<check_matrix_cont1_closure> SN_check_matrix_cont1(SN_check_matrix_cont1c);
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->_tmp3 = largs->_tmp3;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->tmp = largs->tmp;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->b = largs->b;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->a = largs->a;
+    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->errorf0 = largs->errorf0;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->v0 = largs->v0;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->R2 = largs->R2;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->y = largs->y;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->x = largs->x;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->o = largs->o;
+    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->y = largs->y;
+    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->R2 = largs->R2;
     // Original sync was here
     return;
 }
@@ -1250,10 +1181,9 @@ THREAD(check_matrix_cont1) {
     sp0c->y = largs->y;
     sp0c->o = largs->o;
     sp0c->v0 = largs->v0;
+    sp0c->errorf0 = largs->errorf0;
     sp0c->a = largs->a;
     sp0c->b = largs->b;
-    sp0c->tmp = largs->tmp;
-    sp0c->_tmp3 = largs->_tmp3;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
     return;
@@ -1262,15 +1192,14 @@ THREAD(check_matrix_cont2) {
     check_matrix_cont2_closure *largs = (check_matrix_cont2_closure*)(args.get());
     check_matrix_cont3_closure SN_check_matrix_cont3c(largs->k);
     spawn_next<check_matrix_cont3_closure> SN_check_matrix_cont3(SN_check_matrix_cont3c);
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->tmp = largs->tmp;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->b = largs->b;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->a = largs->a;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->o = largs->o;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->y = largs->y;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->R2 = largs->R2;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->v0 = largs->v0;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->_tmp3 = largs->_tmp3;
+    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->o = largs->o;
+    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->a = largs->a;
+    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->errorf0 = largs->errorf0;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->x = largs->x;
+    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->R2 = largs->R2;
     // Original sync was here
     return;
 }
@@ -1282,10 +1211,9 @@ THREAD(check_matrix_cont3) {
     sp0c->y = largs->y;
     sp0c->o = largs->o;
     sp0c->v0 = largs->v0;
+    sp0c->errorf0 = largs->errorf0;
     sp0c->a = largs->a;
     sp0c->b = largs->b;
-    sp0c->tmp = largs->tmp;
-    sp0c->_tmp3 = largs->_tmp3;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
     return;
@@ -1299,9 +1227,6 @@ THREAD(add_matrix_cont0) {
     sp0c->orr = largs->orr;
     sp0c->x0 = largs->x0;
     sp0c->y0 = largs->y0;
-    sp0c->flops1 = largs->flops1;
-    sp0c->_tmp1 = largs->_tmp1;
-    sp0c->_tmp2 = largs->_tmp2;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
     return;
@@ -1315,9 +1240,6 @@ THREAD(add_matrix_cont1) {
     sp0c->orr = largs->orr;
     sp0c->x0 = largs->x0;
     sp0c->y0 = largs->y0;
-    sp0c->flops1 = largs->flops1;
-    sp0c->_tmp1 = largs->_tmp1;
-    sp0c->_tmp2 = largs->_tmp2;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
     return;
@@ -1359,21 +1281,16 @@ THREAD(multiply_matrix_cont0) {
     sp0c->R7 = largs->R7;
     sp0c->orr0 = largs->orr0;
     sp0c->add = largs->add;
-    sp0c->_tmp = largs->_tmp;
-    sp0c->flops2 = largs->flops2;
-    sp0c->_tmp10 = largs->_tmp10;
-    sp0c->_tmp20 = largs->_tmp20;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
     return;
 }
 THREAD(multiply_matrix_cont1) {
-    long long _tmp20;
     multiply_matrix_cont1_closure *largs = (multiply_matrix_cont1_closure*)(args.get());
     multiply_matrix_cont2_closure SN_multiply_matrix_cont2c(largs->k);
     spawn_next<multiply_matrix_cont2_closure> SN_multiply_matrix_cont2(SN_multiply_matrix_cont2c);
     cont sp0k;
-    SN_BIND(SN_multiply_matrix_cont2, &sp0k, _tmp20);
+    SN_BIND_VOID(SN_multiply_matrix_cont2, &sp0k);
     multiply_matrix_closure sp0c(sp0k);
     sp0c.A1 = largs->A1;
     sp0c.oa = largs->oa;
@@ -1387,19 +1304,16 @@ THREAD(multiply_matrix_cont1) {
     sp0c.add = 1;
     spawn<multiply_matrix_closure> sp0(sp0c);
 
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->_tmp10 = largs->_tmp10;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->_tmp = largs->_tmp;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->B1 = largs->B1;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->add = largs->add;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->orr0 = largs->orr0;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->R7 = largs->R7;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->z = largs->z;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->x2 = largs->x2;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->orr0 = largs->orr0;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->B1 = largs->B1;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->y2 = largs->y2;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->A1 = largs->A1;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->flops2 = largs->flops2;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->oa = largs->oa;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->R7 = largs->R7;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->ob = largs->ob;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->A1 = largs->A1;
     // Original sync was here
     return;
 }
@@ -1416,10 +1330,6 @@ THREAD(multiply_matrix_cont2) {
     sp0c->R7 = largs->R7;
     sp0c->orr0 = largs->orr0;
     sp0c->add = largs->add;
-    sp0c->_tmp = largs->_tmp;
-    sp0c->flops2 = largs->flops2;
-    sp0c->_tmp10 = largs->_tmp10;
-    sp0c->_tmp20 = largs->_tmp20;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
     return;
@@ -1437,10 +1347,6 @@ THREAD(multiply_matrix_cont3) {
     sp0c->R7 = largs->R7;
     sp0c->orr0 = largs->orr0;
     sp0c->add = largs->add;
-    sp0c->_tmp = largs->_tmp;
-    sp0c->flops2 = largs->flops2;
-    sp0c->_tmp10 = largs->_tmp10;
-    sp0c->_tmp20 = largs->_tmp20;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
     return;
@@ -1449,26 +1355,25 @@ THREAD(run_cont0) {
     run_cont0_closure *largs = (run_cont0_closure*)(args.get());
     run_cont1_closure SN_run_cont1c(largs->k);
     spawn_next<run_cont1_closure> SN_run_cont1(SN_run_cont1c);
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->R8 = largs->R8;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->B2 = largs->B2;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->A2 = largs->A2;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->t1 = largs->t1;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->check = largs->check;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->t2 = largs->t2;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->z0 = largs->z0;
+    ((run_cont1_closure*)SN_run_cont1.cls.get())->t1 = largs->t1;
+    ((run_cont1_closure*)SN_run_cont1.cls.get())->B2 = largs->B2;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->y3 = largs->y3;
+    ((run_cont1_closure*)SN_run_cont1.cls.get())->A2 = largs->A2;
+    ((run_cont1_closure*)SN_run_cont1.cls.get())->check = largs->check;
+    ((run_cont1_closure*)SN_run_cont1.cls.get())->z0 = largs->z0;
+    ((run_cont1_closure*)SN_run_cont1.cls.get())->R8 = largs->R8;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->x3 = largs->x3;
     // Original sync was here
     return;
 }
 THREAD(run_cont1) {
-    long long flops3;
     run_cont1_closure *largs = (run_cont1_closure*)(args.get());
     gettimeofday(&(largs->t1),0);
     run_cont2_closure SN_run_cont2c(largs->k);
     spawn_next<run_cont2_closure> SN_run_cont2(SN_run_cont2c);
     cont sp0k;
-    SN_BIND(SN_run_cont2, &sp0k, flops3);
+    SN_BIND_VOID(SN_run_cont2, &sp0k);
     multiply_matrix_closure sp0c(sp0k);
     sp0c.A1 = largs->A2;
     sp0c.oa = largs->y3;
@@ -1486,11 +1391,11 @@ THREAD(run_cont1) {
     ((run_cont2_closure*)SN_run_cont2.cls.get())->t1 = largs->t1;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->R8 = largs->R8;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->B2 = largs->B2;
-    ((run_cont2_closure*)SN_run_cont2.cls.get())->A2 = largs->A2;
+    ((run_cont2_closure*)SN_run_cont2.cls.get())->x3 = largs->x3;
+    ((run_cont2_closure*)SN_run_cont2.cls.get())->check = largs->check;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->z0 = largs->z0;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->y3 = largs->y3;
-    ((run_cont2_closure*)SN_run_cont2.cls.get())->check = largs->check;
-    ((run_cont2_closure*)SN_run_cont2.cls.get())->x3 = largs->x3;
+    ((run_cont2_closure*)SN_run_cont2.cls.get())->A2 = largs->A2;
     // Original sync was here
     return;
 }
@@ -1502,26 +1407,28 @@ THREAD(run_cont2) {
     printf("%f\n",(runtime_ms / 1000.));
     if (largs->check) {
         printf("Now check result ... \n");
+        largs->check = 0;
         run_cont3_closure SN_run_cont3c(largs->k);
         spawn_next<run_cont3_closure> SN_run_cont3(SN_run_cont3c);
         cont sp0k;
-        SN_BIND(SN_run_cont3, &sp0k, check);
+        SN_BIND_VOID(SN_run_cont3, &sp0k);
         check_matrix_closure sp0c(sp0k);
         sp0c.R2 = largs->R8;
         sp0c.x = largs->x3;
         sp0c.y = largs->z0;
         sp0c.o = largs->z0;
         sp0c.v0 = (largs->y3 * 16);
+        sp0c.errorf0 = &(largs->check);
         spawn<check_matrix_closure> sp0(sp0c);
 
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->t2 = largs->t2;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->runtime_ms = runtime_ms;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->t1 = largs->t1;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->flops3 = largs->flops3;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->B2 = largs->B2;
+        ((run_cont3_closure*)SN_run_cont3.cls.get())->runtime_ms = runtime_ms;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->R8 = largs->R8;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->A2 = largs->A2;
+        ((run_cont3_closure*)SN_run_cont3.cls.get())->t2 = largs->t2;
+        ((run_cont3_closure*)SN_run_cont3.cls.get())->B2 = largs->B2;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->x3 = largs->x3;
+        ((run_cont3_closure*)SN_run_cont3.cls.get())->check = largs->check;
+        ((run_cont3_closure*)SN_run_cont3.cls.get())->A2 = largs->A2;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->z0 = largs->z0;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->y3 = largs->y3;
         // Original sync was here
@@ -1534,7 +1441,6 @@ THREAD(run_cont2) {
         sp1c->A2 = largs->A2;
         sp1c->B2 = largs->B2;
         sp1c->R8 = largs->R8;
-        sp1c->flops3 = largs->flops3;
         sp1c->t1 = largs->t1;
         sp1c->t2 = largs->t2;
         sp1c->runtime_ms = runtime_ms;
@@ -1553,7 +1459,6 @@ THREAD(run_cont3) {
     sp0c->A2 = largs->A2;
     sp0c->B2 = largs->B2;
     sp0c->R8 = largs->R8;
-    sp0c->flops3 = largs->flops3;
     sp0c->t1 = largs->t1;
     sp0c->t2 = largs->t2;
     sp0c->runtime_ms = largs->runtime_ms;
@@ -1562,10 +1467,7 @@ THREAD(run_cont3) {
     return;
 }
 THREAD(multiply_matrix_afterif1_cont0) {
-    long long flops2;
     multiply_matrix_afterif1_cont0_closure *largs = (multiply_matrix_afterif1_cont0_closure*)(args.get());
-    flops2 = (largs->_tmp10 + largs->_tmp20);
-    SEND_ARGUMENT(largs->k, flops2);
     return;
 }
 THREAD(init_matrix_afterif3_cont0) {
@@ -1574,9 +1476,6 @@ THREAD(init_matrix_afterif3_cont0) {
     return;
 }
 THREAD(add_matrix_afterif4_cont0) {
-    long long flops1;
     add_matrix_afterif4_cont0_closure *largs = (add_matrix_afterif4_cont0_closure*)(args.get());
-    flops1 = (largs->_tmp1 + largs->_tmp2);
-    SEND_ARGUMENT(largs->k, flops1);
     return;
 }

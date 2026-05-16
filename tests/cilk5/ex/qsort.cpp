@@ -44,7 +44,7 @@
 // This implementation is pure C++ code before Intel(R) Cilk(TM) Plus
 // conversion.
 THREAD(sample_qsort);
-unsigned long long todval(struct timeval * tp);
+unsigned long long todval(struct timeval *tp);
 int qmain(int n);
 THREAD(sample_qsort_afterif0);
 THREAD(sample_qsort_cont0);
@@ -52,27 +52,27 @@ THREAD(sample_qsort_cont1);
 THREAD(qmain_cont0);
 
 CLOSURE_DEF(sample_qsort,
-    int * begin;
-    int * end;
+    int *begin;
+    int *end;
 );
 CLOSURE_DEF(sample_qsort_afterif0,
-    int * begin;
-    int * end;
-    int * middle;
+    int *begin;
+    int *end;
+    int *middle;
 );
 CLOSURE_DEF(sample_qsort_cont0,
-    int * begin;
-    int * end;
-    int * middle;
+    int *begin;
+    int *end;
+    int *middle;
 );
 CLOSURE_DEF(sample_qsort_cont1,
-    int * begin;
-    int * end;
-    int * middle;
+    int *begin;
+    int *end;
+    int *middle;
 );
 CLOSURE_DEF(qmain_cont0,
     int n;
-    int * a;
+    int *a;
     struct timeval t1;
     struct timeval t2;
 );
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 }
 
 THREAD(sample_qsort) {
-    int * middle;
+    int *middle;
     sample_qsort_closure *largs = (sample_qsort_closure*)(args.get());
     if ((largs->begin != largs->end)) {
         (--largs->end);
@@ -141,11 +141,11 @@ THREAD(sample_qsort) {
     }
     return;
 }
-unsigned long long todval(struct timeval * tp) {
+unsigned long long todval(struct timeval *tp) {
     return (((tp->tv_sec * 1000) * 1000) + tp->tv_usec);
 }
 int qmain(int n) {
-    int * a;
+    int *a;
     int i;
     std::mt19937 gen(0);
     struct timeval t1;
