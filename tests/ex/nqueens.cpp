@@ -95,13 +95,13 @@ THREAD(nqueens) {
         SEND_ARGUMENT(largs->k, 1);
     } else {
         count = ((int *) __builtin_alloca((largs->n0 * sizeof(int))));
-        ((void) memset(count,0,(largs->n0 * sizeof(int))));
+        ((void) __builtin___memset_chk(count,0,(largs->n0 * sizeof(int)),__builtin_object_size(count,0)));
         nqueens_cont0_closure SN_nqueens_cont0c(largs->k);
         spawn_next<nqueens_cont0_closure> SN_nqueens_cont0(SN_nqueens_cont0c);
         for (i0 = 0;(i0 < largs->n0);i0 = (i0 + 1)) {
             b_alloc = ((char *) __builtin_alloca((((largs->j0 + 1) * sizeof(char)) + 31)));
             b = ((char *) ((((uintptr_t) b_alloc) + 31) & (~31)));
-            memcpy(b,largs->a0,(largs->j0 * sizeof(char)));
+            __builtin___memcpy_chk(b,largs->a0,(largs->j0 * sizeof(char)),__builtin_object_size(b,0));
             b[largs->j0] = i0;
             if (ok((largs->j0 + 1),b)) {
                 cont sp0k;

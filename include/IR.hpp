@@ -6,6 +6,7 @@
 #include <deque>
 #include <memory>
 #include <set>
+#include <unordered_map>
 #include <vector>
 
 #include "clang/AST/Decl.h"
@@ -44,6 +45,7 @@ struct IRVarDecl {
   enum { LOCAL, ARG } DeclLoc;
   bool IsEphemeral = false;
   bool InWhile = false;
+  const clang::VarDecl *ASTDecl = nullptr;
 };
 
 typedef std::variant<ASTVarRef, IRFunction *> IRFunRef;
@@ -60,6 +62,7 @@ struct IRPrintContext {
   clang::ASTContext &ASTCtx;
   const char *NewlineSymbol;
   bool GraphVizEscapeChars = false;
+  std::unordered_map<const clang::NamedDecl *, std::string> VarRenames;
   std::function<void(llvm::raw_ostream &, IRVarRef)> IdentCB =
       &identPrintSimple;
   std::function<void(IRPrintContext *, llvm::raw_ostream &, IRExpr *)> ExprCB =
@@ -674,8 +677,8 @@ public:
   virtual IRStmt *clone() override;
 };
 
-// Wraps an arbitrary Clang Stmt* opaquely (e.g. switch statements).
-// The statement is printed verbatim using Clang's pretty-printer, with
+// Wraps an arbitrary Clang Stmt* opaquely.
+// The statement is printed using Clang's pretty-printer, with
 // variable renames applied so that IR-renamed vars are printed correctly.
 struct ASTStmtWrapIRStmt : IRStmt {
   clang::Stmt *S;

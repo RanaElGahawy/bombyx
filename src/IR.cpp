@@ -2,6 +2,7 @@
 #include "util.hpp"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/ExprCXX.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -113,7 +114,7 @@ void FIdentIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   if (auto *F = std::get_if<IRFunction *>(&FR)) {
     Out << (*F)->getName();
   } else {
-    Out << std::get<ASTVarRef>(FR)->getName();
+    Out << std::get<ASTVarRef>(FR)->getQualifiedNameAsString();
   }
 }
 
@@ -125,10 +126,7 @@ IRExpr *FIdentIRExpr::clone() {
   }
 }
 
-void ASTLiteralIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
-  assert(Lit);
-  Lit->printPretty(Out, nullptr, Ctx.ASTCtx.getPrintingPolicy());
-}
+// ASTLiteralIRExpr::print is defined after VarRenamePrinterHelper below.
 
 IRExpr *ASTLiteralIRExpr::clone() {
   assert(Lit);
@@ -209,7 +207,7 @@ void CallIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   if (auto *F = std::get_if<IRFunction *>(&Fn)) {
     Out << (*F)->getName();
   } else {
-    Out << std::get<ASTVarRef>(Fn)->getName();
+    Out << std::get<ASTVarRef>(Fn)->getQualifiedNameAsString();
   }
   Out << "(";
   bool first = true;
@@ -362,10 +360,89 @@ struct VarRenamePrinterHelper : clang::PrinterHelper {
         return true;
       }
     }
+    // For lambda expressions, rewrite any captured variable that has been
+    // renamed (e.g. end -> largs->end) as an init-capture [end = largs->end]
+    // so the capture list compiles in the transformed function body.
+    if (auto *Lambda = llvm::dyn_cast<clang::LambdaExpr>(E)) {
+      bool AnyRenamed = false;
+      for (const auto &Cap : Lambda->captures()) {
+        if (Cap.capturesVariable() &&
+            Renames.count(Cap.getCapturedVar()) > 0) {
+          AnyRenamed = true;
+          break;
+        }
+      }
+      if (!AnyRenamed)
+        return false; // let printPretty handle it normally
+      // Print capture list with init-captures for renamed vars.
+      OS << "[";
+      bool First = true;
+      if (Lambda->getCaptureDefault() == clang::LCD_ByRef)
+        OS << "&";
+      else if (Lambda->getCaptureDefault() == clang::LCD_ByCopy)
+        OS << "=";
+      else
+        First = true; // no default
+      if (Lambda->getCaptureDefault() != clang::LCD_None)
+        First = false;
+      for (const auto &Cap : Lambda->captures()) {
+        if (Cap.isImplicit())
+          continue;
+        if (!First)
+          OS << ", ";
+        First = false;
+        if (Cap.capturesVariable()) {
+          auto *VD = Cap.getCapturedVar();
+          auto It = Renames.find(VD);
+          if (It != Renames.end()) {
+            OS << VD->getName() << " = " << It->second;
+          } else {
+            if (Cap.getCaptureKind() == clang::LCK_ByRef)
+              OS << "&";
+            OS << VD->getName();
+          }
+        } else if (Cap.capturesThis()) {
+          if (Cap.getCaptureKind() == clang::LCK_StarThis)
+            OS << "*this";
+          else
+            OS << "this";
+        }
+      }
+      OS << "]";
+      // Print parameter list.
+      auto *CallOp = Lambda->getCallOperator();
+      OS << "(";
+      bool FirstParam = true;
+      for (auto *Param : CallOp->parameters()) {
+        if (!FirstParam)
+          OS << ", ";
+        FirstParam = false;
+        Param->getType().print(OS, PP);
+        if (!Param->getName().empty())
+          OS << " " << Param->getName();
+      }
+      OS << ") {\n";
+      // Print body — no helper needed: captured vars inside the body are
+      // fresh lambda-scope VarDecls named after the original, so printPretty
+      // produces the right names without renaming.
+      Lambda->getBody()->printPretty(OS, nullptr, PP);
+      OS << "}";
+      return true;
+    }
     return false;
   }
 };
 } // namespace
+
+void ASTLiteralIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
+  assert(Lit);
+  if (Ctx.VarRenames.empty()) {
+    Lit->printPretty(Out, nullptr, Ctx.ASTCtx.getPrintingPolicy());
+  } else {
+    VarRenamePrinterHelper Helper(Ctx.VarRenames, Ctx.ASTCtx.getPrintingPolicy());
+    Lit->printPretty(Out, &Helper, Ctx.ASTCtx.getPrintingPolicy());
+  }
+}
 
 void ASTStmtWrapIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   assert(S);

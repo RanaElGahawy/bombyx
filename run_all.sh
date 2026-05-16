@@ -55,4 +55,14 @@ $BOMBYX "$BASE/Bombyx_OpenCilk_Examples/triangleCount/main.cpp" \
 echo ">> BarnesHut"
 $BOMBYX "$BASE/Bombyx_OpenCilk_Examples/barnes-hut/main.cpp" \
         "$BASE/Bombyx_OpenCilk_Examples/barnes-hut//output/main.cpp"
+
+echo ">> nqueens"
+./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/nqueens.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/nqueens.cpp"
+echo ">> fib"
+./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/fib.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/fib.cpp" 
+echo ">> cilksort"
+./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/cilksort.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/cilksort.cpp"
+echo ">> qsort"
+./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/qsort.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/qsort.cpp"
+
 echo "✅ Done!"

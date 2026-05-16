@@ -178,12 +178,18 @@ public:
 
 static BinopIRExpr::BinopOp astOpToIROp(clang::BinaryOperatorKind K) {
   switch (K) {
-  case clang::BO_LT:  return BinopIRExpr::BINOP_LT;
-  case clang::BO_GT:  return BinopIRExpr::BINOP_GT;
-  case clang::BO_LE:  return BinopIRExpr::BINOP_LE;
-  case clang::BO_GE:  return BinopIRExpr::BINOP_GE;
-  case clang::BO_EQ:  return BinopIRExpr::BINOP_EQ;
-  case clang::BO_NE:  return BinopIRExpr::BINOP_NEQ;
+  case clang::BO_LT:
+    return BinopIRExpr::BINOP_LT;
+  case clang::BO_GT:
+    return BinopIRExpr::BINOP_GT;
+  case clang::BO_LE:
+    return BinopIRExpr::BINOP_LE;
+  case clang::BO_GE:
+    return BinopIRExpr::BINOP_GE;
+  case clang::BO_EQ:
+    return BinopIRExpr::BINOP_EQ;
+  case clang::BO_NE:
+    return BinopIRExpr::BINOP_NEQ;
   default:
     llvm_unreachable("Unsupported comparison op in desugared condition");
   }
@@ -205,7 +211,8 @@ private:
   bool WhileCtx = false;
   bool SyncInWhile = false;
   // Stack of switch join blocks for break-in-switch handling.
-  // A nullptr entry acts as a loop barrier (breaks inside loops don't exit the switch).
+  // A nullptr entry acts as a loop barrier (breaks inside loops don't exit the
+  // switch).
   std::vector<IRBasicBlock *> SwitchBreakStack;
 
   /* Basicially get a Clang expression visit it then in the visit appropriate
@@ -299,6 +306,11 @@ private:
     if (auto *CE = llvm::dyn_cast<clang::CXXConstructExpr>(Init)) {
       if (CE->getNumArgs() == 0)
         return;
+      // Preserve constructor-initialization syntax .
+      // If the constructor is a real (non-elidable, non-copy) call, skip the
+      // CopyIRStmt and let printLocals emit "Type name(args);" from ASTDecl.
+      if (!CE->isElidable() && !CE->getConstructor()->isCopyConstructor())
+        return;
       if (CE->getNumArgs() == 1)
         Init = CE->getArg(0)->IgnoreParenImpCasts();
     }
@@ -332,7 +344,7 @@ private:
   void emitIfBreak(IRExpr *Cond) {
     auto *CheckB = CurrB;
     auto *BreakB = F->createBlock();
-    auto *ContB  = F->createBlock();
+    auto *ContB = F->createBlock();
 
     CheckB->Term = new IfIRStmt(Cond);
     CheckB->Succs.insert(BreakB); // true  → break
@@ -447,6 +459,7 @@ public:
           .Type = VD->getType(),
           .Name = VDS,
           .DeclLoc = IRVarDecl::LOCAL,
+          .ASTDecl = VD,
       });
       IRVarRef VR = &F->Vars.back();
       VarLookup[VD] = VR;
@@ -486,9 +499,9 @@ public:
     if (FS->getCond())
       DS = analyzeCondForDesugar(FS->getCond());
 
-    auto *ForB  = F->createBlock();
+    auto *ForB = F->createBlock();
     auto *BodyB = F->createBlock();
-    auto *IncB  = F->createBlock();
+    auto *IncB = F->createBlock();
     auto *JoinB = F->createBlock();
 
     CurrB->Succs.insert(ForB);
@@ -535,9 +548,11 @@ public:
     CurrB = BodyB;
 
     if (DS.AssignBO)
-      emitDesugaredBodyPrefix(DS); // advances CurrB to the post-break-check block
+      emitDesugaredBodyPrefix(
+          DS); // advances CurrB to the post-break-check block
 
-    SwitchBreakStack.push_back(nullptr); // loop masks any enclosing switch break
+    SwitchBreakStack.push_back(
+        nullptr); // loop masks any enclosing switch break
     handleStmt(FS->getBody());
     SwitchBreakStack.pop_back();
     CurrB->Succs.insert(IncB);
@@ -559,8 +574,8 @@ public:
     WhileCondDesugar DS = analyzeCondForDesugar(WS->getCond());
 
     auto *WhileB = F->createBlock();
-    auto *BodyB  = F->createBlock();
-    auto *JoinB  = F->createBlock();
+    auto *BodyB = F->createBlock();
+    auto *JoinB = F->createBlock();
 
     CurrB->Succs.insert(WhileB);
     WhileB->Succs.insert(BodyB);
@@ -582,19 +597,21 @@ public:
     CurrB = BodyB;
 
     if (DS.AssignBO)
-      emitDesugaredBodyPrefix(DS); // advances CurrB to the post-break-check block
+      emitDesugaredBodyPrefix(
+          DS); // advances CurrB to the post-break-check block
 
     // Save and restore WhileCtx/SyncInWhile so that nested while
     // loops do not clobber the outer loop's state.
-    bool SavedWhileCtx   = WhileCtx;
+    bool SavedWhileCtx = WhileCtx;
     bool SavedSyncInWhile = SyncInWhile;
-    WhileCtx   = true;
+    WhileCtx = true;
     SyncInWhile = false;
-    SwitchBreakStack.push_back(nullptr); // loop masks any enclosing switch break
+    SwitchBreakStack.push_back(
+        nullptr); // loop masks any enclosing switch break
     handleStmt(WS->getBody());
     SwitchBreakStack.pop_back();
     bool ThisSyncInWhile = SyncInWhile;
-    WhileCtx   = SavedWhileCtx;
+    WhileCtx = SavedWhileCtx;
     SyncInWhile = SavedSyncInWhile;
 
     if (ThisSyncInWhile && SavedWhileCtx)
@@ -642,11 +659,11 @@ public:
 
   void VisitSwitchStmt(SwitchStmt *SS) {
     // Emit the entire switch opaquely — the ScopedIRTraverser in downstream
-    // passes cannot handle the multi-predecessor join that an if-else desugaring
-    // would produce.  The switch body contains no cilk_spawn, so verbatim
-    // output is semantically correct.
-    // Build a rename map so IR-renamed vars (e.g. size→size2) are printed
-    // correctly inside the opaque switch body.
+    // passes cannot handle the multi-predecessor join that an if-else
+    // desugaring would produce.  The switch body contains no cilk_spawn, so
+    // verbatim output is semantically correct. Build a rename map so IR-renamed
+    // vars (e.g. size→size2) are printed correctly inside the opaque switch
+    // body.
     std::unordered_map<const clang::NamedDecl *, std::string> Renames;
     for (auto &[ASTDecl, IRVar] : VarLookup)
       Renames[ASTDecl] = GetSym(IRVar->Name);
@@ -704,9 +721,7 @@ public:
     ExprStack.push_back(AE);
   }
 
-  void VisitConstantExpr(ConstantExpr *Node) {
-    Visit(Node->getSubExpr());
-  }
+  void VisitConstantExpr(ConstantExpr *Node) { Visit(Node->getSubExpr()); }
 
   void VisitIntegerLiteral(IntegerLiteral *Node) {
     auto *LE = new ASTLiteralIRExpr(Node);
@@ -1079,6 +1094,7 @@ public:
             .Type = Param->getType(),
             .Name = PSym,
             .DeclLoc = IRVarDecl::ARG,
+            .ASTDecl = Param,
         });
         VarLookup[Param] = &F->Vars.back();
       }

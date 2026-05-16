@@ -231,6 +231,7 @@ public:
               .Type = Arg->Type,
               .Name = Arg->Name,
               .DeclLoc = IRVarDecl::ARG,
+              .ASTDecl = Arg->ASTDecl,
           });
           Remap[Arg] = &(CF.F->Vars.back());
         }
@@ -239,6 +240,7 @@ public:
               .Type = Local->Type,
               .Name = Local->Name,
               .DeclLoc = IRVarDecl::LOCAL,
+              .ASTDecl = Local->ASTDecl,
           });
           Remap[Local] = &(CF.F->Vars.back());
         }
@@ -336,6 +338,7 @@ public:
                   .Type = VR->Type,
                   .Name = VR->Name,
                   .DeclLoc = IRVarDecl::ARG,
+                  .ASTDecl = VR->ASTDecl,
               });
               Remap[VR] = &CF.F->Vars.back();
             }

@@ -332,12 +332,12 @@ THREAD(cilkmerge) {
   if ((largs->high10 < largs->low10)) {
     memcpy(largs->lowdest0, largs->low20,
            (sizeof(ELM) * (largs->high20 - largs->low20)));
-    return;
+    SEND_ARGUMENT(largs->k, 0);
   } else {
     if (((largs->high20 - largs->low20) < (2 * 1024))) {
       seqmerge(largs->low10, largs->high10, largs->low20, largs->high20,
                largs->lowdest0);
-      return;
+      SEND_ARGUMENT(largs->k, 0);
     } else {
       split1 = ((((largs->high10 - largs->low10) + 1) / 2) + largs->low10);
       split2 = binsplit(*(split1), largs->low20, largs->high20);
@@ -385,7 +385,7 @@ THREAD(cilksort) {
   quarter = (largs->size / 4);
   if ((largs->size < (2 * 1024))) {
     seqquick(largs->low4, ((largs->low4 + largs->size) - 1));
-    return;
+    SEND_ARGUMENT(largs->k, 0);
   } else {
     A = largs->low4;
     tmpA = largs->tmp1;
@@ -527,7 +527,6 @@ int main(int argc, char **argv) {
     ((main_cont0_closure *)SN_main_cont0.cls.get())->size2 = size2;
     // Original sync was here
   }
-  return 0;
 }
 THREAD(cilkmerge_cont0) {
   cilkmerge_cont0_closure *largs = (cilkmerge_cont0_closure *)(args.get());
@@ -538,7 +537,7 @@ THREAD(cilkmerge_cont0) {
 }
 THREAD(cilkmerge_cont1) {
   cilkmerge_cont1_closure *largs = (cilkmerge_cont1_closure *)(args.get());
-  return;
+  SEND_ARGUMENT(largs->k, 0);
   return;
 }
 THREAD(cilksort_cont0) {
@@ -619,7 +618,7 @@ THREAD(cilksort_cont3) {
 }
 THREAD(cilksort_cont4) {
   cilksort_cont4_closure *largs = (cilksort_cont4_closure *)(args.get());
-  return;
+  SEND_ARGUMENT(largs->k, 0);
   return;
 }
 THREAD(main_cont0) {

@@ -12,6 +12,7 @@
 #include "util.hpp"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprCilk.h"
 #include "clang/AST/Stmt.h"
 
@@ -99,7 +100,25 @@ void printLocals(IRFunction *F, clang::ASTContext &C, llvm::raw_ostream &Out) {
         }
       } else {
         Ty.print(Out, C.getPrintingPolicy());
-        Out << " " << Name << ";\n";
+        Out << " " << Name;
+        // Emit constructor-initialization args if the original decl used them.
+        if (Local.ASTDecl && Local.ASTDecl->hasInit()) {
+          auto *Init = Local.ASTDecl->getInit()->IgnoreParenImpCasts();
+          if (auto *CE = llvm::dyn_cast<clang::CXXConstructExpr>(Init)) {
+            if (!CE->isElidable() &&
+                !CE->getConstructor()->isCopyConstructor() &&
+                CE->getNumArgs() > 0) {
+              Out << "(";
+              for (unsigned I = 0; I < CE->getNumArgs(); ++I) {
+                if (I > 0)
+                  Out << ", ";
+                CE->getArg(I)->printPretty(Out, nullptr, C.getPrintingPolicy());
+              }
+              Out << ")";
+            }
+          }
+        }
+        Out << ";\n";
       }
     }
   }
@@ -214,6 +233,10 @@ private:
   int SpawnCtr = 0;
   int IndentLvl = 1;
 
+public:
+  bool LastReturnPrinted = false;
+
+private:
   llvm::raw_ostream &Indent() {
     for (int i = 0; i < IndentLvl; i++)
       Out << TAB;
@@ -366,13 +389,27 @@ private:
       handleSpawnNextDecl(CDS, F);
     } else if (auto *RS = dyn_cast<ReturnIRStmt>(S)) {
       Indent();
+      LastReturnPrinted = true;
       if (F->Info.IsTask) {
         if (RS->RetVal) {
           Out << "SEND_ARGUMENT(largs->k, ";
           RS->RetVal->print(Out, C);
           Out << ");\n";
         } else {
-          Out << "return;\n";
+          // Check if a fire-and-forget spawn already passed largs->k to a
+          // spawned task; if so, that task owns signaling and we just return.
+          bool inheritedByContinuation = false;
+          for (auto &PrevS : *B) {
+            if (PrevS.get() == S)
+              break;
+            if (auto *PES = dyn_cast<ESpawnIRStmt>(PrevS.get()))
+              if (!PES->SN)
+                inheritedByContinuation = true;
+          }
+          if (inheritedByContinuation)
+            Out << "return;\n";
+          else
+            Out << "SEND_ARGUMENT(largs->k, 0);\n";
         }
       } else {
         RS->print(Out, C);
@@ -490,10 +527,21 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
           << "_closure*)(args.get());\n";
     }
 
+    std::unordered_map<const clang::NamedDecl *, std::string> VarRenameMap;
+    for (auto &V : F->Vars) {
+      if (!V.ASTDecl)
+        continue;
+      if (V.DeclLoc == IRVarDecl::ARG && F->Info.IsTask)
+        VarRenameMap[V.ASTDecl] = "largs->" + GetSym(V.Name);
+      else
+        VarRenameMap[V.ASTDecl] = GetSym(V.Name);
+    }
+
     auto IRC =
         IRPrintContext{.ASTCtx = C,
                        .NewlineSymbol = "\n",
                        .GraphVizEscapeChars = false,
+                       .VarRenames = std::move(VarRenameMap),
                        .IdentCB = [&](llvm::raw_ostream &Out, IRVarRef VR) {
                          switch (VR->DeclLoc) {
                          case IRVarDecl::ARG: {
@@ -516,10 +564,13 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
     Printer.traverse(*F);
     if (F->Info.IsTask) {
       out << "    return;\n";
-    }
-    // great hack
-    if (F->getName() == "main") {
-      out << "    return 0;\n";
+    } else if (!Printer.LastReturnPrinted && F->Info.RootFun &&
+               !F->Info.RootFun->getReturnType()->isVoidType()) {
+      auto RetTy = F->Info.RootFun->getReturnType();
+      if (RetTy->isIntegerType())
+        out << "    return 0;\n";
+      else
+        out << "    return {};\n";
     }
     out << "}\n";
   }
