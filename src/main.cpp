@@ -353,21 +353,11 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // std::vector<std::string> compilationFlags = {
-  //     OPENCILK_HOME "/bin/clang", "-c",         "-Wall",
-  //     "-Wno-unused-label",        "-fopencilk", "-fsyntax-only",
-  // };
-
   std::vector<std::string> compilationFlags = {
-      OPENCILK_HOME "/bin/clang++",
-      "-std=gnu++14",
-      "-c",
-      "-Wall",
-      "-Wno-unused-label",
-      "-Wno-deprecated-declarations",
-      "-fopencilk",
-      "-fsyntax-only",
+      OPENCILK_HOME "/bin/clang", "-c",         "-Wall",
+      "-Wno-unused-label",        "-fopencilk", "-fsyntax-only",
   };
+
   compilationFlags.push_back(argv[optind]);
 
   std::shared_ptr<clang::PCHContainerOperations> PCHContainerOps =
