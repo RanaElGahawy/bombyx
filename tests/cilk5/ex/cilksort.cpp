@@ -68,7 +68,19 @@
 #include "cilksan.h"
 #endif
 
+#ifndef RAND_MAX
+#define RAND_MAX 32767
+#endif
+
 typedef long ELM;
+
+/* MERGESIZE must be >= 2 */
+#define KILO 1024
+#define MERGESIZE (2 * KILO)
+#define QUICKSIZE (2 * KILO)
+#define INSERTIONSIZE 20
+
+static unsigned long rand_nxt = 0;
 
 unsigned long long todval(struct timeval *tp);
 unsigned long my_rand();
@@ -109,18 +121,6 @@ CLOSURE_DEF(cilksort_cont3, long size; ELM * A; ELM * tmpA; ELM * tmpC;);
 CLOSURE_DEF(cilksort_cont4, );
 CLOSURE_DEF(main_cont0, long size2; ELM * array; ELM * tmp3; int check;
             struct timeval t1; struct timeval t2;);
-
-#ifndef RAND_MAX
-#define RAND_MAX 32767
-#endif
-
-/* MERGESIZE must be >= 2 */
-#define KILO 1024
-#define MERGESIZE (2 * KILO)
-#define QUICKSIZE (2 * KILO)
-#define INSERTIONSIZE 20
-
-static unsigned long rand_nxt = 0;
 
 /*
  * simple approach for now; a better median-finding

@@ -66,5 +66,6 @@ echo ">> qsort"
 ./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/qsort.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/qsort.cpp"
 echo ">> matmul"
 ./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/matmul.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/matmul.cpp" 
-
+echo ">> rectmul"
+./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/rectmul.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/rectmul.cpp"
 echo "✅ Done!"

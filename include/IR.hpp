@@ -87,8 +87,8 @@ public:
     EXK_LVAL_ACCESS,
     EXK_LVAL_INDEX,
     EXK_LVAL_DREF,
+    EXK_LVAL_CAST,
     EXK_LVAL_LAST,
-    EXK_CAST,
     EXK_CALL,
     EXK_SYM_VAR
   };
@@ -401,16 +401,16 @@ public:
   virtual IRExpr *clone() override { return new IntLiteralIRExpr(Lit); }
 };
 
-struct CastIRExpr : IRExpr {
+struct CastIRExpr : IRLvalExpr {
 private:
   IRType CastType;
 
 public:
   std::unique_ptr<IRExpr> E;
   CastIRExpr(IRType CastType, IRExpr *E)
-      : CastType(CastType), E(E), IRExpr(EXK_CAST) {}
+      : CastType(CastType), E(E), IRLvalExpr(EXK_LVAL_CAST) {}
 
-  static bool classof(const IRExpr *E) { return E->getKind() == EXK_CAST; }
+  static bool classof(const IRExpr *E) { return E->getKind() == EXK_LVAL_CAST; }
 
   virtual void print(llvm::raw_ostream &Out, IRPrintContext &Ctx) override;
   virtual IRExpr *clone() override;
@@ -794,7 +794,7 @@ public:
     case IRExpr::EXK_LVAL_INDEX:
       DerivedThis->VisitIndex(llvm::dyn_cast<IndexIRExpr>(E));
       return;
-    case IRExpr::EXK_CAST:
+    case IRExpr::EXK_LVAL_CAST:
       DerivedThis->VisitCast(llvm::dyn_cast<CastIRExpr>(E));
       return;
     default:
