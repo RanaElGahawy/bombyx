@@ -186,8 +186,7 @@ struct AccessIRExpr : IRLvalExpr {
 
 public:
   AccessIRExpr(IRLvalExpr *Base, std::string Field, bool Arrow)
-      : Base(Base), Field(Field), Arrow(Arrow),
-        IRLvalExpr(EXK_LVAL_ACCESS) {}
+      : Base(Base), Field(Field), Arrow(Arrow), IRLvalExpr(EXK_LVAL_ACCESS) {}
 
   // Convenience constructor for the common case of a simple variable base.
   AccessIRExpr(IRVarRef Struct, std::string Field, bool Arrow)
@@ -472,6 +471,7 @@ public:
     STK_TERMINATOR_END,
     STK_ESPAWN,
     STK_WRAP,
+    STK_STMT_WRAP,
     STK_STORE,
     STK_COPY,
     STK_SCOPE_ANNOT,
@@ -674,6 +674,29 @@ public:
   virtual IRStmt *clone() override;
 };
 
+// Wraps an arbitrary Clang Stmt* opaquely (e.g. switch statements).
+// The statement is printed verbatim using Clang's pretty-printer, with
+// variable renames applied so that IR-renamed vars are printed correctly.
+struct ASTStmtWrapIRStmt : IRStmt {
+  clang::Stmt *S;
+  // Maps original clang::NamedDecl* to the IR-renamed name.
+  std::unordered_map<const clang::NamedDecl *, std::string> VarRenames;
+
+public:
+  ASTStmtWrapIRStmt(clang::Stmt *S) : S(S), IRStmt(STK_STMT_WRAP) {}
+  ASTStmtWrapIRStmt(
+      clang::Stmt *S,
+      std::unordered_map<const clang::NamedDecl *, std::string> VR)
+      : S(S), VarRenames(std::move(VR)), IRStmt(STK_STMT_WRAP) {}
+
+  static bool classof(const IRStmt *St) {
+    return St->getKind() == IRStmt::STK_STMT_WRAP;
+  }
+
+  virtual void print(llvm::raw_ostream &Out, IRPrintContext &Ctx) override;
+  virtual IRStmt *clone() override;
+};
+
 struct StoreIRStmt : IRStmt {
   std::unique_ptr<IRLvalExpr> Dest;
   std::unique_ptr<IRExpr> Src;
@@ -848,7 +871,8 @@ public:
     }
     case IRStmt::STK_SYNC:
     case IRStmt::STK_BREAK:
-    case IRStmt::STK_SPAWN_NEXT: {
+    case IRStmt::STK_SPAWN_NEXT:
+    case IRStmt::STK_STMT_WRAP: {
       return;
     }
     default:

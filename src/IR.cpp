@@ -346,6 +346,41 @@ IRStmt *ExprWrapIRStmt::clone() {
   return new ExprWrapIRStmt(Expr->clone());
 }
 
+namespace {
+struct VarRenamePrinterHelper : clang::PrinterHelper {
+  const std::unordered_map<const clang::NamedDecl *, std::string> &Renames;
+  clang::PrintingPolicy PP;
+  VarRenamePrinterHelper(
+      const std::unordered_map<const clang::NamedDecl *, std::string> &R,
+      clang::PrintingPolicy PP)
+      : Renames(R), PP(PP) {}
+  bool handledStmt(clang::Stmt *E, llvm::raw_ostream &OS) override {
+    if (auto *DRE = llvm::dyn_cast<clang::DeclRefExpr>(E)) {
+      auto It = Renames.find(DRE->getDecl());
+      if (It != Renames.end()) {
+        OS << It->second;
+        return true;
+      }
+    }
+    return false;
+  }
+};
+} // namespace
+
+void ASTStmtWrapIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
+  assert(S);
+  if (VarRenames.empty()) {
+    S->printPretty(Out, nullptr, Ctx.ASTCtx.getPrintingPolicy());
+  } else {
+    VarRenamePrinterHelper Helper(VarRenames, Ctx.ASTCtx.getPrintingPolicy());
+    S->printPretty(Out, &Helper, Ctx.ASTCtx.getPrintingPolicy());
+  }
+}
+
+IRStmt *ASTStmtWrapIRStmt::clone() {
+  return new ASTStmtWrapIRStmt(S, VarRenames);
+}
+
 void StoreIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   assert(Dest);
 
@@ -739,71 +774,81 @@ IRBasicBlock *FindJoin(IRBasicBlock *Left, IRBasicBlock *Right) {
 }
 
 static IRBasicBlock *FindIfJoin(IRBasicBlock *ThenB, IRBasicBlock *ElseB) {
-  // Mark all blocks reachable from ThenB.
-  std::unordered_map<IRBasicBlock *, bool> ThenReachable;
-  std::vector<IRBasicBlock *> WL;
-  WL.push_back(ThenB);
-  while (!WL.empty()) {
-    auto *B = WL.back();
-    WL.pop_back();
-    if (ThenReachable.find(B) != ThenReachable.end())
-      continue;
-    ThenReachable[B] = true;
-    for (auto *S : B->Succs)
-      WL.push_back(S);
+  // Compute blocks reachable from ElseB without going through ThenB.
+  // This avoids false join candidates caused by loop back-edges: a block
+  // inside ThenB's subgraph may appear reachable from ElseB via a loop cycle,
+  // but that is not a valid join for the if-statement.
+  std::unordered_map<IRBasicBlock *, bool> ElseDirectReachable;
+  {
+    std::deque<IRBasicBlock *> WL;
+    WL.push_back(ElseB);
+    while (!WL.empty()) {
+      auto *B = WL.front();
+      WL.pop_front();
+      if (B == ThenB || ElseDirectReachable.count(B))
+        continue;
+      ElseDirectReachable[B] = true;
+      for (auto *S : B->Succs)
+        WL.push_back(S);
+    }
   }
 
-  // Mark all blocks reachable from ElseB.
-  std::unordered_map<IRBasicBlock *, bool> ElseReachable;
-  WL.push_back(ElseB);
-  while (!WL.empty()) {
-    auto *B = WL.back();
-    WL.pop_back();
-    if (ElseReachable.find(B) != ElseReachable.end())
-      continue;
-    ElseReachable[B] = true;
-    for (auto *S : B->Succs)
-      WL.push_back(S);
+  // Compute blocks reachable from ThenB without going through ElseB.
+  std::unordered_map<IRBasicBlock *, bool> ThenDirectReachable;
+  {
+    std::deque<IRBasicBlock *> WL;
+    WL.push_back(ThenB);
+    while (!WL.empty()) {
+      auto *B = WL.front();
+      WL.pop_front();
+      if (B == ElseB || ThenDirectReachable.count(B))
+        continue;
+      ThenDirectReachable[B] = true;
+      for (auto *S : B->Succs)
+        WL.push_back(S);
+    }
   }
 
-  std::unordered_map<IRBasicBlock *, bool> BfsSeen;
-  std::deque<IRBasicBlock *> Q;
-  Q.push_back(ThenB);
-  BfsSeen[ThenB] = true;
-  while (!Q.empty()) {
-    auto *B = Q.front();
-    Q.pop_front();
-    if (B != ThenB && B != ElseB &&
-        ElseReachable.find(B) != ElseReachable.end()) {
-      return B;
-    }
-    if (B == ElseB && ThenReachable.find(B) != ThenReachable.end()) {
-      return B; // ElseB is the merge: ThenB falls through to ElseB.
-    }
-    for (auto *S : B->Succs) {
-      if (BfsSeen.find(S) == BfsSeen.end()) {
-        BfsSeen[S] = true;
-        Q.push_back(S);
+  // BFS from ThenB; return the first block also in ElseDirectReachable.
+  // (ElseB itself is a valid result — it means ThenB falls into ElseB
+  // directly.)
+  {
+    std::unordered_map<IRBasicBlock *, bool> Seen;
+    std::deque<IRBasicBlock *> Q;
+    Q.push_back(ThenB);
+    Seen[ThenB] = true;
+    while (!Q.empty()) {
+      auto *B = Q.front();
+      Q.pop_front();
+      if (B != ThenB && ElseDirectReachable.count(B))
+        return B;
+      for (auto *S : B->Succs) {
+        if (!Seen.count(S)) {
+          Seen[S] = true;
+          Q.push_back(S);
+        }
       }
     }
   }
 
-  // Nothing found via ThenB → BFS from ElseB.
-  Q.clear();
-  BfsSeen.clear();
-  Q.push_back(ElseB);
-  BfsSeen[ElseB] = true;
-  while (!Q.empty()) {
-    auto *B = Q.front();
-    Q.pop_front();
-    if (B != ThenB && B != ElseB &&
-        ThenReachable.find(B) != ThenReachable.end()) {
-      return B;
-    }
-    for (auto *S : B->Succs) {
-      if (BfsSeen.find(S) == BfsSeen.end()) {
-        BfsSeen[S] = true;
-        Q.push_back(S);
+  // Symmetric: BFS from ElseB; return the first block also in
+  // ThenDirectReachable. Exclude both endpoints to prevent returning ThenB or
+  // ElseB themselves.
+  {
+    std::unordered_map<IRBasicBlock *, bool> Seen;
+    std::deque<IRBasicBlock *> Q;
+    Q.push_back(ElseB);
+    Seen[ElseB] = true;
+    while (!Q.empty()) {
+      auto *B = Q.front();
+      Q.pop_front();
+      if (B != ElseB && B != ThenB && ThenDirectReachable.count(B))
+        return B;
+      for (auto *S : B->Succs) {
+        if (!Seen.count(S)) {
+          Seen[S] = true;
+          Q.push_back(S);
+        }
       }
     }
   }

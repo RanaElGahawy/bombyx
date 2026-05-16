@@ -16,6 +16,8 @@
 # Ignore everything inside test output folders first
 /tests/ex/*
 /tests/im/*
+/tests/cilk5/im/*
+/tests/cilk5/ex/*
 
 /tests/ex copy
 /visualize/ir.json
@@ -28,3 +30,9 @@
 !/tests/im/*.cpp
 !/tests/im/*.sh
 !/tests/im/*.c
+!/tests/cilk5/im/*.c
+!/tests/cilk5/im/*h
+!/tests/cilk5/im/*.cpp
+!/tests/cilk5/ex/*.c
+!/tests/cilk5/ex/*h
+!/tests/cilk5/ex/*.cpp

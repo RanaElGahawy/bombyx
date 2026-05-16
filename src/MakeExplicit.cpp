@@ -558,6 +558,24 @@ struct FinalizeExplicitCPS {
   }
 };
 
+// Returns true if F contains any ISpawnIRExpr (unresolved spawn).
+static bool hasSpawns(IRFunction *F) {
+  for (auto &B : *F) {
+    for (auto &S : *B) {
+      if (auto *CS = dyn_cast<CopyIRStmt>(S.get()))
+        if (isa<ISpawnIRExpr>(CS->Src.get()))
+          return true;
+      if (auto *SS = dyn_cast<StoreIRStmt>(S.get()))
+        if (isa<ISpawnIRExpr>(SS->Src.get()))
+          return true;
+      if (auto *EWS = dyn_cast<ExprWrapIRStmt>(S.get()))
+        if (isa<ISpawnIRExpr>(EWS->Expr.get()))
+          return true;
+    }
+  }
+  return false;
+}
+
 void MakeExplicit(IRProgram &P) {
   // Phase 1: Create continuation functions at sync points.
   std::vector<IRFunction *> WorkList;
@@ -572,8 +590,11 @@ void MakeExplicit(IRProgram &P) {
       FWorkList.push_back(CF.F);
     }
     // Phase 2: Finalize explicit CPS for each function.
+    // Skip functions with no spawns — FinalizeExplicitCPS's ScopedIRTraverser
+    // cannot handle arbitrary control flow (e.g. complex nested if-else).
     for (auto *F : FWorkList) {
-      FinalizeExplicitCPS FC(F);
+      if (F->Info.IsTask || hasSpawns(F))
+        FinalizeExplicitCPS FC(F);
     }
   }
 }

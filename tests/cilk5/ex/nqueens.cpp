@@ -1,5 +1,4 @@
 #include "cilk_explicit.hh"
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,12 +10,7 @@
 #include "cilksan.h"
 #endif
 
-#ifdef SERIAL
-#include <cilk/cilk_stub.h>
-#endif
-
-pthread_attr_t *mutex;
-
+unsigned long long todval(struct timeval * tp);
 int ok(int n, char * a);
 THREAD(nqueens);
 int main(int argc, char ** argv);
@@ -35,26 +29,26 @@ CLOSURE_DEF(nqueens_cont0,
 );
 CLOSURE_DEF(main_cont0,
     int res;
+    struct timeval t1;
+    struct timeval t2;
 );
-unsigned long long todval(struct timeval *tp) {
-  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
-}
+
 
 // int * count;
 
-/*
- * nqueen  4 = 2
- * nqueen  5 = 10
- * nqueen  6 = 4
- * nqueen  7 = 40
- * nqueen  8 = 92
- * nqueen  9 = 352
+/* 
+ * nqueen  4 = 2 
+ * nqueen  5 = 10 
+ * nqueen  6 = 4 
+ * nqueen  7 = 40 
+ * nqueen  8 = 92 
+ * nqueen  9 = 352 
  * nqueen 10 = 724
- * nqueen 11 = 2680
- * nqueen 12 = 14200
- * nqueen 13 = 73712
- * nqueen 14 = 365596
- * nqueen 15 = 2279184
+ * nqueen 11 = 2680 
+ * nqueen 12 = 14200 
+ * nqueen 13 = 73712 
+ * nqueen 14 = 365596 
+ * nqueen 15 = 2279184 
  */
 
 /*
@@ -66,14 +60,19 @@ unsigned long long todval(struct timeval *tp) {
 
 
 
+
+
+unsigned long long todval(struct timeval * tp) {
+    return (((tp->tv_sec * 1000) * 1000) + tp->tv_usec);
+}
 int ok(int n, char * a) {
     int i;
     int j;
     char p;
     char q;
-    for (i = 0;(i < n);i = (i + 1)) {
+    for (i = 0;(i < n);(i++)) {
         p = a[i];
-        for (j = (i + 1);(j < n);j = (j + 1)) {
+        for (j = (i + 1);(j < n);(j++)) {
             q = a[j];
             if ((((q == p) || (q == (p - (j - i)))) || (q == (p + (j - i))))) {
                 return 0;
@@ -88,7 +87,6 @@ THREAD(nqueens) {
     int i0;
     int * count;
     int solNum;
-    char * b_alloc;
     nqueens_closure *largs = (nqueens_closure*)(args.get());
     solNum = 0;
     if ((largs->n0 == largs->j0)) {
@@ -98,9 +96,8 @@ THREAD(nqueens) {
         ((void) memset(count,0,(largs->n0 * sizeof(int))));
         nqueens_cont0_closure SN_nqueens_cont0c(largs->k);
         spawn_next<nqueens_cont0_closure> SN_nqueens_cont0(SN_nqueens_cont0c);
-        for (i0 = 0;(i0 < largs->n0);i0 = (i0 + 1)) {
-            b_alloc = ((char *) __builtin_alloca((((largs->j0 + 1) * sizeof(char)) + 31)));
-            b = ((char *) ((((uintptr_t) b_alloc) + 31) & (~31)));
+        for (i0 = 0;(i0 < largs->n0);(i0++)) {
+            b = ((char *) __builtin_alloca(((largs->j0 + 1) * sizeof(char))));
             memcpy(b,largs->a0,(largs->j0 * sizeof(char)));
             b[largs->j0] = i0;
             if (ok((largs->j0 + 1),b)) {
@@ -114,8 +111,8 @@ THREAD(nqueens) {
 
             }
         }
-        ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->solNum = solNum;
         ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->count = count;
+        ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->solNum = solNum;
         ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->n0 = largs->n0;
         // Original sync was here
     }
@@ -127,11 +124,18 @@ int main(int argc, char ** argv) {
     int res;
     struct timeval t1;
     n1 = 13;
+    main_cont0_closure SN_main_cont0c(CONT_DUMMY);
+    spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
+    if ((argc < 2)) {
+        fprintf(__stderrp,"Usage: %s [<cilk-options>] <n>\n",argv[0]);
+        fprintf(__stderrp,"Use default board size, n = 13.\n");
+    } else {
+        n1 = atoi(argv[1]);
+        fprintf(__stderrp,"Running %s with n = %d.\n",argv[0],n1);
+    }
     a1 = ((char *) __builtin_alloca((n1 * sizeof(char))));
     res = 0;
     gettimeofday(&(t1),0);
-    main_cont0_closure SN_main_cont0c(CONT_DUMMY);
-    spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     cont sp0k;
     SN_BIND(SN_main_cont0, &sp0k, res);
     nqueens_closure sp0c(sp0k);
@@ -140,24 +144,29 @@ int main(int argc, char ** argv) {
     sp0c.a0 = a1;
     spawn<nqueens_closure> sp0(sp0c);
 
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
     // Original sync was here
     return 0;
 }
 THREAD(nqueens_cont0) {
     int i0;
     nqueens_cont0_closure *largs = (nqueens_cont0_closure*)(args.get());
-    for (i0 = 0;(i0 < largs->n0);i0 = (i0 + 1)) {
+    for (i0 = 0;(i0 < largs->n0);(i0++)) {
         largs->solNum = (largs->solNum + largs->count[i0]);
     }
     SEND_ARGUMENT(largs->k, largs->solNum);
     return;
 }
 THREAD(main_cont0) {
+    unsigned long long runtime_ms;
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
+    gettimeofday(&(largs->t2),0);
+    runtime_ms = ((todval(&(largs->t2)) - todval(&(largs->t1))) / 1000);
+    printf("%f\n",(runtime_ms / 1000.));
     if ((largs->res == 0)) {
-        printf("No solution found.\n");
+        fprintf(__stderrp,"No solution found.\n");
     } else {
-        printf("Total number of solutions : %d\n",largs->res);
+        fprintf(__stderrp,"Total number of solutions : %d\n",largs->res);
     }
     SEND_ARGUMENT(largs->k, 0);
     return;

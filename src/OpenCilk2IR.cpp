@@ -6,6 +6,7 @@
 
 #include "IR.hpp"
 #include "OpenCilk2IR.hpp"
+#include "desugarOpenCilk.hpp"
 #include "clang/AST/ASTFwd.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
@@ -175,6 +176,19 @@ public:
 // Convert AST to IR //
 //////////////////////
 
+static BinopIRExpr::BinopOp astOpToIROp(clang::BinaryOperatorKind K) {
+  switch (K) {
+  case clang::BO_LT:  return BinopIRExpr::BINOP_LT;
+  case clang::BO_GT:  return BinopIRExpr::BINOP_GT;
+  case clang::BO_LE:  return BinopIRExpr::BINOP_LE;
+  case clang::BO_GE:  return BinopIRExpr::BINOP_GE;
+  case clang::BO_EQ:  return BinopIRExpr::BINOP_EQ;
+  case clang::BO_NE:  return BinopIRExpr::BINOP_NEQ;
+  default:
+    llvm_unreachable("Unsupported comparison op in desugared condition");
+  }
+}
+
 class Stmt2IRVisitor : public clang::StmtVisitor<Stmt2IRVisitor> {
 private:
   IRBasicBlock *CurrB;
@@ -190,6 +204,9 @@ private:
   bool SyncNext = false;
   bool WhileCtx = false;
   bool SyncInWhile = false;
+  // Stack of switch join blocks for break-in-switch handling.
+  // A nullptr entry acts as a loop barrier (breaks inside loops don't exit the switch).
+  std::vector<IRBasicBlock *> SwitchBreakStack;
 
   /* Basicially get a Clang expression visit it then in the visit appropriate
   function and convert it to an IR and return it throught the stack ExprStack
@@ -309,6 +326,60 @@ private:
     pushIRStmt(new CopyIRStmt(VR, IE));
   }
 
+  // Emit `if (Cond) break;` in CurrB, then advance CurrB to the continuation
+  // block.  The BreakIRStmt has no explicit successor — downstream passes
+  // resolve it to the enclosing loop's join block.
+  void emitIfBreak(IRExpr *Cond) {
+    auto *CheckB = CurrB;
+    auto *BreakB = F->createBlock();
+    auto *ContB  = F->createBlock();
+
+    CheckB->Term = new IfIRStmt(Cond);
+    CheckB->Succs.insert(BreakB); // true  → break
+    CheckB->Succs.insert(ContB);  // false → continue body
+
+    CurrB = BreakB;
+    CurrB->Term = new BreakIRStmt();
+
+    CurrB = ContB;
+  }
+
+  // Emit the desugared prefix for a loop body that was produced by
+  // analyzeCondForDesugar:
+  //   1. AssignBO as a statement   (e.g. h = *curr_high)
+  //   2. if (!(clean_cond)) break; (e.g. if (!(h > pivot)) break;)
+  // Advances CurrB to the block where the original loop body should follow.
+  void emitDesugaredBodyPrefix(const WhileCondDesugar &DS) {
+    // Emit the assignment (e.g. h = *curr_high) as a regular statement.
+    handleStmt(DS.AssignBO);
+
+    // Recover the IR variable that was just assigned.
+    auto *AssignedLHS = DS.AssignBO->getLHS()->IgnoreParenImpCasts();
+    auto *AssignedDRE = dyn_cast<DeclRefExpr>(AssignedLHS);
+    assert(AssignedDRE && "Desugared assignment LHS must be a simple variable");
+
+    IRExpr *AssignedVarExpr;
+    auto It = VarLookup.find(AssignedDRE->getDecl());
+    if (It != VarLookup.end())
+      AssignedVarExpr = new IdentIRExpr(It->second);
+    else
+      AssignedVarExpr = new ASTLiteralIRExpr(AssignedDRE);
+
+    IRExpr *NegBreakCond;
+    if (DS.CompBO) {
+      // Clean condition: assigned_var op CompBO->RHS
+      IRExpr *RHSExpr = getExpr(DS.CompBO->getRHS());
+      auto Op = astOpToIROp(DS.CompBO->getOpcode());
+      auto *CleanCond = new BinopIRExpr(Op, AssignedVarExpr, RHSExpr);
+      NegBreakCond = new UnopIRExpr(UnopIRExpr::UNOP_L_NOT, CleanCond);
+    } else {
+      // Condition is just the assignment: break if the assigned value is falsy.
+      NegBreakCond = new UnopIRExpr(UnopIRExpr::UNOP_L_NOT, AssignedVarExpr);
+    }
+
+    emitIfBreak(NegBreakCond);
+  }
+
 public:
   Stmt2IRVisitor(IRFunction *F,
                  std::unordered_map<ASTVarRef, IRVarRef> &VarLookup,
@@ -368,20 +439,18 @@ public:
 
   void VisitDeclStmt(DeclStmt *Node) {
     for (auto *D : Node->decls()) {
-      IRVarRef VR;
-      if (auto *VD = dyn_cast<VarDecl>(D)) {
-        Sym VDS = PutSym(VD->getName().str());
-        F->Vars.push_back(IRVarDecl{
-            .Type = VD->getType(),
-            .Name = VDS,
-            .DeclLoc = IRVarDecl::LOCAL,
-        });
-        VR = &F->Vars.back();
-        VarLookup[VD] = VR;
-      } else {
-        llvm_unreachable("Unsupported non-named decl encountered");
-      }
-      handleVarInit(VR, cast<VarDecl>(D));
+      auto *VD = dyn_cast<VarDecl>(D);
+      if (!VD)
+        continue; // skip implicit decls like lambda closure types
+      Sym VDS = PutSym(VD->getName().str());
+      F->Vars.push_back(IRVarDecl{
+          .Type = VD->getType(),
+          .Name = VDS,
+          .DeclLoc = IRVarDecl::LOCAL,
+      });
+      IRVarRef VR = &F->Vars.back();
+      VarLookup[VD] = VR;
+      handleVarInit(VR, VD);
     }
   }
 
@@ -413,10 +482,13 @@ public:
 
   // drop statements after a return
   void VisitForStmt(ForStmt *FS) {
+    WhileCondDesugar DS;
+    if (FS->getCond())
+      DS = analyzeCondForDesugar(FS->getCond());
 
-    auto *ForB = F->createBlock();
+    auto *ForB  = F->createBlock();
     auto *BodyB = F->createBlock();
-    auto *IncB = F->createBlock();
+    auto *IncB  = F->createBlock();
     auto *JoinB = F->createBlock();
 
     CurrB->Succs.insert(ForB);
@@ -425,33 +497,49 @@ public:
     ForB->Succs.insert(JoinB);
 
     CurrB = ForB;
-    handleStmt(FS->getInit());
+    if (FS->getInit())
+      handleStmt(FS->getInit());
     assert(CurrB == ForB);
     IRStmt *InitS = nullptr;
-    if (CurrB->back()) {
+    if (CurrB->begin() != CurrB->end() && CurrB->back()) {
       InitS = CurrB->back().get();
       InitS->setSilent();
     }
 
     CurrB = IncB;
-    handleStmt(FS->getInc());
+    if (FS->getInc())
+      handleStmt(FS->getInc());
     assert(CurrB == IncB);
     IRStmt *IncS = nullptr;
-    if (CurrB->back()) {
+    if (CurrB->begin() != CurrB->end() && CurrB->back()) {
       IncS = CurrB->back().get();
       IncS->setSilent();
     }
 
     IRExpr *Cond = nullptr;
-    if (FS->getCond()) {
+    if (DS.AssignBO) {
+      // Use only the part of the condition before && as the loop guard;
+      // the assignment and inner check move into the body.
+      Cond = DS.OuterCond ? getExpr(DS.OuterCond)
+                          : static_cast<IRExpr *>(new IntLiteralIRExpr(1));
+    } else if (FS->getCond()) {
       Cond = getExpr(FS->getCond());
+    } else {
+      // for(;;) — no condition means loop forever.
+      Cond = new IntLiteralIRExpr(1);
     }
 
     auto *ForS = new LoopIRStmt(Cond, IncS, InitS);
     ForB->Term = (IRTerminatorStmt *)ForS;
 
     CurrB = BodyB;
+
+    if (DS.AssignBO)
+      emitDesugaredBodyPrefix(DS); // advances CurrB to the post-break-check block
+
+    SwitchBreakStack.push_back(nullptr); // loop masks any enclosing switch break
     handleStmt(FS->getBody());
+    SwitchBreakStack.pop_back();
     CurrB->Succs.insert(IncB);
 
     CurrB = JoinB;
@@ -468,50 +556,51 @@ public:
   }
 
   void VisitWhileStmt(WhileStmt *WS) {
-    auto *WhileB = F->createBlock();
-    auto *BodyB = F->createBlock();
-    auto *JoinB = F->createBlock();
+    WhileCondDesugar DS = analyzeCondForDesugar(WS->getCond());
 
-    // if (!CurrB->Term) {
-    //   PANIC("No Terminator for current B");
-    // }
+    auto *WhileB = F->createBlock();
+    auto *BodyB  = F->createBlock();
+    auto *JoinB  = F->createBlock();
+
     CurrB->Succs.insert(WhileB);
     WhileB->Succs.insert(BodyB);
     WhileB->Succs.insert(JoinB);
 
-    IRExpr *Cond = nullptr;
-    Cond = getExpr(WS->getCond());
+    IRExpr *LoopCond;
+    if (DS.AssignBO) {
+      // Desugared: the outer condition (before &&) guards the loop header;
+      // nullptr means while(1) — the assignment+break inside the body exits.
+      LoopCond = DS.OuterCond ? getExpr(DS.OuterCond)
+                              : static_cast<IRExpr *>(new IntLiteralIRExpr(1));
+    } else {
+      LoopCond = getExpr(WS->getCond());
+    }
 
-    auto *WhileS = new LoopIRStmt(Cond, nullptr, nullptr);
+    auto *WhileS = new LoopIRStmt(LoopCond, nullptr, nullptr);
     WhileB->Term = (IRTerminatorStmt *)WhileS;
 
-    auto *temp = CurrB;
-
     CurrB = BodyB;
+
+    if (DS.AssignBO)
+      emitDesugaredBodyPrefix(DS); // advances CurrB to the post-break-check block
+
     // Save and restore WhileCtx/SyncInWhile so that nested while
-    // loops do not clobber the outer loop's state. Without this,
-    // an inner while (without sync) would clear WhileCtx, causing
-    // the outer while's sync to not be detected.
-    bool SavedWhileCtx = WhileCtx;
+    // loops do not clobber the outer loop's state.
+    bool SavedWhileCtx   = WhileCtx;
     bool SavedSyncInWhile = SyncInWhile;
-    WhileCtx = true;
+    WhileCtx   = true;
     SyncInWhile = false;
+    SwitchBreakStack.push_back(nullptr); // loop masks any enclosing switch break
     handleStmt(WS->getBody());
+    SwitchBreakStack.pop_back();
     bool ThisSyncInWhile = SyncInWhile;
-    WhileCtx = SavedWhileCtx;
+    WhileCtx   = SavedWhileCtx;
     SyncInWhile = SavedSyncInWhile;
 
-    // All while loops stay as LoopIRStmt in the implicit IR.
-    // If a while contains a sync, MakeExplicit's pre-pass will
-    // restructure it into separate functions (fn_loop_reentry, fn_exit).
-    // The WhileCtx/SyncInWhile flags are still used by the outer
-    // CilkAnalyzeVisitor to mark the function as a task.
-    if (ThisSyncInWhile && SavedWhileCtx) {
-      // Propagate sync-in-while to the outer while context
+    if (ThisSyncInWhile && SavedWhileCtx)
       SyncInWhile = true;
-    }
-    CurrB->Succs.insert(WhileB);
 
+    CurrB->Succs.insert(WhileB);
     CurrB = JoinB;
   }
 
@@ -542,7 +631,26 @@ public:
 
   void VisitBreakStmt(BreakStmt *Node) {
     assert(!CurrB->Term);
-    CurrB->Term = new BreakIRStmt();
+    if (!SwitchBreakStack.empty() && SwitchBreakStack.back() != nullptr) {
+      // Break inside a switch case — jump directly to the switch join block.
+      CurrB->Succs.insert(SwitchBreakStack.back());
+      CurrB = F->createBlock(); // dead continuation block
+    } else {
+      CurrB->Term = new BreakIRStmt();
+    }
+  }
+
+  void VisitSwitchStmt(SwitchStmt *SS) {
+    // Emit the entire switch opaquely — the ScopedIRTraverser in downstream
+    // passes cannot handle the multi-predecessor join that an if-else desugaring
+    // would produce.  The switch body contains no cilk_spawn, so verbatim
+    // output is semantically correct.
+    // Build a rename map so IR-renamed vars (e.g. size→size2) are printed
+    // correctly inside the opaque switch body.
+    std::unordered_map<const clang::NamedDecl *, std::string> Renames;
+    for (auto &[ASTDecl, IRVar] : VarLookup)
+      Renames[ASTDecl] = GetSym(IRVar->Name);
+    pushIRStmt(new ASTStmtWrapIRStmt(SS, std::move(Renames)));
   }
 
   void VisitCilkSyncStmt(CilkSyncStmt *Node) {
@@ -596,6 +704,10 @@ public:
     ExprStack.push_back(AE);
   }
 
+  void VisitConstantExpr(ConstantExpr *Node) {
+    Visit(Node->getSubExpr());
+  }
+
   void VisitIntegerLiteral(IntegerLiteral *Node) {
     auto *LE = new ASTLiteralIRExpr(Node);
     ExprStack.push_back((IRExpr *)LE);
@@ -632,9 +744,7 @@ public:
       return;
     }
 
-    llvm::errs() << "Unsupported CXXConstructExpr with " << Node->getNumArgs()
-                 << " args\n";
-    llvm_unreachable("Unsupported CXXConstructExpr");
+    ExprStack.push_back(new ASTLiteralIRExpr(Node));
   }
 
   void VisitBinaryOperator(BinaryOperator *Node) {
@@ -718,7 +828,14 @@ public:
 
     if (Node->getOpcode() == clang::BO_Assign) {
       assert(!ExprCtx);
-      handleAssign(Left, Right);
+      if (dyn_cast<ASTLiteralIRExpr>(Left)) {
+        // Global or untracked variable — emit the whole assignment opaquely.
+        delete Left;
+        delete Right;
+        pushIRStmt(new ExprWrapIRStmt(new ASTLiteralIRExpr(Node)));
+      } else {
+        handleAssign(Left, Right);
+      }
     } else if (Node->getOpcode() > clang::BO_Assign &&
                Node->getOpcode() <= clang::BO_OrAssign) {
       assert(!ExprCtx);
@@ -797,6 +914,14 @@ public:
   }
 
   void VisitCallExpr(CallExpr *Node) {
+    // Calls to non-identifier-named functions (operators, destructors, etc.)
+    // cannot be represented in the IR and are emitted opaquely.
+    auto *DirectCallee = Node->getDirectCallee();
+    if (DirectCallee && !DirectCallee->getDeclName().isIdentifier()) {
+      ExprStack.push_back(new ASTLiteralIRExpr(Node));
+      return;
+    }
+
     CallCtx = true;
     auto *FnExpr = getExpr(Node->getCallee());
     CallCtx = false;
@@ -829,6 +954,26 @@ public:
 
   void VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *Node) {
     ExprStack.push_back(new ASTLiteralIRExpr(Node));
+  }
+
+  void VisitLambdaExpr(LambdaExpr *Node) {
+    ExprStack.push_back(new ASTLiteralIRExpr(Node));
+  }
+
+  void VisitCXXNewExpr(CXXNewExpr *Node) {
+    ExprStack.push_back(new ASTLiteralIRExpr(Node));
+  }
+
+  void VisitCXXDeleteExpr(CXXDeleteExpr *Node) {
+    ExprStack.push_back(new ASTLiteralIRExpr(Node));
+  }
+
+  void VisitExprWithCleanups(ExprWithCleanups *Node) {
+    ExprStack.push_back(getExpr(Node->getSubExpr()));
+  }
+
+  void VisitMaterializeTemporaryExpr(MaterializeTemporaryExpr *Node) {
+    ExprStack.push_back(getExpr(Node->getSubExpr()));
   }
 
   void VisitCStyleCastExpr(CStyleCastExpr *Node) {
@@ -885,6 +1030,8 @@ public:
   bool VisitCallExpr(CallExpr *CE) {
     auto *Callee = CE->getDirectCallee();
     if (!Callee || !Callee->getBody())
+      return true;
+    if (!Callee->getDeclName().isIdentifier())
       return true;
     if (Tasks.count(Callee) || TaskCallers.count(Callee))
       return true;
