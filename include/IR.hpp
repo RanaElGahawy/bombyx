@@ -70,6 +70,9 @@ struct IRPrintContext {
       &identPrintSimple;
   std::function<void(IRPrintContext *, llvm::raw_ostream &, IRExpr *)> ExprCB =
       &exprPrintId;
+  // a flag that tells the opaque AST printer that it is inside a task function,
+  // when it sees return expr, replace it with send argument
+  std::string TaskContinuationKey;
 };
 
 class IRExpr {

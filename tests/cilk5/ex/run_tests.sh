@@ -26,3 +26,6 @@ xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-
 printf "\n >> lu \n"
 xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality lu.cpp  getoptions.c -o lu
 ./lu -n 1024 -c
+printf "\n >> heat \n"
+xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality heat.cpp  getoptions.c -o heat
+./heat -benchmark long

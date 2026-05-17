@@ -303,8 +303,21 @@ private:
         if (ES->Local) {
           auto *IdentDest = dyn_cast<IdentIRExpr>(ES->Dest.get());
           assert(IdentDest);
-          Indent() << "SN_BIND(SN_" << SpawnNextFnName << ", &sp" << SpawnCtr
-                   << "k, " << GetSym(IdentDest->Ident->Name) << ");\n";
+          const std::string DestName = GetSym(IdentDest->Ident->Name);
+          bool destIsArg = false;
+          for (auto &V : ES->SN->Fn->Vars) {
+            if (V.DeclLoc == IRVarDecl::ARG && GetSym(V.Name) == DestName) {
+              destIsArg = true;
+              break;
+            }
+          }
+          if (destIsArg) {
+            Indent() << "SN_BIND(SN_" << SpawnNextFnName << ", &sp" << SpawnCtr
+                     << "k, " << DestName << ");\n";
+          } else {
+            Indent() << "SN_BIND_VOID(SN_" << SpawnNextFnName << ", &sp"
+                     << SpawnCtr << "k);\n";
+          }
         } else {
           Indent() << "SN_BIND_EXT(SN_" << SpawnNextFnName << ", &sp"
                    << SpawnCtr << "k, &(";
@@ -557,7 +570,9 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
                          default:
                            PANIC("unsupported");
                          }
-                       }};
+                       },
+                       .TaskContinuationKey =
+                           F->Info.IsTask ? std::string("largs->k") : ""};
     Cilk1EmuPrinter Printer(out, IRC);
     Printer.traverse(*F);
     if (F->Info.IsTask) {

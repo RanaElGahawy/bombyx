@@ -445,6 +445,79 @@ struct VarRenamePrinterHelper : clang::PrinterHelper {
 };
 } // namespace
 
+// Recursively rewriting every ReturnStmt encountered as
+//   SEND_ARGUMENT(ContKey, val);
+// Uses printPretty for statements that don't contain returns,
+static void printStmtWithReturnRewrite(llvm::raw_ostream &Out, clang::Stmt *S,
+                                       VarRenamePrinterHelper *Helper,
+                                       const clang::PrintingPolicy &PP,
+                                       const std::string &ContKey,
+                                       unsigned Depth) {
+  const unsigned IW = PP.Indentation ? PP.Indentation : 2;
+  std::string Ind(Depth * IW, ' ');
+
+  if (auto *RS = clang::dyn_cast<clang::ReturnStmt>(S)) {
+    Out << Ind << "SEND_ARGUMENT(" << ContKey << ", ";
+    if (auto *Val = RS->getRetValue())
+      Val->printPretty(Out, Helper, PP);
+    else
+      Out << "0";
+    Out << ");\n" << Ind << "return;\n";
+    return;
+  }
+
+  if (auto *SW = clang::dyn_cast<clang::SwitchStmt>(S)) {
+    Out << Ind << "switch (";
+    SW->getCond()->printPretty(Out, Helper, PP);
+    Out << ") {\n";
+    auto *Body = clang::dyn_cast<clang::CompoundStmt>(SW->getBody());
+    if (Body) {
+      for (auto *Child : Body->body())
+        printStmtWithReturnRewrite(Out, Child, Helper, PP, ContKey, Depth + 1);
+    } else if (SW->getBody()) {
+      printStmtWithReturnRewrite(Out, SW->getBody(), Helper, PP, ContKey,
+                                 Depth + 1);
+    }
+    Out << Ind << "}";
+    return;
+  }
+
+  if (auto *CS = clang::dyn_cast<clang::CompoundStmt>(S)) {
+    Out << "{\n";
+    for (auto *Child : CS->body())
+      printStmtWithReturnRewrite(Out, Child, Helper, PP, ContKey, Depth + 1);
+    Out << Ind << "}\n";
+    return;
+  }
+
+  if (auto *Ca = clang::dyn_cast<clang::CaseStmt>(S)) {
+    std::string CaseInd(Depth > 0 ? (Depth - 1) * IW : 0, ' ');
+    Out << CaseInd << "case ";
+    Ca->getLHS()->printPretty(Out, Helper, PP);
+    Out << ":\n";
+    printStmtWithReturnRewrite(Out, Ca->getSubStmt(), Helper, PP, ContKey,
+                               Depth);
+    return;
+  }
+
+  if (auto *Df = clang::dyn_cast<clang::DefaultStmt>(S)) {
+    std::string DefInd(Depth > 0 ? (Depth - 1) * IW : 0, ' ');
+    Out << DefInd << "default:\n";
+    printStmtWithReturnRewrite(Out, Df->getSubStmt(), Helper, PP, ContKey,
+                               Depth);
+    return;
+  }
+
+  if (clang::isa<clang::Expr>(S)) {
+    Out << Ind;
+    S->printPretty(Out, Helper, PP, 0);
+    Out << ";\n";
+    return;
+  }
+
+  S->printPretty(Out, Helper, PP, Depth);
+}
+
 void ASTLiteralIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   assert(Lit);
   if (Ctx.VarRenames.empty()) {
@@ -458,11 +531,21 @@ void ASTLiteralIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
 
 void ASTStmtWrapIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   assert(S);
-  if (VarRenames.empty()) {
-    S->printPretty(Out, nullptr, Ctx.ASTCtx.getPrintingPolicy());
+  auto Effective = VarRenames;
+  for (auto &[D, N] : Ctx.VarRenames)
+    Effective[D] = N;
+  const auto &PP = Ctx.ASTCtx.getPrintingPolicy();
+  // rewrite returns
+  if (!Ctx.TaskContinuationKey.empty()) {
+    VarRenamePrinterHelper Helper(Effective, PP);
+    printStmtWithReturnRewrite(Out, S, &Helper, PP, Ctx.TaskContinuationKey, 0);
+    // no rewriting needed
+  } else if (Effective.empty()) {
+    S->printPretty(Out, nullptr, PP);
   } else {
-    VarRenamePrinterHelper Helper(VarRenames, Ctx.ASTCtx.getPrintingPolicy());
-    S->printPretty(Out, &Helper, Ctx.ASTCtx.getPrintingPolicy());
+    // rename variables
+    VarRenamePrinterHelper Helper(Effective, PP);
+    S->printPretty(Out, &Helper, PP);
   }
 }
 

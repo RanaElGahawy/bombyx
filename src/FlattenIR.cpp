@@ -119,6 +119,7 @@ createTaskFunction(IRProgram *P, const std::string &Name, IRType RetTy,
         .Type = OldVR->Type,
         .Name = OldVR->Name,
         .DeclLoc = IRVarDecl::ARG,
+        .ASTDecl = OldVR->ASTDecl,
     });
     Remap[OldVR] = &F->Vars.back();
   }
@@ -333,6 +334,11 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
 
   moveAndRemapBlocks(OrigBodyBlocks, &F, ReentryF, ReentryRemap);
 
+  // Was initially silenced by VisitForStmt because LoopIRStmt was supposed to
+  // print it. Now that the loop is broken up, un-silence it
+  if (LoopTerm->Inc)
+    LoopTerm->Inc->Silent = false;
+
   auto *ReentryIf = new IfIRStmt(ReentryCondExpr);
   ReentryEntry->Term = (IRTerminatorStmt *)ReentryIf;
   ReentryEntry->Succs.insert(BodyB);
@@ -376,6 +382,11 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   }
 
   // === Step 4: Replace LoopHeader in F with a stub that spawns ReentryF
+  // The Init statement lives in LoopHeader and was silenced by VisitForStmt.
+  // Un-silence it now so the caller emits it before the spawn.
+  if (LoopTerm->Init)
+    LoopTerm->Init->Silent = false;
+
   while (!LoopHeader->Succs.empty()) {
     LoopHeader->Succs.remove(*LoopHeader->Succs.begin());
   }

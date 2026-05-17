@@ -72,5 +72,6 @@ echo ">> rectmulred"
 ./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/rectmulred.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/rectmulred.cpp"
 echo ">> lu"
 ./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/lu.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/lu.cpp" 
-
+echo ">> heat"
+./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/heat.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/heat.cpp" 
 echo "✅ Done!"

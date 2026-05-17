@@ -771,6 +771,23 @@ public:
   }
 
   void VisitBinaryOperator(BinaryOperator *Node) {
+    if (Node->getOpcode() == clang::BO_Comma) {
+      if (!ExprCtx) {
+        // for (i=0, j=0; ...) or for (...; i++, j++)
+        // emit each operand as its own statement in order.
+        handleStmt(Node->getLHS());
+        handleStmt(Node->getRHS());
+      } else {
+        // x = (a++, b+1)
+        // LHS is a side-effect statement, RHS is the value.
+        ExprCtx = false;
+        handleStmt(Node->getLHS());
+        ExprCtx = true;
+        ExprStack.push_back(getExpr(Node->getRHS()));
+      }
+      return;
+    }
+
     IRExpr *Left = getExpr(Node->getLHS());
     IRExpr *Right = getExpr(Node->getRHS());
 
@@ -981,6 +998,10 @@ public:
       HandleCilkSpawn(SpawnedE);
       SyncNext = true;
     }
+  }
+
+  void VisitConditionalOperator(ConditionalOperator *Node) {
+    ExprStack.push_back(new ASTLiteralIRExpr(Node));
   }
 
   void VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *Node) {
