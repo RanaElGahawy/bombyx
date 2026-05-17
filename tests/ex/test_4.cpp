@@ -13,11 +13,11 @@ THREAD(compute_cont0);
 THREAD(main_cont0);
 
 CLOSURE_DEF(process,
-    Node * n;
+    Node *n;
 );
 CLOSURE_DEF(compute,
-    Node * a;
-    Node * b;
+    Node *a;
+    Node *b;
 );
 CLOSURE_DEF(compute_cont0,
     int x;

@@ -6,7 +6,7 @@ struct Counter {
   int val;
 };
 
-int counter_get(Counter * c);
+int counter_get(Counter *c);
 THREAD(worker);
 THREAD(compute);
 int main();
@@ -34,7 +34,7 @@ CLOSURE_DEF(main_cont0,
 
 
 
-int counter_get(Counter * c) {
+int counter_get(Counter *c) {
     return c->val;
 }
 THREAD(worker) {

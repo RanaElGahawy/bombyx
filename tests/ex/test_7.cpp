@@ -19,18 +19,18 @@ CLOSURE_DEF(worker,
     int x;
 );
 CLOSURE_DEF(reduce,
-    int * arr;
+    int *arr;
     int n;
 );
 CLOSURE_DEF(reduce_exit0,
-    int * arr;
+    int *arr;
     int n;
     Accum acc;
     int i;
     int r;
 );
 CLOSURE_DEF(reduce_reentry0,
-    int * arr;
+    int *arr;
     int n;
     Accum acc;
     int i;
@@ -40,7 +40,7 @@ CLOSURE_DEF(main_cont0,
     int result;
 );
 CLOSURE_DEF(reduce_reentry0_cont0,
-    int * arr;
+    int *arr;
     int n;
     Accum acc;
     int i;

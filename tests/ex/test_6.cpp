@@ -14,11 +14,11 @@ THREAD(compute_cont0);
 THREAD(main_cont0);
 
 CLOSURE_DEF(magnitude,
-    Vec2 * v;
+    Vec2 *v;
 );
 CLOSURE_DEF(compute,
-    Vec2 * a;
-    Vec2 * b;
+    Vec2 *a;
+    Vec2 *b;
 );
 CLOSURE_DEF(compute_cont0,
     float m1;
