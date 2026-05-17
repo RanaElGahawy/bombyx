@@ -282,6 +282,11 @@ void set_target(const char *targ) {
   }
 }
 
+static bool endsWith(const std::string &s, const std::string &suffix) {
+  return s.size() >= suffix.size() &&
+         s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 int main(int argc, char *argv[]) {
   opterr = 0;
   int c;
@@ -353,9 +358,23 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  std::string Input = argv[optind];
+
+  bool IsCpp = endsWith(Input, ".cpp") || endsWith(Input, ".cc") ||
+               endsWith(Input, ".cxx") || endsWith(Input, ".C") ||
+               endsWith(Input, ".hpp") || endsWith(Input, ".hh") ||
+               endsWith(Input, ".hxx");
+
   std::vector<std::string> compilationFlags = {
-      OPENCILK_HOME "/bin/clang", "-c",         "-Wall",
-      "-Wno-unused-label",        "-fopencilk", "-fsyntax-only",
+      IsCpp ? OPENCILK_HOME "/bin/clang++" : OPENCILK_HOME "/bin/clang",
+      "-x",
+      IsCpp ? "c++" : "c",
+      "-c",
+      "-Wall",
+      "-Wno-unused-label",
+      "-fopencilk",
+      "-fsyntax-only",
+      "-Wno-unused",
   };
 
   compilationFlags.push_back(argv[optind]);

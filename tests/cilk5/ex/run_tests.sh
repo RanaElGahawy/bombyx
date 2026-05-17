@@ -2,33 +2,57 @@
 
 set -e
 
+CLANGXX="xcrun /opt/opencilk/bin/clang++"
+
+COMMON_FLAGS="-fopencilk -Wno-backend-plugin"
+CXX_FLAGS="$COMMON_FLAGS -Wno-parentheses-equality"
+
+compile_with_getoptions() {
+  SRC="$1"
+  OUT="$2"
+  EXTRA_FLAGS="$3"
+
+  $CLANGXX $COMMON_FLAGS -x c++ -c getoptions.c -o getoptions.o
+  $CLANGXX $CXX_FLAGS $EXTRA_FLAGS -c "$SRC" -o "$OUT.o"
+  $CLANGXX $COMMON_FLAGS "$OUT.o" getoptions.o -o "$OUT"
+}
+
 printf ">> nqueens \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality nqueens.cpp getoptions.c -o nqueens
-./nqueens 13 
+compile_with_getoptions nqueens.cpp nqueens ""
+./nqueens 13
+
 printf "\n >> fib \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality fib.cpp getoptions.c -o fib
+compile_with_getoptions fib.cpp fib ""
 ./fib 35
+
 printf "\n >> cilksort \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality cilksort.cpp getoptions.c -o cilksort
+compile_with_getoptions cilksort.cpp cilksort ""
 ./cilksort -n 100000000 -c
+
 printf "\n >> qsort \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality qsort.cpp -o qsort 
+$CLANGXX $CXX_FLAGS qsort.cpp -o qsort
 ./qsort 80000000 -c
+
 printf "\n >> matmul \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality matmul.cpp getoptions.c -o matmul
+compile_with_getoptions matmul.cpp matmul ""
 ./matmul -n 1000 -c
+
 printf "\n >> rectmul \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality -Wdeprecated -Wunneeded-internal-declaration rectmul.cpp getoptions.c -o rectmul
+compile_with_getoptions rectmul.cpp rectmul "-Wdeprecated -Wunneeded-internal-declaration"
 ./rectmul -benchmark long -c
+
 printf "\n >> rectmulred \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality rectmulred.cpp getoptions.c -o rectmulred
+compile_with_getoptions rectmulred.cpp rectmulred ""
 ./rectmulred -benchmark long -c
+
 printf "\n >> lu \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality lu.cpp  getoptions.c -o lu
+compile_with_getoptions lu.cpp lu ""
 ./lu -n 1024 -c
+
 printf "\n >> heat \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality heat.cpp  getoptions.c -o heat
+compile_with_getoptions heat.cpp heat ""
 ./heat -benchmark long
+
 printf "\n >> strassen \n"
-xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality strassen.cpp  getoptions.c -o strassen
+compile_with_getoptions strassen.cpp strassen ""
 ./strassen -n 1024 -c
