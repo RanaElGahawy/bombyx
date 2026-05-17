@@ -29,3 +29,6 @@ xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-
 printf "\n >> heat \n"
 xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality heat.cpp  getoptions.c -o heat
 ./heat -benchmark long
+printf "\n >> strassen \n"
+xcrun /opt/opencilk/bin/clang++ -fopencilk -Wno-backend-plugin -Wno-parentheses-equality strassen.cpp  getoptions.c -o strassen
+./strassen -n 1024 -c

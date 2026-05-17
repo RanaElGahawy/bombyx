@@ -31,10 +31,6 @@
 #include <string.h>
 #include <sys/time.h>
 
-unsigned long long todval(struct timeval *tp) {
-  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
-}
-
 #include "getoptions.h"
 
 #if CILKSAN
@@ -56,6 +52,10 @@ typedef struct {
 
 /* apparently register storage specifier is deprecated */
 #define register
+
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+}
 
 /*
  * compute the W coefficients (that is, powers of the root of 1)
@@ -3137,8 +3137,8 @@ static void fft_aux(int n, COMPLEX *in, COMPLEX *out, int *factors, COMPLEX *W,
     /* for(k = 0; k < n; k += m) { */
     /*   cilk_spawn fft_aux(m, out + k, in + k, factors + 1, W, nW); */
     /* } */
-    cilk_for(int k = 0; k < n; k += m) {
-      fft_aux(m, out + k, in + k, factors + 1, W, nW);
+    for (int k = 0; k < n; k += m) {
+      cilk_spawn fft_aux(m, out + k, in + k, factors + 1, W, nW);
     }
 
     cilk_sync;
@@ -3235,7 +3235,9 @@ void test_fft(int n, COMPLEX *in, COMPLEX *out) {
   /* for(j = 0; j < n; ++j) { */
   /*   cilk_spawn test_fft_elem(n, j, in, out); */
   /* } */
-  cilk_for(int j = 0; j < n; ++j) { test_fft_elem(n, j, in, out); }
+  for (int j = 0; j < n; ++j) {
+    cilk_spawn test_fft_elem(n, j, in, out);
+  }
 
   cilk_sync;
 

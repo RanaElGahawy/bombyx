@@ -91,10 +91,14 @@ void AccessIRExpr::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   assert(Base);
   if (auto *IE = llvm::dyn_cast<IdentIRExpr>(Base.get())) {
     Ctx.IdentCB(Out, IE->Ident);
+    Out << (Arrow ? "->" : ".");
+  } else if (auto *DE = llvm::dyn_cast<DRefIRExpr>(Base.get())) {
+    Ctx.ExprCB(&Ctx, Out, DE->Expr.get());
+    Out << "->";
   } else {
     Ctx.ExprCB(&Ctx, Out, Base.get());
+    Out << (Arrow ? "->" : ".");
   }
-  Out << (Arrow ? "->" : ".");
   Out << Field;
 }
 

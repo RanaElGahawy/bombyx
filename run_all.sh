@@ -74,4 +74,7 @@ echo ">> lu"
 ./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/lu.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/lu.cpp" 
 echo ">> heat"
 ./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/heat.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/heat.cpp" 
+echo ">> strassen"
+./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/strassen.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/strassen.cpp" 
+
 echo "✅ Done!"

@@ -629,7 +629,7 @@ public:
     CurrB = JoinB;
   }
 
-  void VisitDoWhileStmt(DoStmt *DS) {
+  void VisitDoStmt(DoStmt *DS) {
     auto *DoAnnot = new ScopeAnnotIRStmt(ScopeAnnot::SA_DO);
     pushIRStmt((IRStmt *)DoAnnot);
 
@@ -785,6 +785,15 @@ public:
         ExprCtx = true;
         ExprStack.push_back(getExpr(Node->getRHS()));
       }
+      return;
+    }
+
+    // Assignment used as an expression: a = b - (c = d)
+    if (Node->isAssignmentOp() && ExprCtx) {
+      ExprCtx = false;
+      handleStmt(Node);
+      ExprCtx = true;
+      ExprStack.push_back(getExpr(Node->getLHS()));
       return;
     }
 
