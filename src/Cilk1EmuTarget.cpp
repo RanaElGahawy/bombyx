@@ -606,7 +606,7 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
         .TaskContinuationKey = F->Info.IsTask ? std::string("largs->k") : ""};
     Cilk1EmuPrinter Printer(out, IRC);
     Printer.traverse(*F);
-    if (F->Info.IsTask) {
+    if (F->Info.IsTask && !Printer.LastReturnPrinted) {
       out << "    return;\n";
     } else if (!Printer.LastReturnPrinted && F->Info.RootFun &&
                !F->Info.RootFun->getReturnType()->isVoidType()) {

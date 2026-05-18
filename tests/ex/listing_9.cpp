@@ -47,7 +47,6 @@ CLOSURE_DEF(fun_reentry0_cont0,
 THREAD(worker) {
     worker_closure *largs = (worker_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->x + 1));
-    return;
 }
 THREAD(fun) {
     int iter;
@@ -64,7 +63,6 @@ THREAD(fun) {
     sp0c->a = a;
     sp0c->b = b;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }
 int main() {
@@ -116,12 +114,10 @@ THREAD(fun_reentry0) {
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
 THREAD(fun_reentry0_cont0) {
     fun_reentry0_cont0_closure *largs = (fun_reentry0_cont0_closure*)(args.get());
@@ -135,6 +131,5 @@ THREAD(fun_reentry0_cont0) {
     sp0c->a = largs->a;
     sp0c->b = largs->b;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }

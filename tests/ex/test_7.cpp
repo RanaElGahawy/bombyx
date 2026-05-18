@@ -54,7 +54,6 @@ CLOSURE_DEF(reduce_reentry0_cont0,
 THREAD(worker) {
     worker_closure *largs = (worker_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->x * largs->x));
-    return;
 }
 THREAD(reduce) {
     Accum acc;
@@ -72,21 +71,20 @@ THREAD(reduce) {
     sp0c->r = r;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
-    return;
 }
 int main() {
-    int arr0[4];
+    int arr[4];
     int result;
-    arr0[0] = 1;
-    arr0[1] = 2;
-    arr0[2] = 3;
-    arr0[3] = 4;
+    arr[0] = 1;
+    arr[1] = 2;
+    arr[2] = 3;
+    arr[3] = 4;
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     cont sp0k;
     SN_BIND(SN_main_cont0, &sp0k, result);
     reduce_closure sp0c(sp0k);
-    sp0c.arr = arr0;
+    sp0c.arr = arr;
     sp0c.n = 4;
     spawn<reduce_closure> sp0(sp0c);
 
@@ -96,7 +94,6 @@ int main() {
 THREAD(reduce_exit0) {
     reduce_exit0_closure *largs = (reduce_exit0_closure*)(args.get());
     SEND_ARGUMENT(largs->k, largs->acc.value);
-    return;
 }
 THREAD(reduce_reentry0) {
     reduce_reentry0_closure *largs = (reduce_reentry0_closure*)(args.get());
@@ -124,13 +121,11 @@ THREAD(reduce_reentry0) {
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
     printf("result = %d\n",largs->result);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
 THREAD(reduce_reentry0_cont0) {
     reduce_reentry0_cont0_closure *largs = (reduce_reentry0_cont0_closure*)(args.get());
@@ -144,6 +139,5 @@ THREAD(reduce_reentry0_cont0) {
     sp0c->i = largs->i;
     sp0c->r = largs->r;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }

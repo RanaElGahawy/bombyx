@@ -33,7 +33,7 @@ CLOSURE_DEF(fun_cont1,
     long h;
 );
 CLOSURE_DEF(main_cont0,
-    int n0;
+    int n;
 );
 
 
@@ -74,14 +74,13 @@ THREAD(fun) {
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
-    return;
 }
 int main() {
-    int n0;
+    int n;
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     cont sp0k;
-    SN_BIND(SN_main_cont0, &sp0k, n0);
+    SN_BIND(SN_main_cont0, &sp0k, n);
     fun_closure sp0c(sp0k);
     sp0c.n = 8;
     spawn<fun_closure> sp0(sp0c);
@@ -95,7 +94,6 @@ THREAD(fun_afterif0) {
     largs->w = (largs->w * 10);
     largs->w = (largs->w - 6);
     SEND_ARGUMENT(largs->k, largs->w);
-    return;
 }
 THREAD(fun_cont0) {
     long f;
@@ -136,11 +134,9 @@ THREAD(fun_cont1) {
     sp0c->h = largs->h;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
-    printf("fun = %d\n",largs->n0);
+    printf("fun = %d\n",largs->n);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

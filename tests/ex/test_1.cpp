@@ -19,10 +19,10 @@ CLOSURE_DEF(worker,
     unsigned long long n;
 );
 CLOSURE_DEF(fun,
-    long n0;
+    long n;
 );
 CLOSURE_DEF(fun_exit0,
-    long n0;
+    long n;
     unsigned long long w;
     unsigned long long result;
     unsigned long long sum;
@@ -34,7 +34,7 @@ CLOSURE_DEF(fun_exit0,
     unsigned long long y;
 );
 CLOSURE_DEF(fun_reentry0,
-    long n0;
+    long n;
     unsigned long long w;
     unsigned long long result;
     unsigned long long sum;
@@ -46,7 +46,7 @@ CLOSURE_DEF(fun_reentry0,
     unsigned long long y;
 );
 CLOSURE_DEF(fun_reentry0_exit1,
-    long n0;
+    long n;
     unsigned long long w;
     unsigned long long result;
     unsigned long long sum;
@@ -58,7 +58,7 @@ CLOSURE_DEF(fun_reentry0_exit1,
     unsigned long long y;
 );
 CLOSURE_DEF(fun_reentry0_reentry1,
-    long n0;
+    long n;
     unsigned long long w;
     unsigned long long result;
     unsigned long long sum;
@@ -70,7 +70,7 @@ CLOSURE_DEF(fun_reentry0_reentry1,
     unsigned long long y;
 );
 CLOSURE_DEF(fun_exit0_exit2,
-    long n0;
+    long n;
     unsigned long long w;
     unsigned long long result;
     unsigned long long sum;
@@ -82,7 +82,7 @@ CLOSURE_DEF(fun_exit0_exit2,
     unsigned long long y;
 );
 CLOSURE_DEF(fun_exit0_reentry2,
-    long n0;
+    long n;
     unsigned long long w;
     unsigned long long result;
     unsigned long long sum;
@@ -94,10 +94,10 @@ CLOSURE_DEF(fun_exit0_reentry2,
     unsigned long long y;
 );
 CLOSURE_DEF(main_cont0,
-    unsigned long long n1;
+    unsigned long long n;
 );
 CLOSURE_DEF(fun_reentry0_reentry1_cont0,
-    long n0;
+    long n;
     unsigned long long w;
     unsigned long long result;
     unsigned long long sum;
@@ -109,7 +109,7 @@ CLOSURE_DEF(fun_reentry0_reentry1_cont0,
     unsigned long long y;
 );
 CLOSURE_DEF(fun_exit0_reentry2_cont0,
-    long n0;
+    long n;
     unsigned long long w;
     unsigned long long sum;
     unsigned long long val_0;
@@ -127,7 +127,6 @@ CLOSURE_DEF(fun_exit0_reentry2_cont0,
 THREAD(worker) {
     worker_closure *largs = (worker_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->n * largs->n));
-    return;
 }
 THREAD(fun) {
     unsigned long long w;
@@ -144,7 +143,7 @@ THREAD(fun) {
     result = 2;
     if ((w > 0)) {
         auto sp0c = std::make_shared<fun_reentry0_closure>(largs->k);
-        sp0c->n0 = largs->n0;
+        sp0c->n = largs->n;
         sp0c->w = w;
         sp0c->result = result;
         sp0c->sum = sum;
@@ -159,7 +158,7 @@ THREAD(fun) {
     } else {
         w = 0;
         auto sp1c = std::make_shared<fun_exit0_closure>(largs->k);
-        sp1c->n0 = largs->n0;
+        sp1c->n = largs->n;
         sp1c->w = w;
         sp1c->result = result;
         sp1c->sum = sum;
@@ -172,16 +171,15 @@ THREAD(fun) {
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
-    return;
 }
 int main() {
-    unsigned long long n1;
+    unsigned long long n;
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     cont sp0k;
-    SN_BIND(SN_main_cont0, &sp0k, n1);
+    SN_BIND(SN_main_cont0, &sp0k, n);
     fun_closure sp0c(sp0k);
-    sp0c.n0 = 10;
+    sp0c.n = 10;
     spawn<fun_closure> sp0(sp0c);
 
     // Original sync was here
@@ -193,7 +191,7 @@ THREAD(fun_exit0) {
     if ((largs->x > 3)) {
         largs->v = 0;
         auto sp0c = std::make_shared<fun_exit0_reentry2_closure>(largs->k);
-        sp0c->n0 = largs->n0;
+        sp0c->n = largs->n;
         sp0c->w = largs->w;
         sp0c->result = largs->result;
         sp0c->sum = largs->sum;
@@ -208,7 +206,7 @@ THREAD(fun_exit0) {
     } else {
         largs->w = 0;
         auto sp1c = std::make_shared<fun_exit0_exit2_closure>(largs->k);
-        sp1c->n0 = largs->n0;
+        sp1c->n = largs->n;
         sp1c->w = largs->w;
         sp1c->result = largs->result;
         sp1c->sum = largs->sum;
@@ -221,13 +219,12 @@ THREAD(fun_exit0) {
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
-    return;
 }
 THREAD(fun_reentry0) {
     fun_reentry0_closure *largs = (fun_reentry0_closure*)(args.get());
     if ((largs->w > 0)) {
         auto sp0c = std::make_shared<fun_reentry0_reentry1_closure>(largs->k);
-        sp0c->n0 = largs->n0;
+        sp0c->n = largs->n;
         sp0c->w = largs->w;
         sp0c->result = largs->result;
         sp0c->sum = largs->sum;
@@ -241,7 +238,7 @@ THREAD(fun_reentry0) {
         return;
     } else {
         auto sp1c = std::make_shared<fun_exit0_closure>(largs->k);
-        sp1c->n0 = largs->n0;
+        sp1c->n = largs->n;
         sp1c->w = largs->w;
         sp1c->result = largs->result;
         sp1c->sum = largs->sum;
@@ -254,13 +251,12 @@ THREAD(fun_reentry0) {
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
-    return;
 }
 THREAD(fun_reentry0_exit1) {
     fun_reentry0_exit1_closure *largs = (fun_reentry0_exit1_closure*)(args.get());
     largs->w = (largs->w - 1);
     auto sp0c = std::make_shared<fun_reentry0_closure>(largs->k);
-    sp0c->n0 = largs->n0;
+    sp0c->n = largs->n;
     sp0c->w = largs->w;
     sp0c->result = largs->result;
     sp0c->sum = largs->sum;
@@ -272,18 +268,17 @@ THREAD(fun_reentry0_exit1) {
     sp0c->y = largs->y;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
-    return;
 }
 THREAD(fun_reentry0_reentry1) {
     fun_reentry0_reentry1_closure *largs = (fun_reentry0_reentry1_closure*)(args.get());
-    if ((largs->n0 > 0)) {
-        largs->sum = (largs->w + largs->n0);
+    if ((largs->n > 0)) {
+        largs->sum = (largs->w + largs->n);
         fun_reentry0_reentry1_cont0_closure SN_fun_reentry0_reentry1_cont0c(largs->k);
         spawn_next<fun_reentry0_reentry1_cont0_closure> SN_fun_reentry0_reentry1_cont0(SN_fun_reentry0_reentry1_cont0c);
         cont sp0k;
         SN_BIND(SN_fun_reentry0_reentry1_cont0, &sp0k, val_0);
         worker_closure sp0c(sp0k);
-        sp0c.n = largs->n0;
+        sp0c.n = largs->n;
         spawn<worker_closure> sp0(sp0c);
 
         cont sp1k;
@@ -293,17 +288,17 @@ THREAD(fun_reentry0_reentry1) {
         spawn<worker_closure> sp1(sp1c);
 
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->y = largs->y;
+        ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->z = largs->z;
+        ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->v = largs->v;
+        ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->n = largs->n;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->x = largs->x;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->sum = largs->sum;
-        ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->z = largs->z;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->result = largs->result;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->w = largs->w;
-        ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->v = largs->v;
-        ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->n0 = largs->n0;
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<fun_reentry0_exit1_closure>(largs->k);
-        sp2c->n0 = largs->n0;
+        sp2c->n = largs->n;
         sp2c->w = largs->w;
         sp2c->result = largs->result;
         sp2c->sum = largs->sum;
@@ -316,12 +311,10 @@ THREAD(fun_reentry0_reentry1) {
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
-    return;
 }
 THREAD(fun_exit0_exit2) {
     fun_exit0_exit2_closure *largs = (fun_exit0_exit2_closure*)(args.get());
     SEND_ARGUMENT(largs->k, largs->result);
-    return;
 }
 THREAD(fun_exit0_reentry2) {
     fun_exit0_reentry2_closure *largs = (fun_exit0_reentry2_closure*)(args.get());
@@ -343,15 +336,15 @@ THREAD(fun_exit0_reentry2) {
 
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->v = largs->v;
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->x = largs->x;
-        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->val_1 = largs->val_1;
-        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->val_0 = largs->val_0;
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->sum = largs->sum;
+        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->val_1 = largs->val_1;
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->w = largs->w;
-        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->n0 = largs->n0;
+        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->val_0 = largs->val_0;
+        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->n = largs->n;
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<fun_exit0_exit2_closure>(largs->k);
-        sp2c->n0 = largs->n0;
+        sp2c->n = largs->n;
         sp2c->w = largs->w;
         sp2c->result = largs->result;
         sp2c->sum = largs->sum;
@@ -364,20 +357,18 @@ THREAD(fun_exit0_reentry2) {
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
-    printf("fun = %llu\n",largs->n1);
+    printf("fun = %llu\n",largs->n);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
 THREAD(fun_reentry0_reentry1_cont0) {
     fun_reentry0_reentry1_cont0_closure *largs = (fun_reentry0_reentry1_cont0_closure*)(args.get());
     largs->result = ((largs->result + largs->val_0) + largs->val_1);
-    largs->n0 = (largs->n0 - 1);
+    largs->n = (largs->n - 1);
     auto sp0c = std::make_shared<fun_reentry0_reentry1_closure>(largs->k);
-    sp0c->n0 = largs->n0;
+    sp0c->n = largs->n;
     sp0c->w = largs->w;
     sp0c->result = largs->result;
     sp0c->sum = largs->sum;
@@ -389,7 +380,6 @@ THREAD(fun_reentry0_reentry1_cont0) {
     sp0c->y = largs->y;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
-    return;
 }
 THREAD(fun_exit0_reentry2_cont0) {
     unsigned long long result;
@@ -397,7 +387,7 @@ THREAD(fun_exit0_reentry2_cont0) {
     result = ((largs->x + largs->y) + largs->z);
     largs->v = (largs->v + 1);
     auto sp0c = std::make_shared<fun_exit0_reentry2_closure>(largs->k);
-    sp0c->n0 = largs->n0;
+    sp0c->n = largs->n;
     sp0c->w = largs->w;
     sp0c->result = result;
     sp0c->sum = largs->sum;
@@ -408,6 +398,5 @@ THREAD(fun_exit0_reentry2_cont0) {
     sp0c->z = largs->z;
     sp0c->y = largs->y;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }

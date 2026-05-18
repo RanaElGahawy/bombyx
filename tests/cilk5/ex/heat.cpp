@@ -44,8 +44,8 @@ extern int errno;
 #undef ERROR_SUMMARY
 
 void allcgrid(double **neww, double **old, int lb, int ub);
-void initgrid(double **old0, int lb0, int ub0);
-void compstripe(double **neww0, double **old1, int lb1, int ub1);
+void initgrid(double **old, int lb, int ub);
+void compstripe(double **neww, double **old, int lb, int ub);
 THREAD(divide);
 int heat();
 THREAD(heat_exit0);
@@ -57,24 +57,24 @@ THREAD(heat_cont1);
 THREAD(heat_reentry0_cont0);
 
 CLOSURE_DEF(divide,
-    int lb2;
-    int ub2;
-    double **neww1;
-    double **old2;
+    int lb;
+    int ub;
+    double **neww;
+    double **old;
     int mode;
     int timestep;
 );
 CLOSURE_DEF(heat_exit0,
-    double **old3;
-    double **neww2;
+    double **old;
+    double **neww;
     int c;
-    int l0;
+    int l;
 );
 CLOSURE_DEF(heat_reentry0,
-    double **old3;
-    double **neww2;
+    double **old;
+    double **neww;
     int c;
-    int l0;
+    int l;
 );
 CLOSURE_DEF(divide_cont0,
     int l;
@@ -85,19 +85,19 @@ CLOSURE_DEF(divide_cont1,
     int r;
 );
 CLOSURE_DEF(heat_cont0,
-    double **old3;
-    double **neww2;
+    double **old;
+    double **neww;
 );
 CLOSURE_DEF(heat_cont1,
-    double **old3;
-    double **neww2;
-    int l0;
+    double **old;
+    double **neww;
+    int l;
 );
 CLOSURE_DEF(heat_reentry0_cont0,
-    double **old3;
-    double **neww2;
+    double **old;
+    double **neww;
     int c;
-    int l0;
+    int l;
 );
 unsigned long long todval (struct timeval *tp) {
     return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
@@ -315,69 +315,69 @@ void allcgrid(double **neww, double **old, int lb, int ub) {
         (rol++);
     }
 }
-void initgrid(double **old0, int lb0, int ub0) {
+void initgrid(double **old, int lb, int ub) {
     int a;
     int b;
     int llb;
     int lub;
-    llb = (lb0 == 0) ? 1 : lb0;
-    lub = (ub0 == nx) ? nx - 1 : ub0;
+    llb = (lb == 0) ? 1 : lb;
+    lub = (ub == nx) ? nx - 1 : ub;
     a = llb;
     for (b = 0;(a < lub);(a++)) {
-        old0[a][b] = 0.;
+        old[a][b] = 0.;
     }
     a = llb;
     for (b = (ny - 1);(a < lub);(a++)) {
-        old0[a][b] = (exp(((-2) * 0)) * sin((xu + (a * dx))));
+        old[a][b] = (exp(((-2) * 0)) * sin((xu + (a * dx))));
     }
-    if ((lb0 == 0)) {
+    if ((lb == 0)) {
         a = 0;
         for (b = 0;(b < ny);(b++)) {
-            old0[a][b] = 0.;
+            old[a][b] = 0.;
         }
     }
-    if ((ub0 == nx)) {
+    if ((ub == nx)) {
         a = (nx - 1);
         for (b = 0;(b < ny);(b++)) {
-            old0[a][b] = (exp(((-2) * 0)) * sin((yu + (b * dy))));
+            old[a][b] = (exp(((-2) * 0)) * sin((yu + (b * dy))));
         }
     }
     for (a = llb;(a < lub);(a++)) {
         for (b = 1;(b < (ny - 1));(b++)) {
-            old0[a][b] = (sin((xu + (a * dx))) * sin((yu + (b * dy))));
+            old[a][b] = (sin((xu + (a * dx))) * sin((yu + (b * dy))));
         }
     }
 }
-void compstripe(double **neww0, double **old1, int lb1, int ub1) {
-    int a0;
-    int b0;
-    int llb0;
-    int lub0;
-    llb0 = (lb1 == 0) ? 1 : lb1;
-    lub0 = (ub1 == nx) ? nx - 1 : ub1;
-    for (a0 = llb0;(a0 < lub0);(a0++)) {
-        for (b0 = 1;(b0 < (ny - 1));(b0++)) {
-            neww0[a0][b0] = (((dtdxsq * ((old1[(a0 + 1)][b0] - (2 * old1[a0][b0])) + old1[(a0 - 1)][b0])) + (dtdysq * ((old1[a0][(b0 + 1)] - (2 * old1[a0][b0])) + old1[a0][(b0 - 1)]))) + old1[a0][b0]);
+void compstripe(double **neww, double **old, int lb, int ub) {
+    int a;
+    int b;
+    int llb;
+    int lub;
+    llb = (lb == 0) ? 1 : lb;
+    lub = (ub == nx) ? nx - 1 : ub;
+    for (a = llb;(a < lub);(a++)) {
+        for (b = 1;(b < (ny - 1));(b++)) {
+            neww[a][b] = (((dtdxsq * ((old[(a + 1)][b] - (2 * old[a][b])) + old[(a - 1)][b])) + (dtdysq * ((old[a][(b + 1)] - (2 * old[a][b])) + old[a][(b - 1)]))) + old[a][b]);
         }
     }
-    a0 = llb0;
-    for (b0 = (ny - 1);(a0 < lub0);(a0++)) {
-        neww0[a0][b0] = (exp(((-2) * t)) * sin((xu + (a0 * dx))));
+    a = llb;
+    for (b = (ny - 1);(a < lub);(a++)) {
+        neww[a][b] = (exp(((-2) * t)) * sin((xu + (a * dx))));
     }
-    a0 = llb0;
-    for (b0 = 0;(a0 < lub0);(a0++)) {
-        neww0[a0][b0] = 0.;
+    a = llb;
+    for (b = 0;(a < lub);(a++)) {
+        neww[a][b] = 0.;
     }
-    if ((lb1 == 0)) {
-        a0 = 0;
-        for (b0 = 0;(b0 < ny);(b0++)) {
-            neww0[a0][b0] = 0.;
+    if ((lb == 0)) {
+        a = 0;
+        for (b = 0;(b < ny);(b++)) {
+            neww[a][b] = 0.;
         }
     }
-    if ((ub1 == nx)) {
-        a0 = (nx - 1);
-        for (b0 = 0;(b0 < ny);(b0++)) {
-            neww0[a0][b0] = (exp(((-2) * t)) * sin((yu + (b0 * dy))));
+    if ((ub == nx)) {
+        a = (nx - 1);
+        for (b = 0;(b < ny);(b++)) {
+            neww[a][b] = (exp(((-2) * t)) * sin((yu + (b * dy))));
         }
     }
 }
@@ -385,17 +385,17 @@ THREAD(divide) {
     int l;
     int r;
     divide_closure *largs = (divide_closure*)(args.get());
-    if (((largs->ub2 - largs->lb2) > leafmaxcol)) {
+    if (((largs->ub - largs->lb) > leafmaxcol)) {
         l = 0;
         divide_cont0_closure SN_divide_cont0c(largs->k);
         spawn_next<divide_cont0_closure> SN_divide_cont0(SN_divide_cont0c);
         cont sp0k;
         SN_BIND(SN_divide_cont0, &sp0k, l);
         divide_closure sp0c(sp0k);
-        sp0c.lb2 = largs->lb2;
-        sp0c.ub2 = ((largs->ub2 + largs->lb2) / 2);
-        sp0c.neww1 = largs->neww1;
-        sp0c.old2 = largs->old2;
+        sp0c.lb = largs->lb;
+        sp0c.ub = ((largs->ub + largs->lb) / 2);
+        sp0c.neww = largs->neww;
+        sp0c.old = largs->old;
         sp0c.mode = largs->mode;
         sp0c.timestep = largs->timestep;
         spawn<divide_closure> sp0(sp0c);
@@ -403,10 +403,10 @@ THREAD(divide) {
         cont sp1k;
         SN_BIND(SN_divide_cont0, &sp1k, r);
         divide_closure sp1c(sp1k);
-        sp1c.lb2 = ((largs->ub2 + largs->lb2) / 2);
-        sp1c.ub2 = largs->ub2;
-        sp1c.neww1 = largs->neww1;
-        sp1c.old2 = largs->old2;
+        sp1c.lb = ((largs->ub + largs->lb) / 2);
+        sp1c.ub = largs->ub;
+        sp1c.neww = largs->neww;
+        sp1c.old = largs->old;
         sp1c.mode = largs->mode;
         sp1c.timestep = largs->timestep;
         spawn<divide_closure> sp1(sp1c);
@@ -416,52 +416,50 @@ THREAD(divide) {
         switch (largs->mode) {
 case 2:
   if (largs->timestep % 2)
-      compstripe(largs->neww1, largs->old2, largs->lb2, largs->ub2);
+      compstripe(largs->neww, largs->old, largs->lb, largs->ub);
   else
-      compstripe(largs->old2, largs->neww1, largs->lb2, largs->ub2);
+      compstripe(largs->old, largs->neww, largs->lb, largs->ub);
   SEND_ARGUMENT(largs->k, 1);
   return;
 case 0:
-  allcgrid(largs->neww1, largs->old2, largs->lb2, largs->ub2);
+  allcgrid(largs->neww, largs->old, largs->lb, largs->ub);
   SEND_ARGUMENT(largs->k, 1);
   return;
 case 1:
-  initgrid(largs->old2, largs->lb2, largs->ub2);
+  initgrid(largs->old, largs->lb, largs->ub);
   SEND_ARGUMENT(largs->k, 1);
   return;
 };
         SEND_ARGUMENT(largs->k, 0);
     }
-    return;
 }
 int heat() {
-    double **old3;
-    double **neww2;
-    int l0;
-    old3 = ((double **) malloc((nx * sizeof(double *))));
-    neww2 = ((double **) malloc((nx * sizeof(double *))));
+    double **old;
+    double **neww;
+    int l;
+    old = ((double **) malloc((nx * sizeof(double *))));
+    neww = ((double **) malloc((nx * sizeof(double *))));
     heat_cont0_closure SN_heat_cont0c(CONT_DUMMY);
     spawn_next<heat_cont0_closure> SN_heat_cont0(SN_heat_cont0c);
     cont sp0k;
     SN_BIND_VOID(SN_heat_cont0, &sp0k);
     divide_closure sp0c(sp0k);
-    sp0c.lb2 = 0;
-    sp0c.ub2 = nx;
-    sp0c.neww1 = neww2;
-    sp0c.old2 = old3;
+    sp0c.lb = 0;
+    sp0c.ub = nx;
+    sp0c.neww = neww;
+    sp0c.old = old;
     sp0c.mode = 0;
     sp0c.timestep = 0;
     spawn<divide_closure> sp0(sp0c);
 
-    ((heat_cont0_closure*)SN_heat_cont0.cls.get())->neww2 = neww2;
-    ((heat_cont0_closure*)SN_heat_cont0.cls.get())->old3 = old3;
+    ((heat_cont0_closure*)SN_heat_cont0.cls.get())->neww = neww;
+    ((heat_cont0_closure*)SN_heat_cont0.cls.get())->old = old;
     // Original sync was here
     return 0;
 }
 THREAD(heat_exit0) {
     heat_exit0_closure *largs = (heat_exit0_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
 THREAD(heat_reentry0) {
     heat_reentry0_closure *largs = (heat_reentry0_closure*)(args.get());
@@ -470,30 +468,29 @@ THREAD(heat_reentry0) {
         heat_reentry0_cont0_closure SN_heat_reentry0_cont0c(largs->k);
         spawn_next<heat_reentry0_cont0_closure> SN_heat_reentry0_cont0(SN_heat_reentry0_cont0c);
         cont sp0k;
-        SN_BIND(SN_heat_reentry0_cont0, &sp0k, l0);
+        SN_BIND(SN_heat_reentry0_cont0, &sp0k, l);
         divide_closure sp0c(sp0k);
-        sp0c.lb2 = 0;
-        sp0c.ub2 = nx;
-        sp0c.neww1 = largs->neww2;
-        sp0c.old2 = largs->old3;
+        sp0c.lb = 0;
+        sp0c.ub = nx;
+        sp0c.neww = largs->neww;
+        sp0c.old = largs->old;
         sp0c.mode = 2;
         sp0c.timestep = largs->c;
         spawn<divide_closure> sp0(sp0c);
 
         ((heat_reentry0_cont0_closure*)SN_heat_reentry0_cont0.cls.get())->c = largs->c;
-        ((heat_reentry0_cont0_closure*)SN_heat_reentry0_cont0.cls.get())->neww2 = largs->neww2;
-        ((heat_reentry0_cont0_closure*)SN_heat_reentry0_cont0.cls.get())->old3 = largs->old3;
+        ((heat_reentry0_cont0_closure*)SN_heat_reentry0_cont0.cls.get())->neww = largs->neww;
+        ((heat_reentry0_cont0_closure*)SN_heat_reentry0_cont0.cls.get())->old = largs->old;
         // Original sync was here
     } else {
         auto sp1c = std::make_shared<heat_exit0_closure>(largs->k);
-        sp1c->old3 = largs->old3;
-        sp1c->neww2 = largs->neww2;
+        sp1c->old = largs->old;
+        sp1c->neww = largs->neww;
         sp1c->c = largs->c;
-        sp1c->l0 = largs->l0;
+        sp1c->l = largs->l;
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
-    return;
 }
 THREAD(divide_cont0) {
     divide_cont0_closure *largs = (divide_cont0_closure*)(args.get());
@@ -509,26 +506,25 @@ THREAD(divide_cont1) {
     divide_cont1_closure *largs = (divide_cont1_closure*)(args.get());
     _tmp = (largs->l + largs->r);
     SEND_ARGUMENT(largs->k, _tmp);
-    return;
 }
 THREAD(heat_cont0) {
-    int l0;
+    int l;
     heat_cont0_closure *largs = (heat_cont0_closure*)(args.get());
     heat_cont1_closure SN_heat_cont1c(largs->k);
     spawn_next<heat_cont1_closure> SN_heat_cont1(SN_heat_cont1c);
     cont sp0k;
-    SN_BIND(SN_heat_cont1, &sp0k, l0);
+    SN_BIND(SN_heat_cont1, &sp0k, l);
     divide_closure sp0c(sp0k);
-    sp0c.lb2 = 0;
-    sp0c.ub2 = nx;
-    sp0c.neww1 = largs->neww2;
-    sp0c.old2 = largs->old3;
+    sp0c.lb = 0;
+    sp0c.ub = nx;
+    sp0c.neww = largs->neww;
+    sp0c.old = largs->old;
     sp0c.mode = 1;
     sp0c.timestep = 0;
     spawn<divide_closure> sp0(sp0c);
 
-    ((heat_cont1_closure*)SN_heat_cont1.cls.get())->neww2 = largs->neww2;
-    ((heat_cont1_closure*)SN_heat_cont1.cls.get())->old3 = largs->old3;
+    ((heat_cont1_closure*)SN_heat_cont1.cls.get())->neww = largs->neww;
+    ((heat_cont1_closure*)SN_heat_cont1.cls.get())->old = largs->old;
     // Original sync was here
     return;
 }
@@ -537,23 +533,21 @@ THREAD(heat_cont1) {
     heat_cont1_closure *largs = (heat_cont1_closure*)(args.get());
     c = 1;
     auto sp0c = std::make_shared<heat_reentry0_closure>(largs->k);
-    sp0c->old3 = largs->old3;
-    sp0c->neww2 = largs->neww2;
+    sp0c->old = largs->old;
+    sp0c->neww = largs->neww;
     sp0c->c = c;
-    sp0c->l0 = largs->l0;
+    sp0c->l = largs->l;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }
 THREAD(heat_reentry0_cont0) {
     heat_reentry0_cont0_closure *largs = (heat_reentry0_cont0_closure*)(args.get());
     (largs->c++);
     auto sp0c = std::make_shared<heat_reentry0_closure>(largs->k);
-    sp0c->old3 = largs->old3;
-    sp0c->neww2 = largs->neww2;
+    sp0c->old = largs->old;
+    sp0c->neww = largs->neww;
     sp0c->c = largs->c;
-    sp0c->l0 = largs->l0;
+    sp0c->l = largs->l;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }

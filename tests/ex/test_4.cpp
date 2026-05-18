@@ -36,7 +36,6 @@ CLOSURE_DEF(main_cont0,
 THREAD(process) {
     process_closure *largs = (process_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->n->value * largs->n->weight));
-    return;
 }
 THREAD(compute) {
     int x;
@@ -60,20 +59,20 @@ THREAD(compute) {
     return;
 }
 int main() {
-    Node a0;
-    Node b0;
+    Node a;
+    Node b;
     int result;
-    a0.value = 3;
-    a0.weight = 4;
-    b0.value = 5;
-    b0.weight = 6;
+    a.value = 3;
+    a.weight = 4;
+    b.value = 5;
+    b.weight = 6;
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     cont sp0k;
     SN_BIND(SN_main_cont0, &sp0k, result);
     compute_closure sp0c(sp0k);
-    sp0c.a = &(a0);
-    sp0c.b = &(b0);
+    sp0c.a = &(a);
+    sp0c.b = &(b);
     spawn<compute_closure> sp0(sp0c);
 
     // Original sync was here
@@ -82,11 +81,9 @@ int main() {
 THREAD(compute_cont0) {
     compute_cont0_closure *largs = (compute_cont0_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->x + largs->y));
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
     printf("result = %d\n",largs->result);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

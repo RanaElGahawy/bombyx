@@ -21,7 +21,7 @@ CLOSURE_DEF(compute,
     int b;
 );
 CLOSURE_DEF(compute_cont0,
-    int x0;
+    int x;
     int y;
 );
 CLOSURE_DEF(main_cont0,
@@ -38,20 +38,19 @@ int counter_get(Counter *c) {
     return c->val;
 }
 THREAD(worker) {
-    Counter c0;
+    Counter c;
     worker_closure *largs = (worker_closure*)(args.get());
-    c0.val = largs->x;
-    SEND_ARGUMENT(largs->k, counter_get(&(c0)));
-    return;
+    c.val = largs->x;
+    SEND_ARGUMENT(largs->k, counter_get(&(c)));
 }
 THREAD(compute) {
-    int x0;
+    int x;
     int y;
     compute_closure *largs = (compute_closure*)(args.get());
     compute_cont0_closure SN_compute_cont0c(largs->k);
     spawn_next<compute_cont0_closure> SN_compute_cont0(SN_compute_cont0c);
     cont sp0k;
-    SN_BIND(SN_compute_cont0, &sp0k, x0);
+    SN_BIND(SN_compute_cont0, &sp0k, x);
     worker_closure sp0c(sp0k);
     sp0c.x = largs->a;
     spawn<worker_closure> sp0(sp0c);
@@ -81,12 +80,10 @@ int main() {
 }
 THREAD(compute_cont0) {
     compute_cont0_closure *largs = (compute_cont0_closure*)(args.get());
-    SEND_ARGUMENT(largs->k, (largs->x0 + largs->y));
-    return;
+    SEND_ARGUMENT(largs->k, (largs->x + largs->y));
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
     printf("result = %d\n",largs->result);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

@@ -87,15 +87,15 @@ unsigned long my_rand();
 void my_srand(unsigned long seed);
 ELM med3(ELM a, ELM b, ELM c);
 ELM choose_pivot(ELM *low, ELM *high);
-ELM * seqpart(ELM *low0, ELM *high0);
-void insertion_sort(ELM *low3, ELM *high3);
-void seqquick(ELM *low4, ELM *high4);
+ELM * seqpart(ELM *low, ELM *high);
+void insertion_sort(ELM *low, ELM *high);
+void seqquick(ELM *low, ELM *high);
 void seqmerge(ELM *low1, ELM *high1, ELM *low2, ELM *high2, ELM *lowdest);
-ELM * binsplit(ELM val, ELM *low5, ELM *high5);
+ELM * binsplit(ELM val, ELM *low, ELM *high);
 THREAD(cilkmerge);
 THREAD(cilksort);
-void scramble_array(ELM *arr, unsigned long size0);
-void fill_array(ELM *arr0, unsigned long size1);
+void scramble_array(ELM *arr, unsigned long size);
+void fill_array(ELM *arr, unsigned long size);
 int usage();
 int main(int argc, char **argv);
 THREAD(cilkmerge_cont0);
@@ -108,15 +108,15 @@ THREAD(cilksort_cont4);
 THREAD(main_cont0);
 
 CLOSURE_DEF(cilkmerge,
-    ELM *low10;
-    ELM *high10;
-    ELM *low20;
-    ELM *high20;
-    ELM *lowdest0;
+    ELM *low1;
+    ELM *high1;
+    ELM *low2;
+    ELM *high2;
+    ELM *lowdest;
 );
 CLOSURE_DEF(cilksort,
-    ELM *low6;
-    ELM *tmp1;
+    ELM *low;
+    ELM *tmp;
     long size;
 );
 CLOSURE_DEF(cilkmerge_cont0,
@@ -124,7 +124,7 @@ CLOSURE_DEF(cilkmerge_cont0,
 CLOSURE_DEF(cilkmerge_cont1,
 );
 CLOSURE_DEF(cilksort_cont0,
-    ELM *low6;
+    ELM *low;
     long size;
     long quarter;
     ELM *A;
@@ -135,7 +135,7 @@ CLOSURE_DEF(cilksort_cont0,
     ELM *tmpC;
 );
 CLOSURE_DEF(cilksort_cont1,
-    ELM *low6;
+    ELM *low;
     long size;
     long quarter;
     ELM *A;
@@ -160,9 +160,9 @@ CLOSURE_DEF(cilksort_cont3,
 CLOSURE_DEF(cilksort_cont4,
 );
 CLOSURE_DEF(main_cont0,
-    long size2;
+    long size;
     ELM *array;
-    ELM *tmp3;
+    ELM *tmp;
     int check;
     struct timeval t1;
     struct timeval t2;
@@ -261,15 +261,15 @@ ELM med3(ELM a, ELM b, ELM c) {
 ELM choose_pivot(ELM *low, ELM *high) {
     return med3(*(low),*(high),low[((high - low) / 2)]);
 }
-ELM * seqpart(ELM *low0, ELM *high0) {
+ELM * seqpart(ELM *low, ELM *high) {
     ELM pivot;
     ELM h;
     ELM l;
     ELM *curr_low;
     ELM *curr_high;
-    curr_low = low0;
-    curr_high = high0;
-    pivot = choose_pivot(low0,high0);
+    curr_low = low;
+    curr_high = high;
+    pivot = choose_pivot(low,high);
     while (1) {
         while (1) {
             h = *(curr_high);
@@ -293,38 +293,38 @@ ELM * seqpart(ELM *low0, ELM *high0) {
         *((curr_high--)) = l;
         *((curr_low++)) = h;
     }
-    if ((curr_high < high0)) {
+    if ((curr_high < high)) {
         return curr_high;
     } else {
         return (curr_high - 1);
     }
 }
-void insertion_sort(ELM *low3, ELM *high3) {
+void insertion_sort(ELM *low, ELM *high) {
     ELM *p;
     ELM *q;
-    ELM a0;
-    ELM b0;
-    for (q = (low3 + 1);(q <= high3);(++q)) {
-        a0 = q[0];
-        for (p = (q - 1);(p >= low3);(p--)) {
-            b0 = p[0];
-            if ((!(b0 > a0))) {
+    ELM a;
+    ELM b;
+    for (q = (low + 1);(q <= high);(++q)) {
+        a = q[0];
+        for (p = (q - 1);(p >= low);(p--)) {
+            b = p[0];
+            if ((!(b > a))) {
                 break;
             } else {
-                p[1] = b0;
+                p[1] = b;
             }
         }
-        p[1] = a0;
+        p[1] = a;
     }
 }
-void seqquick(ELM *low4, ELM *high4) {
-    ELM *p0;
-    while (((high4 - low4) >= 20)) {
-        p0 = seqpart(low4,high4);
-        seqquick(low4,p0);
-        low4 = (p0 + 1);
+void seqquick(ELM *low, ELM *high) {
+    ELM *p;
+    while (((high - low) >= 20)) {
+        p = seqpart(low,high);
+        seqquick(low,p);
+        low = (p + 1);
     }
-    insertion_sort(low4,high4);
+    insertion_sort(low,high);
 }
 void seqmerge(ELM *low1, ELM *high1, ELM *low2, ELM *high2, ELM *lowdest) {
     ELM a1;
@@ -375,20 +375,20 @@ void seqmerge(ELM *low1, ELM *high1, ELM *low2, ELM *high2, ELM *lowdest) {
         memcpy(lowdest,low1,(sizeof(ELM) * ((high1 - low1) + 1)));
     }
 }
-ELM * binsplit(ELM val, ELM *low5, ELM *high5) {
+ELM * binsplit(ELM val, ELM *low, ELM *high) {
     ELM *mid;
-    while ((low5 != high5)) {
-        mid = (low5 + (((high5 - low5) + 1) >> 1));
+    while ((low != high)) {
+        mid = (low + (((high - low) + 1) >> 1));
         if ((val <= *(mid))) {
-            high5 = (mid - 1);
+            high = (mid - 1);
         } else {
-            low5 = mid;
+            low = mid;
         }
     }
-    if ((*(low5) > val)) {
-        return (low5 - 1);
+    if ((*(low) > val)) {
+        return (low - 1);
     } else {
-        return low5;
+        return low;
     }
 }
 THREAD(cilkmerge) {
@@ -398,52 +398,51 @@ THREAD(cilkmerge) {
     ELM *tmp;
     ELM *tmp0;
     cilkmerge_closure *largs = (cilkmerge_closure*)(args.get());
-    if (((largs->high20 - largs->low20) > (largs->high10 - largs->low10))) {
-        tmp = largs->low10;
-        largs->low10 = largs->low20;
-        largs->low20 = tmp;
-        tmp0 = largs->high10;
-        largs->high10 = largs->high20;
-        largs->high20 = tmp0;
+    if (((largs->high2 - largs->low2) > (largs->high1 - largs->low1))) {
+        tmp = largs->low1;
+        largs->low1 = largs->low2;
+        largs->low2 = tmp;
+        tmp0 = largs->high1;
+        largs->high1 = largs->high2;
+        largs->high2 = tmp0;
     }
-    if ((largs->high10 < largs->low10)) {
-        memcpy(largs->lowdest0,largs->low20,(sizeof(ELM) * (largs->high20 - largs->low20)));
+    if ((largs->high1 < largs->low1)) {
+        memcpy(largs->lowdest,largs->low2,(sizeof(ELM) * (largs->high2 - largs->low2)));
         SEND_ARGUMENT(largs->k, 0);
     } else {
-        if (((largs->high20 - largs->low20) < (2 * 1024))) {
-            seqmerge(largs->low10,largs->high10,largs->low20,largs->high20,largs->lowdest0);
+        if (((largs->high2 - largs->low2) < (2 * 1024))) {
+            seqmerge(largs->low1,largs->high1,largs->low2,largs->high2,largs->lowdest);
             SEND_ARGUMENT(largs->k, 0);
         } else {
-            split1 = ((((largs->high10 - largs->low10) + 1) / 2) + largs->low10);
-            split2 = binsplit(*(split1),largs->low20,largs->high20);
-            lowsize = (((split1 - largs->low10) + split2) - largs->low20);
-            *(((largs->lowdest0 + lowsize) + 1)) = *(split1);
+            split1 = ((((largs->high1 - largs->low1) + 1) / 2) + largs->low1);
+            split2 = binsplit(*(split1),largs->low2,largs->high2);
+            lowsize = (((split1 - largs->low1) + split2) - largs->low2);
+            *(((largs->lowdest + lowsize) + 1)) = *(split1);
             cilkmerge_cont0_closure SN_cilkmerge_cont0c(largs->k);
             spawn_next<cilkmerge_cont0_closure> SN_cilkmerge_cont0(SN_cilkmerge_cont0c);
             cont sp0k;
             SN_BIND_VOID(SN_cilkmerge_cont0, &sp0k);
             cilkmerge_closure sp0c(sp0k);
-            sp0c.low10 = largs->low10;
-            sp0c.high10 = (split1 - 1);
-            sp0c.low20 = largs->low20;
-            sp0c.high20 = split2;
-            sp0c.lowdest0 = largs->lowdest0;
+            sp0c.low1 = largs->low1;
+            sp0c.high1 = (split1 - 1);
+            sp0c.low2 = largs->low2;
+            sp0c.high2 = split2;
+            sp0c.lowdest = largs->lowdest;
             spawn<cilkmerge_closure> sp0(sp0c);
 
             cont sp1k;
             SN_BIND_VOID(SN_cilkmerge_cont0, &sp1k);
             cilkmerge_closure sp1c(sp1k);
-            sp1c.low10 = (split1 + 1);
-            sp1c.high10 = largs->high10;
-            sp1c.low20 = (split2 + 1);
-            sp1c.high20 = largs->high20;
-            sp1c.lowdest0 = ((largs->lowdest0 + lowsize) + 2);
+            sp1c.low1 = (split1 + 1);
+            sp1c.high1 = largs->high1;
+            sp1c.low2 = (split2 + 1);
+            sp1c.high2 = largs->high2;
+            sp1c.lowdest = ((largs->lowdest + lowsize) + 2);
             spawn<cilkmerge_closure> sp1(sp1c);
 
             // Original sync was here
         }
     }
-    return;
 }
 THREAD(cilksort) {
     long quarter;
@@ -458,11 +457,11 @@ THREAD(cilksort) {
     cilksort_closure *largs = (cilksort_closure*)(args.get());
     quarter = (largs->size / 4);
     if ((largs->size < (2 * 1024))) {
-        seqquick(largs->low6,((largs->low6 + largs->size) - 1));
+        seqquick(largs->low,((largs->low + largs->size) - 1));
         SEND_ARGUMENT(largs->k, 0);
     } else {
-        A = largs->low6;
-        tmpA = largs->tmp1;
+        A = largs->low;
+        tmpA = largs->tmp;
         B = (A + quarter);
         tmpB = (tmpA + quarter);
         C = (B + quarter);
@@ -474,67 +473,66 @@ THREAD(cilksort) {
         cont sp0k;
         SN_BIND_VOID(SN_cilksort_cont0, &sp0k);
         cilksort_closure sp0c(sp0k);
-        sp0c.low6 = A;
-        sp0c.tmp1 = tmpA;
+        sp0c.low = A;
+        sp0c.tmp = tmpA;
         sp0c.size = quarter;
         spawn<cilksort_closure> sp0(sp0c);
 
         cont sp1k;
         SN_BIND_VOID(SN_cilksort_cont0, &sp1k);
         cilksort_closure sp1c(sp1k);
-        sp1c.low6 = B;
-        sp1c.tmp1 = tmpB;
+        sp1c.low = B;
+        sp1c.tmp = tmpB;
         sp1c.size = quarter;
         spawn<cilksort_closure> sp1(sp1c);
 
         cont sp2k;
         SN_BIND_VOID(SN_cilksort_cont0, &sp2k);
         cilksort_closure sp2c(sp2k);
-        sp2c.low6 = C;
-        sp2c.tmp1 = tmpC;
+        sp2c.low = C;
+        sp2c.tmp = tmpC;
         sp2c.size = quarter;
         spawn<cilksort_closure> sp2(sp2c);
 
         cont sp3k;
         SN_BIND_VOID(SN_cilksort_cont0, &sp3k);
         cilksort_closure sp3c(sp3k);
-        sp3c.low6 = D;
-        sp3c.tmp1 = tmpD;
+        sp3c.low = D;
+        sp3c.tmp = tmpD;
         sp3c.size = (largs->size - (3 * quarter));
         spawn<cilksort_closure> sp3(sp3c);
 
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->low6 = largs->low6;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->B = B;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->D = D;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->A = A;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->size = largs->size;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpC = tmpC;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpA = tmpA;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->D = D;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpC = tmpC;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->A = A;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->C = C;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->quarter = quarter;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->size = largs->size;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->B = B;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->low = largs->low;
         // Original sync was here
     }
-    return;
 }
-void scramble_array(ELM *arr, unsigned long size0) {
+void scramble_array(ELM *arr, unsigned long size) {
     unsigned long i;
     unsigned long j;
-    ELM tmp2;
-    for (i = 0;(i < size0);(++i)) {
+    ELM tmp;
+    for (i = 0;(i < size);(++i)) {
         j = my_rand();
-        j = (j % size0);
-        tmp2 = arr[i];
+        j = (j % size);
+        tmp = arr[i];
         arr[i] = arr[j];
-        arr[j] = tmp2;
+        arr[j] = tmp;
     }
 }
-void fill_array(ELM *arr0, unsigned long size1) {
-    unsigned long i0;
+void fill_array(ELM *arr, unsigned long size) {
+    unsigned long i;
     my_srand(1);
-    for (i0 = 0;(i0 < size1);(++i0)) {
-        arr0[i0] = i0;
+    for (i = 0;(i < size);(++i)) {
+        arr[i] = i;
     }
-    scramble_array(arr0,size1);
+    scramble_array(arr,size);
 }
 int usage() {
     fprintf(__stderrp,"\nUsage: cilksort [<cilk-options>] [-n size] [-c] [-benchmark] [-h]\n\n");
@@ -546,16 +544,16 @@ int usage() {
     return (-1);
 }
 int main(int argc, char **argv) {
-    long size2;
+    long size;
     ELM *array;
-    ELM *tmp3;
+    ELM *tmp;
     int benchmark;
     int help;
     int check;
     struct timeval t1;
     check = 0;
-    size2 = 3000000;
-    get_options(argc,argv,specifiers,opt_types,&(size2),&(check),&(benchmark),&(help));
+    size = 3000000;
+    get_options(argc,argv,specifiers,opt_types,&(size),&(check),&(benchmark),&(help));
     if (help) {
         return usage();
     } else {
@@ -564,34 +562,34 @@ int main(int argc, char **argv) {
         if (benchmark) {
             switch (benchmark) {
   case 1:
-    size2 = 10000;
+    size = 10000;
     break;
   case 2:
-    size2 = 3000000;
+    size = 3000000;
     break;
   case 3:
-    size2 = 4100000;
+    size = 4100000;
     break;
 }
 ;
         }
-        array = ((ELM *) malloc((size2 * sizeof(ELM))));
-        tmp3 = ((ELM *) malloc((size2 * sizeof(ELM))));
-        fill_array(array,size2);
+        array = ((ELM *) malloc((size * sizeof(ELM))));
+        tmp = ((ELM *) malloc((size * sizeof(ELM))));
+        fill_array(array,size);
         gettimeofday(&(t1),0);
         cont sp0k;
         SN_BIND_VOID(SN_main_cont0, &sp0k);
         cilksort_closure sp0c(sp0k);
-        sp0c.low6 = array;
-        sp0c.tmp1 = tmp3;
-        sp0c.size = size2;
+        sp0c.low = array;
+        sp0c.tmp = tmp;
+        sp0c.size = size;
         spawn<cilksort_closure> sp0(sp0c);
 
         ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->check = check;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->tmp3 = tmp3;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->tmp = tmp;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->array = array;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->size2 = size2;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->size = size;
         // Original sync was here
     }
 }
@@ -605,21 +603,20 @@ THREAD(cilkmerge_cont0) {
 THREAD(cilkmerge_cont1) {
     cilkmerge_cont1_closure *largs = (cilkmerge_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
 THREAD(cilksort_cont0) {
     cilksort_cont0_closure *largs = (cilksort_cont0_closure*)(args.get());
     cilksort_cont1_closure SN_cilksort_cont1c(largs->k);
     spawn_next<cilksort_cont1_closure> SN_cilksort_cont1(SN_cilksort_cont1c);
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpC = largs->tmpC;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpA = largs->tmpA;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->D = largs->D;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->C = largs->C;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->low6 = largs->low6;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->B = largs->B;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->A = largs->A;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->B = largs->B;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->quarter = largs->quarter;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->size = largs->size;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpC = largs->tmpC;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->D = largs->D;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->low = largs->low;
     // Original sync was here
     return;
 }
@@ -630,26 +627,26 @@ THREAD(cilksort_cont1) {
     cont sp0k;
     SN_BIND_VOID(SN_cilksort_cont2, &sp0k);
     cilkmerge_closure sp0c(sp0k);
-    sp0c.low10 = largs->A;
-    sp0c.high10 = ((largs->A + largs->quarter) - 1);
-    sp0c.low20 = largs->B;
-    sp0c.high20 = ((largs->B + largs->quarter) - 1);
-    sp0c.lowdest0 = largs->tmpA;
+    sp0c.low1 = largs->A;
+    sp0c.high1 = ((largs->A + largs->quarter) - 1);
+    sp0c.low2 = largs->B;
+    sp0c.high2 = ((largs->B + largs->quarter) - 1);
+    sp0c.lowdest = largs->tmpA;
     spawn<cilkmerge_closure> sp0(sp0c);
 
     cont sp1k;
     SN_BIND_VOID(SN_cilksort_cont2, &sp1k);
     cilkmerge_closure sp1c(sp1k);
-    sp1c.low10 = largs->C;
-    sp1c.high10 = ((largs->C + largs->quarter) - 1);
-    sp1c.low20 = largs->D;
-    sp1c.high20 = ((largs->low6 + largs->size) - 1);
-    sp1c.lowdest0 = largs->tmpC;
+    sp1c.low1 = largs->C;
+    sp1c.high1 = ((largs->C + largs->quarter) - 1);
+    sp1c.low2 = largs->D;
+    sp1c.high2 = ((largs->low + largs->size) - 1);
+    sp1c.lowdest = largs->tmpC;
     spawn<cilkmerge_closure> sp1(sp1c);
 
-    ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->tmpC = largs->tmpC;
     ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->tmpA = largs->tmpA;
     ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->A = largs->A;
+    ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->tmpC = largs->tmpC;
     ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->size = largs->size;
     // Original sync was here
     return;
@@ -672,11 +669,11 @@ THREAD(cilksort_cont3) {
     cont sp0k;
     SN_BIND_VOID(SN_cilksort_cont4, &sp0k);
     cilkmerge_closure sp0c(sp0k);
-    sp0c.low10 = largs->tmpA;
-    sp0c.high10 = (largs->tmpC - 1);
-    sp0c.low20 = largs->tmpC;
-    sp0c.high20 = ((largs->tmpA + largs->size) - 1);
-    sp0c.lowdest0 = largs->A;
+    sp0c.low1 = largs->tmpA;
+    sp0c.high1 = (largs->tmpC - 1);
+    sp0c.low2 = largs->tmpC;
+    sp0c.high2 = ((largs->tmpA + largs->size) - 1);
+    sp0c.lowdest = largs->A;
     spawn<cilkmerge_closure> sp0(sp0c);
 
     // Original sync was here
@@ -685,10 +682,9 @@ THREAD(cilksort_cont3) {
 THREAD(cilksort_cont4) {
     cilksort_cont4_closure *largs = (cilksort_cont4_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
 THREAD(main_cont0) {
-    long i1;
+    long i;
     int success;
     unsigned long long runtime_ms;
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
@@ -698,8 +694,8 @@ THREAD(main_cont0) {
     if (largs->check) {
         printf("Now check result ... \n");
         success = 1;
-        for (i1 = 0;(i1 < largs->size2);(++i1)) {
-            if ((largs->array[i1] != i1)) {
+        for (i = 0;(i < largs->size);(++i)) {
+            if ((largs->array[i] != i)) {
                 success = 0;
             }
         }
@@ -710,9 +706,8 @@ THREAD(main_cont0) {
         }
     }
     fprintf(__stderrp,"\nCilk Example: cilksort\n");
-    fprintf(__stderrp,"options: number of elements = %ld\n\n",largs->size2);
+    fprintf(__stderrp,"options: number of elements = %ld\n\n",largs->size);
     free(largs->array);
-    free(largs->tmp3);
+    free(largs->tmp);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

@@ -139,7 +139,6 @@ THREAD(sample_qsort) {
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
-    return;
 }
 unsigned long long todval(struct timeval *tp) {
     return (((tp->tv_sec * 1000) * 1000) + tp->tv_usec);
@@ -193,7 +192,6 @@ THREAD(sample_qsort_cont1) {
     sp0c->middle = largs->middle;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
-    return;
 }
 THREAD(qmain_cont0) {
     unsigned long long runtime_ms;
@@ -213,5 +211,4 @@ THREAD(qmain_cont0) {
     std::cerr << "Sort succeeded." << std::endl;
     delete [] largs->a;
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

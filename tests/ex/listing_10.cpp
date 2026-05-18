@@ -43,7 +43,6 @@ THREAD(original) {
 
         // Original sync was here
     }
-    return;
 }
 int main() {
     int res;
@@ -63,11 +62,9 @@ THREAD(original_cont0) {
     original_cont0_closure *largs = (original_cont0_closure*)(args.get());
     result = (largs->left + largs->right);
     SEND_ARGUMENT(largs->k, result);
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
     printf("Final result = %d\n",largs->res);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

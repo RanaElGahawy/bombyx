@@ -15,7 +15,7 @@ CLOSURE_DEF(fib_cont0,
     int f2;
 );
 CLOSURE_DEF(main_cont0,
-    int n0;
+    int n;
 );
 
 
@@ -44,14 +44,13 @@ THREAD(fib) {
 
         // Original sync was here
     }
-    return;
 }
 int main() {
-    int n0;
+    int n;
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     cont sp0k;
-    SN_BIND(SN_main_cont0, &sp0k, n0);
+    SN_BIND(SN_main_cont0, &sp0k, n);
     fib_closure sp0c(sp0k);
     sp0c.n = 8;
     spawn<fib_closure> sp0(sp0c);
@@ -62,11 +61,9 @@ int main() {
 THREAD(fib_cont0) {
     fib_cont0_closure *largs = (fib_cont0_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->f1 + largs->f2));
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
-    printf("fib = %d\n",largs->n0);
+    printf("fib = %d\n",largs->n);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

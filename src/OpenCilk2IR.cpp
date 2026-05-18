@@ -1167,14 +1167,17 @@ public:
     // Only process the actual definition, not a forward declaration.
     if (Decl->doesThisDeclarationHaveABody()) {
       GSymTable.DupCnt.clear();
+      GSymTable.DupCnt["k"] = 0;
       IRFunction *F =
           P.createFunc(Decl->getName().str(), Decl->getDeclaredReturnType());
       F->Info.RootFun = Decl;
       std::unordered_map<ASTVarRef, IRVarRef> VarLookup;
       for (auto *Param : Decl->parameters()) {
         Sym PSym = PutSym(Param->getName().str());
+        auto OrigTy = Param->getOriginalType();
         F->Vars.push_back(IRVarDecl{
-            .Type = Param->getType(),
+            .Type =
+                OrigTy->getAs<clang::TypedefType>() ? OrigTy : Param->getType(),
             .Name = PSym,
             .DeclLoc = IRVarDecl::ARG,
             .ASTDecl = Param,

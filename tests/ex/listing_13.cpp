@@ -17,7 +17,7 @@ CLOSURE_DEF(f,
     int x;
 );
 CLOSURE_DEF(g,
-    int x0;
+    int x;
 );
 CLOSURE_DEF(original,
     int n;
@@ -69,12 +69,10 @@ CLOSURE_DEF(original_reentry0_cont1,
 THREAD(f) {
     f_closure *largs = (f_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->x + 1));
-    return;
 }
 THREAD(g) {
     g_closure *largs = (g_closure*)(args.get());
-    SEND_ARGUMENT(largs->k, (largs->x0 + 100));
-    return;
+    SEND_ARGUMENT(largs->k, (largs->x + 100));
 }
 THREAD(original) {
     int i;
@@ -92,7 +90,6 @@ THREAD(original) {
     sp0c->a = a;
     sp0c->b = b;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }
 int main() {
@@ -112,7 +109,6 @@ THREAD(original_exit0) {
     original_exit0_closure *largs = (original_exit0_closure*)(args.get());
     largs->total = (largs->total + 30);
     SEND_ARGUMENT(largs->k, largs->total);
-    return;
 }
 THREAD(original_reentry0) {
     original_reentry0_closure *largs = (original_reentry0_closure*)(args.get());
@@ -128,9 +124,9 @@ THREAD(original_reentry0) {
             sp0c.x = largs->i;
             spawn<f_closure> sp0(sp0c);
 
+            ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->b = largs->b;
             ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->total = largs->total;
             ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->i = largs->i;
-            ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->b = largs->b;
             ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->n = largs->n;
             // Original sync was here
         } else {
@@ -140,12 +136,12 @@ THREAD(original_reentry0) {
             cont sp1k;
             SN_BIND(SN_original_reentry0_cont0, &sp1k, b);
             g_closure sp1c(sp1k);
-            sp1c.x0 = largs->i;
+            sp1c.x = largs->i;
             spawn<g_closure> sp1(sp1c);
 
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->total = largs->total;
-            ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->i = largs->i;
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->a = largs->a;
+            ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->i = largs->i;
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->n = largs->n;
             // Original sync was here
         }
@@ -159,7 +155,6 @@ THREAD(original_reentry0) {
         cilk_spawn taskSpawn(sp2c->getTask(), sp2c);
         return;
     }
-    return;
 }
 THREAD(original_reentry0_afterif0) {
     original_reentry0_afterif0_closure *largs = (original_reentry0_afterif0_closure*)(args.get());
@@ -173,13 +168,11 @@ THREAD(original_reentry0_afterif0) {
     sp0c->b = largs->b;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
     printf("%d\n",largs->y);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
 THREAD(original_reentry0_cont0) {
     original_reentry0_cont0_closure *largs = (original_reentry0_cont0_closure*)(args.get());
@@ -192,7 +185,6 @@ THREAD(original_reentry0_cont0) {
     sp0c->b = largs->b;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
-    return;
 }
 THREAD(original_reentry0_cont1) {
     original_reentry0_cont1_closure *largs = (original_reentry0_cont1_closure*)(args.get());
@@ -204,6 +196,5 @@ THREAD(original_reentry0_cont1) {
     sp0c->a = largs->a;
     sp0c->b = largs->b;
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
-    return;
     return;
 }

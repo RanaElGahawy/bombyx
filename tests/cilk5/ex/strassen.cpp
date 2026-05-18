@@ -69,18 +69,18 @@ unsigned long rand_nxt = 0;
 unsigned long long todval(struct timeval *tp);
 int cilk_rand();
 void mat_vec_mul(int m, int n, int rw, REAL *A, REAL *V, REAL *P, int add);
-void matrixmul(int n0, REAL *A0, int an, REAL *B, int bn, REAL *C, int cn);
-void FastNaiveMatrixMultiply(REAL *C0, REAL *A1, REAL *B0, unsigned int MatrixSize, unsigned int RowWidthC, unsigned int RowWidthA, unsigned int RowWidthB);
-void FastAdditiveNaiveMatrixMultiply(REAL *C1, REAL *A2, REAL *B1, unsigned int MatrixSize0, unsigned int RowWidthC0, unsigned int RowWidthA0, unsigned int RowWidthB0);
-void MultiplyByDivideAndConquer(REAL *C3, REAL *A3, REAL *B2, unsigned int MatrixSize1, unsigned int RowWidthC1, unsigned int RowWidthA1, unsigned int RowWidthB1, int AdditiveMode);
+void matrixmul(int n, REAL *A, int an, REAL *B, int bn, REAL *C, int cn);
+void FastNaiveMatrixMultiply(REAL *C, REAL *A, REAL *B, unsigned int MatrixSize, unsigned int RowWidthC, unsigned int RowWidthA, unsigned int RowWidthB);
+void FastAdditiveNaiveMatrixMultiply(REAL *C, REAL *A, REAL *B, unsigned int MatrixSize, unsigned int RowWidthC, unsigned int RowWidthA, unsigned int RowWidthB);
+void MultiplyByDivideAndConquer(REAL *C, REAL *A, REAL *B, unsigned int MatrixSize, unsigned int RowWidthC, unsigned int RowWidthA, unsigned int RowWidthB, int AdditiveMode);
 THREAD(OptimizedStrassenMultiply);
-int compare_vec(int n2, REAL *V1, REAL *V2);
-REAL * alloc_vec(int n3);
-void free_vec(REAL *V0);
-void init_matrix(int n4, REAL *A5, int an0);
-int compare_matrix(int n5, REAL *A6, int an1, REAL *B4, int bn0);
-REAL * alloc_matrix(int n6);
-void free_matrix(REAL *A7);
+int compare_vec(int n, REAL *V1, REAL *V2);
+REAL * alloc_vec(int n);
+void free_vec(REAL *V);
+void init_matrix(int n, REAL *A, int an);
+int compare_matrix(int n, REAL *A, int an, REAL *B, int bn);
+REAL * alloc_matrix(int n);
+void free_matrix(REAL *A);
 int usage();
 int main(int argc, char **argv);
 THREAD(OptimizedStrassenMultiply_cont0);
@@ -88,45 +88,45 @@ THREAD(OptimizedStrassenMultiply_cont1);
 THREAD(main_cont0);
 
 CLOSURE_DEF(OptimizedStrassenMultiply,
-    REAL *C4;
-    REAL *A4;
-    REAL *B3;
-    unsigned int MatrixSize2;
-    unsigned int RowWidthC2;
-    unsigned int RowWidthA2;
-    unsigned int RowWidthB2;
+    REAL *C;
+    REAL *A;
+    REAL *B;
+    unsigned int MatrixSize;
+    unsigned int RowWidthC;
+    unsigned int RowWidthA;
+    unsigned int RowWidthB;
 );
 CLOSURE_DEF(OptimizedStrassenMultiply_cont0,
-    REAL *C4;
-    unsigned int QuadrantSize0;
+    REAL *C;
+    unsigned int QuadrantSize;
     REAL *C12;
     REAL *C21;
     REAL *C22;
     REAL *M2;
     REAL *M5;
     REAL *T1sMULT;
-    PTR RowIncrementC1;
+    PTR RowIncrementC;
     void *StartHeap;
 );
 CLOSURE_DEF(OptimizedStrassenMultiply_cont1,
-    REAL *C4;
-    unsigned int QuadrantSize0;
+    REAL *C;
+    unsigned int QuadrantSize;
     REAL *C12;
     REAL *C21;
     REAL *C22;
     REAL *M2;
     REAL *M5;
     REAL *T1sMULT;
-    PTR RowIncrementC1;
+    PTR RowIncrementC;
     void *StartHeap;
 );
 CLOSURE_DEF(main_cont0,
-    REAL *A8;
-    REAL *B5;
-    REAL *C5;
+    REAL *A;
+    REAL *B;
+    REAL *C;
     int verify;
     int rand_check;
-    int n7;
+    int n;
     struct timeval t1;
     struct timeval t2;
 );
@@ -355,22 +355,22 @@ void mat_vec_mul(int m, int n, int rw, REAL *A, REAL *V, REAL *P, int add) {
         }
     }
 }
-void matrixmul(int n0, REAL *A0, int an, REAL *B, int bn, REAL *C, int cn) {
-    int i0;
-    int j0;
-    int k;
+void matrixmul(int n, REAL *A, int an, REAL *B, int bn, REAL *C, int cn) {
+    int i;
+    int j;
+    int k0;
     REAL s;
-    for (i0 = 0;(i0 < n0);(++i0)) {
-        for (j0 = 0;(j0 < n0);(++j0)) {
+    for (i = 0;(i < n);(++i)) {
+        for (j = 0;(j < n);(++j)) {
             s = 0.;
-            for (k = 0;(k < n0);(++k)) {
-                s = (s + (A0[((i0 * an) + k)] * B[((k * bn) + j0)]));
+            for (k0 = 0;(k0 < n);(++k0)) {
+                s = (s + (A[((i * an) + k0)] * B[((k0 * bn) + j)]));
             }
-            C[((i0 * cn) + j0)] = s;
+            C[((i * cn) + j)] = s;
         }
     }
 }
-void FastNaiveMatrixMultiply(REAL *C0, REAL *A1, REAL *B0, unsigned int MatrixSize, unsigned int RowWidthC, unsigned int RowWidthA, unsigned int RowWidthB) {
+void FastNaiveMatrixMultiply(REAL *C, REAL *A, REAL *B, unsigned int MatrixSize, unsigned int RowWidthC, unsigned int RowWidthA, unsigned int RowWidthB) {
     PTR RowWidthBInBytes;
     PTR RowWidthAInBytes;
     PTR MatrixWidthInBytes;
@@ -394,10 +394,10 @@ void FastNaiveMatrixMultiply(REAL *C0, REAL *A1, REAL *B0, unsigned int MatrixSi
     RowWidthAInBytes = (RowWidthA << 3);
     MatrixWidthInBytes = (MatrixSize << 3);
     RowIncrementC = ((RowWidthC - MatrixSize) << 3);
-    ARowStart = A1;
+    ARowStart = A;
     for (Vertical = 0;(Vertical < MatrixSize);(Vertical++)) {
         for (Horizontal = 0;(Horizontal < MatrixSize);Horizontal = (Horizontal + 8)) {
-            BColumnStart = (B0 + Horizontal);
+            BColumnStart = (B + Horizontal);
             FirstARowValue = *((ARowStart++));
             Sum0 = (FirstARowValue * *(BColumnStart));
             Sum1 = (FirstARowValue * *((BColumnStart + 1)));
@@ -420,83 +420,83 @@ void FastNaiveMatrixMultiply(REAL *C0, REAL *A1, REAL *B0, unsigned int MatrixSi
                 Sum7 = (Sum7 + (ARowValue * *((BColumnStart + 7))));
             }
             ARowStart = ((REAL *) (((PTR) ARowStart) - MatrixWidthInBytes));
-            *(C0) = Sum0;
-            *((C0 + 1)) = Sum1;
-            *((C0 + 2)) = Sum2;
-            *((C0 + 3)) = Sum3;
-            *((C0 + 4)) = Sum4;
-            *((C0 + 5)) = Sum5;
-            *((C0 + 6)) = Sum6;
-            *((C0 + 7)) = Sum7;
-            C0 = (C0 + 8);
+            *(C) = Sum0;
+            *((C + 1)) = Sum1;
+            *((C + 2)) = Sum2;
+            *((C + 3)) = Sum3;
+            *((C + 4)) = Sum4;
+            *((C + 5)) = Sum5;
+            *((C + 6)) = Sum6;
+            *((C + 7)) = Sum7;
+            C = (C + 8);
         }
         ARowStart = ((REAL *) (((PTR) ARowStart) + RowWidthAInBytes));
-        C0 = ((REAL *) (((PTR) C0) + RowIncrementC));
+        C = ((REAL *) (((PTR) C) + RowIncrementC));
     }
 }
-void FastAdditiveNaiveMatrixMultiply(REAL *C1, REAL *A2, REAL *B1, unsigned int MatrixSize0, unsigned int RowWidthC0, unsigned int RowWidthA0, unsigned int RowWidthB0) {
-    PTR RowWidthBInBytes0;
-    PTR RowWidthAInBytes0;
-    PTR MatrixWidthInBytes0;
-    PTR RowIncrementC0;
-    unsigned int Horizontal0;
-    unsigned int Vertical0;
-    REAL *ARowStart0;
-    REAL *BColumnStart0;
-    REAL Sum00;
-    REAL Sum10;
-    REAL Sum20;
-    REAL Sum30;
-    REAL Sum40;
-    REAL Sum50;
-    REAL Sum60;
-    REAL Sum70;
-    unsigned int Products0;
-    REAL ARowValue0;
-    RowWidthBInBytes0 = (RowWidthB0 << 3);
-    RowWidthAInBytes0 = (RowWidthA0 << 3);
-    MatrixWidthInBytes0 = (MatrixSize0 << 3);
-    RowIncrementC0 = ((RowWidthC0 - MatrixSize0) << 3);
-    ARowStart0 = A2;
-    for (Vertical0 = 0;(Vertical0 < MatrixSize0);(Vertical0++)) {
-        for (Horizontal0 = 0;(Horizontal0 < MatrixSize0);Horizontal0 = (Horizontal0 + 8)) {
-            BColumnStart0 = (B1 + Horizontal0);
-            Sum00 = *(C1);
-            Sum10 = *((C1 + 1));
-            Sum20 = *((C1 + 2));
-            Sum30 = *((C1 + 3));
-            Sum40 = *((C1 + 4));
-            Sum50 = *((C1 + 5));
-            Sum60 = *((C1 + 6));
-            Sum70 = *((C1 + 7));
-            for (Products0 = 0;(Products0 < MatrixSize0);(Products0++)) {
-                ARowValue0 = *((ARowStart0++));
-                Sum00 = (Sum00 + (ARowValue0 * *(BColumnStart0)));
-                Sum10 = (Sum10 + (ARowValue0 * *((BColumnStart0 + 1))));
-                Sum20 = (Sum20 + (ARowValue0 * *((BColumnStart0 + 2))));
-                Sum30 = (Sum30 + (ARowValue0 * *((BColumnStart0 + 3))));
-                Sum40 = (Sum40 + (ARowValue0 * *((BColumnStart0 + 4))));
-                Sum50 = (Sum50 + (ARowValue0 * *((BColumnStart0 + 5))));
-                Sum60 = (Sum60 + (ARowValue0 * *((BColumnStart0 + 6))));
-                Sum70 = (Sum70 + (ARowValue0 * *((BColumnStart0 + 7))));
-                BColumnStart0 = ((REAL *) (((PTR) BColumnStart0) + RowWidthBInBytes0));
+void FastAdditiveNaiveMatrixMultiply(REAL *C, REAL *A, REAL *B, unsigned int MatrixSize, unsigned int RowWidthC, unsigned int RowWidthA, unsigned int RowWidthB) {
+    PTR RowWidthBInBytes;
+    PTR RowWidthAInBytes;
+    PTR MatrixWidthInBytes;
+    PTR RowIncrementC;
+    unsigned int Horizontal;
+    unsigned int Vertical;
+    REAL *ARowStart;
+    REAL *BColumnStart;
+    REAL Sum0;
+    REAL Sum1;
+    REAL Sum2;
+    REAL Sum3;
+    REAL Sum4;
+    REAL Sum5;
+    REAL Sum6;
+    REAL Sum7;
+    unsigned int Products;
+    REAL ARowValue;
+    RowWidthBInBytes = (RowWidthB << 3);
+    RowWidthAInBytes = (RowWidthA << 3);
+    MatrixWidthInBytes = (MatrixSize << 3);
+    RowIncrementC = ((RowWidthC - MatrixSize) << 3);
+    ARowStart = A;
+    for (Vertical = 0;(Vertical < MatrixSize);(Vertical++)) {
+        for (Horizontal = 0;(Horizontal < MatrixSize);Horizontal = (Horizontal + 8)) {
+            BColumnStart = (B + Horizontal);
+            Sum0 = *(C);
+            Sum1 = *((C + 1));
+            Sum2 = *((C + 2));
+            Sum3 = *((C + 3));
+            Sum4 = *((C + 4));
+            Sum5 = *((C + 5));
+            Sum6 = *((C + 6));
+            Sum7 = *((C + 7));
+            for (Products = 0;(Products < MatrixSize);(Products++)) {
+                ARowValue = *((ARowStart++));
+                Sum0 = (Sum0 + (ARowValue * *(BColumnStart)));
+                Sum1 = (Sum1 + (ARowValue * *((BColumnStart + 1))));
+                Sum2 = (Sum2 + (ARowValue * *((BColumnStart + 2))));
+                Sum3 = (Sum3 + (ARowValue * *((BColumnStart + 3))));
+                Sum4 = (Sum4 + (ARowValue * *((BColumnStart + 4))));
+                Sum5 = (Sum5 + (ARowValue * *((BColumnStart + 5))));
+                Sum6 = (Sum6 + (ARowValue * *((BColumnStart + 6))));
+                Sum7 = (Sum7 + (ARowValue * *((BColumnStart + 7))));
+                BColumnStart = ((REAL *) (((PTR) BColumnStart) + RowWidthBInBytes));
             }
-            ARowStart0 = ((REAL *) (((PTR) ARowStart0) - MatrixWidthInBytes0));
-            *(C1) = Sum00;
-            *((C1 + 1)) = Sum10;
-            *((C1 + 2)) = Sum20;
-            *((C1 + 3)) = Sum30;
-            *((C1 + 4)) = Sum40;
-            *((C1 + 5)) = Sum50;
-            *((C1 + 6)) = Sum60;
-            *((C1 + 7)) = Sum70;
-            C1 = (C1 + 8);
+            ARowStart = ((REAL *) (((PTR) ARowStart) - MatrixWidthInBytes));
+            *(C) = Sum0;
+            *((C + 1)) = Sum1;
+            *((C + 2)) = Sum2;
+            *((C + 3)) = Sum3;
+            *((C + 4)) = Sum4;
+            *((C + 5)) = Sum5;
+            *((C + 6)) = Sum6;
+            *((C + 7)) = Sum7;
+            C = (C + 8);
         }
-        ARowStart0 = ((REAL *) (((PTR) ARowStart0) + RowWidthAInBytes0));
-        C1 = ((REAL *) (((PTR) C1) + RowIncrementC0));
+        ARowStart = ((REAL *) (((PTR) ARowStart) + RowWidthAInBytes));
+        C = ((REAL *) (((PTR) C) + RowIncrementC));
     }
 }
-void MultiplyByDivideAndConquer(REAL *C3, REAL *A3, REAL *B2, unsigned int MatrixSize1, unsigned int RowWidthC1, unsigned int RowWidthA1, unsigned int RowWidthB1, int AdditiveMode) {
+void MultiplyByDivideAndConquer(REAL *C, REAL *A, REAL *B, unsigned int MatrixSize, unsigned int RowWidthC, unsigned int RowWidthA, unsigned int RowWidthB, int AdditiveMode) {
     REAL *A01;
     REAL *A10;
     REAL *A11;
@@ -507,46 +507,46 @@ void MultiplyByDivideAndConquer(REAL *C3, REAL *A3, REAL *B2, unsigned int Matri
     REAL *C10;
     REAL *C11;
     unsigned int QuadrantSize;
-    QuadrantSize = (MatrixSize1 >> 1);
-    A01 = (A3 + QuadrantSize);
-    A10 = (A3 + (RowWidthA1 * QuadrantSize));
+    QuadrantSize = (MatrixSize >> 1);
+    A01 = (A + QuadrantSize);
+    A10 = (A + (RowWidthA * QuadrantSize));
     A11 = (A10 + QuadrantSize);
-    B01 = (B2 + QuadrantSize);
-    B10 = (B2 + (RowWidthB1 * QuadrantSize));
+    B01 = (B + QuadrantSize);
+    B10 = (B + (RowWidthB * QuadrantSize));
     B11 = (B10 + QuadrantSize);
-    C01 = (C3 + QuadrantSize);
-    C10 = (C3 + (RowWidthC1 * QuadrantSize));
+    C01 = (C + QuadrantSize);
+    C10 = (C + (RowWidthC * QuadrantSize));
     C11 = (C10 + QuadrantSize);
     if ((QuadrantSize > 16)) {
-        MultiplyByDivideAndConquer(C3,A3,B2,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1,AdditiveMode);
-        MultiplyByDivideAndConquer(C01,A3,B01,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1,AdditiveMode);
-        MultiplyByDivideAndConquer(C11,A10,B01,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1,AdditiveMode);
-        MultiplyByDivideAndConquer(C10,A10,B2,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1,AdditiveMode);
-        MultiplyByDivideAndConquer(C3,A01,B10,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1,1);
-        MultiplyByDivideAndConquer(C01,A01,B11,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1,1);
-        MultiplyByDivideAndConquer(C11,A11,B11,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1,1);
-        MultiplyByDivideAndConquer(C10,A11,B10,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1,1);
+        MultiplyByDivideAndConquer(C,A,B,QuadrantSize,RowWidthC,RowWidthA,RowWidthB,AdditiveMode);
+        MultiplyByDivideAndConquer(C01,A,B01,QuadrantSize,RowWidthC,RowWidthA,RowWidthB,AdditiveMode);
+        MultiplyByDivideAndConquer(C11,A10,B01,QuadrantSize,RowWidthC,RowWidthA,RowWidthB,AdditiveMode);
+        MultiplyByDivideAndConquer(C10,A10,B,QuadrantSize,RowWidthC,RowWidthA,RowWidthB,AdditiveMode);
+        MultiplyByDivideAndConquer(C,A01,B10,QuadrantSize,RowWidthC,RowWidthA,RowWidthB,1);
+        MultiplyByDivideAndConquer(C01,A01,B11,QuadrantSize,RowWidthC,RowWidthA,RowWidthB,1);
+        MultiplyByDivideAndConquer(C11,A11,B11,QuadrantSize,RowWidthC,RowWidthA,RowWidthB,1);
+        MultiplyByDivideAndConquer(C10,A11,B10,QuadrantSize,RowWidthC,RowWidthA,RowWidthB,1);
     } else {
         if (AdditiveMode) {
-            FastAdditiveNaiveMatrixMultiply(C3,A3,B2,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-            FastAdditiveNaiveMatrixMultiply(C01,A3,B01,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-            FastAdditiveNaiveMatrixMultiply(C11,A10,B01,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-            FastAdditiveNaiveMatrixMultiply(C10,A10,B2,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
+            FastAdditiveNaiveMatrixMultiply(C,A,B,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+            FastAdditiveNaiveMatrixMultiply(C01,A,B01,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+            FastAdditiveNaiveMatrixMultiply(C11,A10,B01,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+            FastAdditiveNaiveMatrixMultiply(C10,A10,B,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
         } else {
-            FastNaiveMatrixMultiply(C3,A3,B2,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-            FastNaiveMatrixMultiply(C01,A3,B01,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-            FastNaiveMatrixMultiply(C11,A10,B01,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-            FastNaiveMatrixMultiply(C10,A10,B2,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
+            FastNaiveMatrixMultiply(C,A,B,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+            FastNaiveMatrixMultiply(C01,A,B01,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+            FastNaiveMatrixMultiply(C11,A10,B01,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+            FastNaiveMatrixMultiply(C10,A10,B,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
         }
-        FastAdditiveNaiveMatrixMultiply(C3,A01,B10,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-        FastAdditiveNaiveMatrixMultiply(C01,A01,B11,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-        FastAdditiveNaiveMatrixMultiply(C11,A11,B11,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
-        FastAdditiveNaiveMatrixMultiply(C10,A11,B10,QuadrantSize,RowWidthC1,RowWidthA1,RowWidthB1);
+        FastAdditiveNaiveMatrixMultiply(C,A01,B10,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+        FastAdditiveNaiveMatrixMultiply(C01,A01,B11,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+        FastAdditiveNaiveMatrixMultiply(C11,A11,B11,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
+        FastAdditiveNaiveMatrixMultiply(C10,A11,B10,QuadrantSize,RowWidthC,RowWidthA,RowWidthB);
     }
     return ;
 }
 THREAD(OptimizedStrassenMultiply) {
-    unsigned int QuadrantSize0;
+    unsigned int QuadrantSize;
     unsigned int QuadrantSizeInBytes;
     unsigned int Column;
     unsigned int Row;
@@ -575,32 +575,32 @@ THREAD(OptimizedStrassenMultiply) {
     PTR MatrixOffsetB;
     PTR RowIncrementA;
     PTR RowIncrementB;
-    PTR RowIncrementC1;
+    PTR RowIncrementC;
     char *Heap;
     void *StartHeap;
     char *_tmp;
     OptimizedStrassenMultiply_closure *largs = (OptimizedStrassenMultiply_closure*)(args.get());
-    QuadrantSize0 = (largs->MatrixSize2 >> 1);
-    QuadrantSizeInBytes = (((sizeof(REAL) * QuadrantSize0) * QuadrantSize0) + 32);
+    QuadrantSize = (largs->MatrixSize >> 1);
+    QuadrantSizeInBytes = (((sizeof(REAL) * QuadrantSize) * QuadrantSize) + 32);
     TempMatrixOffset = 0;
     MatrixOffsetA = 0;
     MatrixOffsetB = 0;
-    RowIncrementA = ((largs->RowWidthA2 - QuadrantSize0) << 3);
-    RowIncrementB = ((largs->RowWidthB2 - QuadrantSize0) << 3);
-    RowIncrementC1 = ((largs->RowWidthC2 - QuadrantSize0) << 3);
-    if ((largs->MatrixSize2 <= 64)) {
-        MultiplyByDivideAndConquer(largs->C4,largs->A4,largs->B3,largs->MatrixSize2,largs->RowWidthC2,largs->RowWidthA2,largs->RowWidthB2,0);
+    RowIncrementA = ((largs->RowWidthA - QuadrantSize) << 3);
+    RowIncrementB = ((largs->RowWidthB - QuadrantSize) << 3);
+    RowIncrementC = ((largs->RowWidthC - QuadrantSize) << 3);
+    if ((largs->MatrixSize <= 64)) {
+        MultiplyByDivideAndConquer(largs->C,largs->A,largs->B,largs->MatrixSize,largs->RowWidthC,largs->RowWidthA,largs->RowWidthB,0);
         SEND_ARGUMENT(largs->k, 0);
     } else {
-        A12 = (largs->A4 + QuadrantSize0);
-        B12 = (largs->B3 + QuadrantSize0);
-        C12 = (largs->C4 + QuadrantSize0);
-        A21 = (largs->A4 + (largs->RowWidthA2 * QuadrantSize0));
-        B21 = (largs->B3 + (largs->RowWidthB2 * QuadrantSize0));
-        C21 = (largs->C4 + (largs->RowWidthC2 * QuadrantSize0));
-        A22 = (A21 + QuadrantSize0);
-        B22 = (B21 + QuadrantSize0);
-        C22 = (C21 + QuadrantSize0);
+        A12 = (largs->A + QuadrantSize);
+        B12 = (largs->B + QuadrantSize);
+        C12 = (largs->C + QuadrantSize);
+        A21 = (largs->A + (largs->RowWidthA * QuadrantSize));
+        B21 = (largs->B + (largs->RowWidthB * QuadrantSize));
+        C21 = (largs->C + (largs->RowWidthC * QuadrantSize));
+        A22 = (A21 + QuadrantSize);
+        B22 = (B21 + QuadrantSize);
+        C22 = (C21 + QuadrantSize);
         _tmp = ((char *) malloc((QuadrantSizeInBytes * 11)));
         Heap = _tmp;
         StartHeap = Heap;
@@ -631,15 +631,15 @@ THREAD(OptimizedStrassenMultiply) {
         Heap = (Heap + QuadrantSizeInBytes);
         T1sMULT = ((REAL *) Heap);
         Heap = (Heap + QuadrantSizeInBytes);
-        for (Row = 0;(Row < QuadrantSize0);(Row++)) {
-            for (Column = 0;(Column < QuadrantSize0);(Column++)) {
+        for (Row = 0;(Row < QuadrantSize);(Row++)) {
+            for (Column = 0;(Column < QuadrantSize);(Column++)) {
                 *(((REAL *) (((PTR) S1) + TempMatrixOffset))) = (*(((REAL *) (((PTR) A21) + MatrixOffsetA))) + *(((REAL *) (((PTR) A22) + MatrixOffsetA))));
-                *(((REAL *) (((PTR) S2) + TempMatrixOffset))) = (*(((REAL *) (((PTR) S1) + TempMatrixOffset))) - *(((REAL *) (((PTR) largs->A4) + MatrixOffsetA))));
+                *(((REAL *) (((PTR) S2) + TempMatrixOffset))) = (*(((REAL *) (((PTR) S1) + TempMatrixOffset))) - *(((REAL *) (((PTR) largs->A) + MatrixOffsetA))));
                 *(((REAL *) (((PTR) S4) + TempMatrixOffset))) = (*(((REAL *) (((PTR) A12) + MatrixOffsetA))) - *(((REAL *) (((PTR) S2) + TempMatrixOffset))));
-                *(((REAL *) (((PTR) S5) + TempMatrixOffset))) = (*(((REAL *) (((PTR) B12) + MatrixOffsetB))) - *(((REAL *) (((PTR) largs->B3) + MatrixOffsetB))));
+                *(((REAL *) (((PTR) S5) + TempMatrixOffset))) = (*(((REAL *) (((PTR) B12) + MatrixOffsetB))) - *(((REAL *) (((PTR) largs->B) + MatrixOffsetB))));
                 *(((REAL *) (((PTR) S6) + TempMatrixOffset))) = (*(((REAL *) (((PTR) B22) + MatrixOffsetB))) - *(((REAL *) (((PTR) S5) + TempMatrixOffset))));
                 *(((REAL *) (((PTR) S8) + TempMatrixOffset))) = (*(((REAL *) (((PTR) S6) + TempMatrixOffset))) - *(((REAL *) (((PTR) B21) + MatrixOffsetB))));
-                *(((REAL *) (((PTR) S3) + TempMatrixOffset))) = (*(((REAL *) (((PTR) largs->A4) + MatrixOffsetA))) - *(((REAL *) (((PTR) A21) + MatrixOffsetA))));
+                *(((REAL *) (((PTR) S3) + TempMatrixOffset))) = (*(((REAL *) (((PTR) largs->A) + MatrixOffsetA))) - *(((REAL *) (((PTR) A21) + MatrixOffsetA))));
                 *(((REAL *) (((PTR) S7) + TempMatrixOffset))) = (*(((REAL *) (((PTR) B22) + MatrixOffsetB))) - *(((REAL *) (((PTR) B12) + MatrixOffsetB))));
                 TempMatrixOffset = (TempMatrixOffset + sizeof(REAL));
                 MatrixOffsetA = (MatrixOffsetA + sizeof(REAL));
@@ -651,113 +651,112 @@ THREAD(OptimizedStrassenMultiply) {
         cont sp0k;
         SN_BIND_VOID(SN_OptimizedStrassenMultiply_cont0, &sp0k);
         OptimizedStrassenMultiply_closure sp0c(sp0k);
-        sp0c.C4 = M2;
-        sp0c.A4 = largs->A4;
-        sp0c.B3 = largs->B3;
-        sp0c.MatrixSize2 = QuadrantSize0;
-        sp0c.RowWidthC2 = QuadrantSize0;
-        sp0c.RowWidthA2 = largs->RowWidthA2;
-        sp0c.RowWidthB2 = largs->RowWidthB2;
+        sp0c.C = M2;
+        sp0c.A = largs->A;
+        sp0c.B = largs->B;
+        sp0c.MatrixSize = QuadrantSize;
+        sp0c.RowWidthC = QuadrantSize;
+        sp0c.RowWidthA = largs->RowWidthA;
+        sp0c.RowWidthB = largs->RowWidthB;
         spawn<OptimizedStrassenMultiply_closure> sp0(sp0c);
 
         cont sp1k;
         SN_BIND_VOID(SN_OptimizedStrassenMultiply_cont0, &sp1k);
         OptimizedStrassenMultiply_closure sp1c(sp1k);
-        sp1c.C4 = M5;
-        sp1c.A4 = S1;
-        sp1c.B3 = S5;
-        sp1c.MatrixSize2 = QuadrantSize0;
-        sp1c.RowWidthC2 = QuadrantSize0;
-        sp1c.RowWidthA2 = QuadrantSize0;
-        sp1c.RowWidthB2 = QuadrantSize0;
+        sp1c.C = M5;
+        sp1c.A = S1;
+        sp1c.B = S5;
+        sp1c.MatrixSize = QuadrantSize;
+        sp1c.RowWidthC = QuadrantSize;
+        sp1c.RowWidthA = QuadrantSize;
+        sp1c.RowWidthB = QuadrantSize;
         spawn<OptimizedStrassenMultiply_closure> sp1(sp1c);
 
         cont sp2k;
         SN_BIND_VOID(SN_OptimizedStrassenMultiply_cont0, &sp2k);
         OptimizedStrassenMultiply_closure sp2c(sp2k);
-        sp2c.C4 = T1sMULT;
-        sp2c.A4 = S2;
-        sp2c.B3 = S6;
-        sp2c.MatrixSize2 = QuadrantSize0;
-        sp2c.RowWidthC2 = QuadrantSize0;
-        sp2c.RowWidthA2 = QuadrantSize0;
-        sp2c.RowWidthB2 = QuadrantSize0;
+        sp2c.C = T1sMULT;
+        sp2c.A = S2;
+        sp2c.B = S6;
+        sp2c.MatrixSize = QuadrantSize;
+        sp2c.RowWidthC = QuadrantSize;
+        sp2c.RowWidthA = QuadrantSize;
+        sp2c.RowWidthB = QuadrantSize;
         spawn<OptimizedStrassenMultiply_closure> sp2(sp2c);
 
         cont sp3k;
         SN_BIND_VOID(SN_OptimizedStrassenMultiply_cont0, &sp3k);
         OptimizedStrassenMultiply_closure sp3c(sp3k);
-        sp3c.C4 = C22;
-        sp3c.A4 = S3;
-        sp3c.B3 = S7;
-        sp3c.MatrixSize2 = QuadrantSize0;
-        sp3c.RowWidthC2 = largs->RowWidthC2;
-        sp3c.RowWidthA2 = QuadrantSize0;
-        sp3c.RowWidthB2 = QuadrantSize0;
+        sp3c.C = C22;
+        sp3c.A = S3;
+        sp3c.B = S7;
+        sp3c.MatrixSize = QuadrantSize;
+        sp3c.RowWidthC = largs->RowWidthC;
+        sp3c.RowWidthA = QuadrantSize;
+        sp3c.RowWidthB = QuadrantSize;
         spawn<OptimizedStrassenMultiply_closure> sp3(sp3c);
 
         cont sp4k;
         SN_BIND_VOID(SN_OptimizedStrassenMultiply_cont0, &sp4k);
         OptimizedStrassenMultiply_closure sp4c(sp4k);
-        sp4c.C4 = largs->C4;
-        sp4c.A4 = A12;
-        sp4c.B3 = B21;
-        sp4c.MatrixSize2 = QuadrantSize0;
-        sp4c.RowWidthC2 = largs->RowWidthC2;
-        sp4c.RowWidthA2 = largs->RowWidthA2;
-        sp4c.RowWidthB2 = largs->RowWidthB2;
+        sp4c.C = largs->C;
+        sp4c.A = A12;
+        sp4c.B = B21;
+        sp4c.MatrixSize = QuadrantSize;
+        sp4c.RowWidthC = largs->RowWidthC;
+        sp4c.RowWidthA = largs->RowWidthA;
+        sp4c.RowWidthB = largs->RowWidthB;
         spawn<OptimizedStrassenMultiply_closure> sp4(sp4c);
 
         cont sp5k;
         SN_BIND_VOID(SN_OptimizedStrassenMultiply_cont0, &sp5k);
         OptimizedStrassenMultiply_closure sp5c(sp5k);
-        sp5c.C4 = C12;
-        sp5c.A4 = S4;
-        sp5c.B3 = B22;
-        sp5c.MatrixSize2 = QuadrantSize0;
-        sp5c.RowWidthC2 = largs->RowWidthC2;
-        sp5c.RowWidthA2 = QuadrantSize0;
-        sp5c.RowWidthB2 = largs->RowWidthB2;
+        sp5c.C = C12;
+        sp5c.A = S4;
+        sp5c.B = B22;
+        sp5c.MatrixSize = QuadrantSize;
+        sp5c.RowWidthC = largs->RowWidthC;
+        sp5c.RowWidthA = QuadrantSize;
+        sp5c.RowWidthB = largs->RowWidthB;
         spawn<OptimizedStrassenMultiply_closure> sp5(sp5c);
 
         cont sp6k;
         SN_BIND_VOID(SN_OptimizedStrassenMultiply_cont0, &sp6k);
         OptimizedStrassenMultiply_closure sp6c(sp6k);
-        sp6c.C4 = C21;
-        sp6c.A4 = A22;
-        sp6c.B3 = S8;
-        sp6c.MatrixSize2 = QuadrantSize0;
-        sp6c.RowWidthC2 = largs->RowWidthC2;
-        sp6c.RowWidthA2 = largs->RowWidthA2;
-        sp6c.RowWidthB2 = QuadrantSize0;
+        sp6c.C = C21;
+        sp6c.A = A22;
+        sp6c.B = S8;
+        sp6c.MatrixSize = QuadrantSize;
+        sp6c.RowWidthC = largs->RowWidthC;
+        sp6c.RowWidthA = largs->RowWidthA;
+        sp6c.RowWidthB = QuadrantSize;
         spawn<OptimizedStrassenMultiply_closure> sp6(sp6c);
 
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->T1sMULT = T1sMULT;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->RowIncrementC = RowIncrementC;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->M5 = M5;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C21 = C21;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C12 = C12;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->QuadrantSize = QuadrantSize;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->M2 = M2;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C22 = C22;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C21 = C21;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->RowIncrementC1 = RowIncrementC1;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C12 = C12;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->QuadrantSize0 = QuadrantSize0;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->StartHeap = StartHeap;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C4 = largs->C4;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->T1sMULT = T1sMULT;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C = largs->C;
         // Original sync was here
     }
-    return;
 }
-int compare_vec(int n2, REAL *V1, REAL *V2) {
-    int i1;
-    REAL c1;
+int compare_vec(int n, REAL *V1, REAL *V2) {
+    int i;
+    REAL c;
     REAL sum;
     sum = 0.;
-    for (i1 = 0;(i1 < n2);(++i1)) {
-        c1 = (V1[i1] - V2[i1]);
-        if ((c1 < 0.)) {
-            c1 = (-c1);
+    for (i = 0;(i < n);(++i)) {
+        c = (V1[i] - V2[i]);
+        if ((c < 0.)) {
+            c = (-c);
         }
-        sum = (sum + c1);
-        if ((c1 > 9.9999999999999995E-7)) {
+        sum = (sum + c);
+        if ((c > 9.9999999999999995E-7)) {
             return (-1);
         } else {
         }
@@ -765,33 +764,33 @@ int compare_vec(int n2, REAL *V1, REAL *V2) {
     printf("Sum of errors: %g\n",sum);
     return 0;
 }
-REAL * alloc_vec(int n3) {
-    return ((REAL *) malloc((n3 * sizeof(REAL))));
+REAL * alloc_vec(int n) {
+    return ((REAL *) malloc((n * sizeof(REAL))));
 }
-void free_vec(REAL *V0) {
-    free(V0);
+void free_vec(REAL *V) {
+    free(V);
 }
-void init_matrix(int n4, REAL *A5, int an0) {
-    int i2;
-    int j1;
-    for (i2 = 0;(i2 < n4);(++i2)) {
-        for (j1 = 0;(j1 < n4);(++j1)) {
-            A5[((i2 * an0) + j1)] = (((double) cilk_rand()) / ((double) 2147483647));
+void init_matrix(int n, REAL *A, int an) {
+    int i;
+    int j;
+    for (i = 0;(i < n);(++i)) {
+        for (j = 0;(j < n);(++j)) {
+            A[((i * an) + j)] = (((double) cilk_rand()) / ((double) 2147483647));
         }
     }
 }
-int compare_matrix(int n5, REAL *A6, int an1, REAL *B4, int bn0) {
-    int i3;
-    int j2;
-    REAL c2;
-    for (i3 = 0;(i3 < n5);(++i3)) {
-        for (j2 = 0;(j2 < n5);(++j2)) {
-            c2 = (A6[((i3 * an1) + j2)] - B4[((i3 * bn0) + j2)]);
-            if ((c2 < 0.)) {
-                c2 = (-c2);
+int compare_matrix(int n, REAL *A, int an, REAL *B, int bn) {
+    int i;
+    int j;
+    REAL c;
+    for (i = 0;(i < n);(++i)) {
+        for (j = 0;(j < n);(++j)) {
+            c = (A[((i * an) + j)] - B[((i * bn) + j)]);
+            if ((c < 0.)) {
+                c = (-c);
             }
-            c2 = (c2 / A6[((i3 * an1) + j2)]);
-            if ((c2 > 9.9999999999999995E-7)) {
+            c = (c / A[((i * an) + j)]);
+            if ((c > 9.9999999999999995E-7)) {
                 return (-1);
             } else {
             }
@@ -799,78 +798,78 @@ int compare_matrix(int n5, REAL *A6, int an1, REAL *B4, int bn0) {
     }
     return 0;
 }
-REAL * alloc_matrix(int n6) {
-    return ((REAL *) malloc(((n6 * n6) * sizeof(REAL))));
+REAL * alloc_matrix(int n) {
+    return ((REAL *) malloc(((n * n) * sizeof(REAL))));
 }
-void free_matrix(REAL *A7) {
-    free(A7);
+void free_matrix(REAL *A) {
+    free(A);
 }
 int usage() {
     fprintf(__stderrp,"\nUsage: strassen [<cilk-options>] [-n #] [-c] [-rc]\n\nMultiplies two randomly generated n x n matrices. To check for\ncorrectness use -c using iterative matrix multiply or use -rc \nusing randomized algorithm due to Freivalds.\n\n");
     return 1;
 }
 int main(int argc, char **argv) {
-    REAL *A8;
-    REAL *B5;
-    REAL *C5;
+    REAL *A;
+    REAL *B;
+    REAL *C;
     int verify;
     int rand_check;
     int benchmark;
     int help;
-    int n7;
+    int n;
     struct timeval t1;
-    n7 = 512;
+    n = 512;
     verify = 0;
     rand_check = 0;
-    get_options(argc,argv,specifiers,opt_types,&(n7),&(verify),&(rand_check),&(benchmark),&(help));
+    get_options(argc,argv,specifiers,opt_types,&(n),&(verify),&(rand_check),&(benchmark),&(help));
     if (help) {
         return usage();
     } else {
         if (benchmark) {
             switch (benchmark) {
   case 1:
-    n7 = 512;
+    n = 512;
     break;
   case 2:
-    n7 = 2048;
+    n = 2048;
     break;
   case 3:
-    n7 = 4096;
+    n = 4096;
     break;
 }
 ;
         }
-        if ((((n7 & (n7 - 1)) != 0) || ((n7 % 16) != 0))) {
-            printf("%d: matrix size must be a power of 2 and a multiple of %d\n",n7,16);
+        if ((((n & (n - 1)) != 0) || ((n % 16) != 0))) {
+            printf("%d: matrix size must be a power of 2 and a multiple of %d\n",n,16);
             return 1;
         } else {
-            A8 = alloc_matrix(n7);
-            B5 = alloc_matrix(n7);
-            C5 = alloc_matrix(n7);
-            init_matrix(n7,A8,n7);
-            init_matrix(n7,B5,n7);
+            A = alloc_matrix(n);
+            B = alloc_matrix(n);
+            C = alloc_matrix(n);
+            init_matrix(n,A,n);
+            init_matrix(n,B,n);
             gettimeofday(&(t1),0);
             main_cont0_closure SN_main_cont0c(CONT_DUMMY);
             spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
             cont sp0k;
             SN_BIND_VOID(SN_main_cont0, &sp0k);
             OptimizedStrassenMultiply_closure sp0c(sp0k);
-            sp0c.C4 = C5;
-            sp0c.A4 = A8;
-            sp0c.B3 = B5;
-            sp0c.MatrixSize2 = n7;
-            sp0c.RowWidthC2 = n7;
-            sp0c.RowWidthA2 = n7;
-            sp0c.RowWidthB2 = n7;
+            sp0c.C = C;
+            sp0c.A = A;
+            sp0c.B = B;
+            sp0c.MatrixSize = n;
+            sp0c.RowWidthC = n;
+            sp0c.RowWidthA = n;
+            sp0c.RowWidthB = n;
             spawn<OptimizedStrassenMultiply_closure> sp0(sp0c);
 
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->n7 = n7;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->verify = verify;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->C5 = C5;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->B5 = B5;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->n = n;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->B = B;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->rand_check = rand_check;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->A8 = A8;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->verify = verify;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->C = C;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->A = A;
             // Original sync was here
         }
     }
@@ -880,15 +879,15 @@ THREAD(OptimizedStrassenMultiply_cont0) {
     OptimizedStrassenMultiply_cont1_closure SN_OptimizedStrassenMultiply_cont1c(largs->k);
     spawn_next<OptimizedStrassenMultiply_cont1_closure> SN_OptimizedStrassenMultiply_cont1(SN_OptimizedStrassenMultiply_cont1c);
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->StartHeap = largs->StartHeap;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->RowIncrementC = largs->RowIncrementC;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->T1sMULT = largs->T1sMULT;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M2 = largs->M2;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C22 = largs->C22;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->RowIncrementC1 = largs->RowIncrementC1;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C21 = largs->C21;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C12 = largs->C12;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M5 = largs->M5;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->QuadrantSize0 = largs->QuadrantSize0;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C4 = largs->C4;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M2 = largs->M2;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C = largs->C;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C21 = largs->C21;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C22 = largs->C22;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C12 = largs->C12;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->QuadrantSize = largs->QuadrantSize;
     // Original sync was here
     return;
 }
@@ -912,8 +911,8 @@ THREAD(OptimizedStrassenMultiply_cont1) {
     REAL T2_2;
     REAL T2_3;
     OptimizedStrassenMultiply_cont1_closure *largs = (OptimizedStrassenMultiply_cont1_closure*)(args.get());
-    for (Row = 0;(Row < largs->QuadrantSize0);(Row++)) {
-        for (Column = 0;(Column < largs->QuadrantSize0);Column = (Column + 4)) {
+    for (Row = 0;(Row < largs->QuadrantSize);(Row++)) {
+        for (Column = 0;(Column < largs->QuadrantSize);Column = (Column + 4)) {
             LocalM5_0 = *(largs->M5);
             LocalM5_1 = *((largs->M5 + 1));
             LocalM5_2 = *((largs->M5 + 2));
@@ -930,10 +929,10 @@ THREAD(OptimizedStrassenMultiply_cont1) {
             T2_1 = (*((largs->C22 + 1)) + T1_1);
             T2_2 = (*((largs->C22 + 2)) + T1_2);
             T2_3 = (*((largs->C22 + 3)) + T1_3);
-            (*(largs->C4)) += LocalM2_0;
-            (*(largs->C4 + 1)) += LocalM2_1;
-            (*(largs->C4 + 2)) += LocalM2_2;
-            (*(largs->C4 + 3)) += LocalM2_3;
+            (*(largs->C)) += LocalM2_0;
+            (*(largs->C + 1)) += LocalM2_1;
+            (*(largs->C + 2)) += LocalM2_2;
+            (*(largs->C + 3)) += LocalM2_3;
             (*(largs->C12)) += LocalM5_0 + T1_0;
             (*(largs->C12 + 1)) += LocalM5_1 + T1_1;
             (*(largs->C12 + 2)) += LocalM5_2 + T1_2;
@@ -949,47 +948,46 @@ THREAD(OptimizedStrassenMultiply_cont1) {
             largs->M5 = (largs->M5 + 4);
             largs->M2 = (largs->M2 + 4);
             largs->T1sMULT = (largs->T1sMULT + 4);
-            largs->C4 = (largs->C4 + 4);
+            largs->C = (largs->C + 4);
             largs->C12 = (largs->C12 + 4);
             largs->C21 = (largs->C21 + 4);
             largs->C22 = (largs->C22 + 4);
         }
-        largs->C4 = ((REAL *) (((PTR) largs->C4) + largs->RowIncrementC1));
-        largs->C12 = ((REAL *) (((PTR) largs->C12) + largs->RowIncrementC1));
-        largs->C21 = ((REAL *) (((PTR) largs->C21) + largs->RowIncrementC1));
-        largs->C22 = ((REAL *) (((PTR) largs->C22) + largs->RowIncrementC1));
+        largs->C = ((REAL *) (((PTR) largs->C) + largs->RowIncrementC));
+        largs->C12 = ((REAL *) (((PTR) largs->C12) + largs->RowIncrementC));
+        largs->C21 = ((REAL *) (((PTR) largs->C21) + largs->RowIncrementC));
+        largs->C22 = ((REAL *) (((PTR) largs->C22) + largs->RowIncrementC));
     }
     free(largs->StartHeap);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
 THREAD(main_cont0) {
     unsigned long long runtime_ms;
     REAL *R;
-    REAL *V10;
-    REAL *V20;
+    REAL *V1;
+    REAL *V2;
     REAL *C2;
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
     gettimeofday(&(largs->t2),0);
     runtime_ms = ((todval(&(largs->t2)) - todval(&(largs->t1))) / 1000);
     printf("%f\n",(runtime_ms / 1000.));
     if (largs->rand_check) {
-        R = alloc_vec(largs->n7);
-        V10 = alloc_vec(largs->n7);
-        V20 = alloc_vec(largs->n7);
-        mat_vec_mul(largs->n7,largs->n7,largs->n7,largs->B5,R,V10,0);
-        mat_vec_mul(largs->n7,largs->n7,largs->n7,largs->A8,V10,V20,0);
-        mat_vec_mul(largs->n7,largs->n7,largs->n7,largs->C5,R,V10,0);
-        largs->rand_check = compare_vec(largs->n7,V10,V20);
+        R = alloc_vec(largs->n);
+        V1 = alloc_vec(largs->n);
+        V2 = alloc_vec(largs->n);
+        mat_vec_mul(largs->n,largs->n,largs->n,largs->B,R,V1,0);
+        mat_vec_mul(largs->n,largs->n,largs->n,largs->A,V1,V2,0);
+        mat_vec_mul(largs->n,largs->n,largs->n,largs->C,R,V1,0);
+        largs->rand_check = compare_vec(largs->n,V1,V2);
         free_vec(R);
-        free_vec(V10);
-        free_vec(V20);
+        free_vec(V1);
+        free_vec(V2);
     } else {
         if (largs->verify) {
             fprintf(__stderrp,"Checking results ... \n");
-            C2 = alloc_matrix(largs->n7);
-            matrixmul(largs->n7,largs->A8,largs->n7,largs->B5,largs->n7,C2,largs->n7);
-            largs->verify = compare_matrix(largs->n7,largs->C5,largs->n7,C2,largs->n7);
+            C2 = alloc_matrix(largs->n);
+            matrixmul(largs->n,largs->A,largs->n,largs->B,largs->n,C2,largs->n);
+            largs->verify = compare_matrix(largs->n,largs->C,largs->n,C2,largs->n);
             free_matrix(C2);
         }
     }
@@ -997,11 +995,10 @@ THREAD(main_cont0) {
         fprintf(__stderrp,"WRONG RESULT!\n");
     } else {
         fprintf(__stderrp,"\nCilk Example: strassen\n");
-        fprintf(__stderrp,"Options: n = %d\n\n",largs->n7);
+        fprintf(__stderrp,"Options: n = %d\n\n",largs->n);
     }
-    free_matrix(largs->A8);
-    free_matrix(largs->B5);
-    free_matrix(largs->C5);
+    free_matrix(largs->A);
+    free_matrix(largs->B);
+    free_matrix(largs->C);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

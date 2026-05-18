@@ -83,10 +83,9 @@ THREAD(fib) {
 
         // Original sync was here
     }
-    return;
 }
 int main(int argc, char **argv) {
-    int n0;
+    int n;
     int result;
     struct timeval t1;
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
@@ -95,12 +94,12 @@ int main(int argc, char **argv) {
         fprintf(__stderrp,"Usage: fib [<cilk options>] <n>\n");
         exit(1);
     }
-    n0 = atoi(argv[1]);
+    n = atoi(argv[1]);
     gettimeofday(&(t1),0);
     cont sp0k;
     SN_BIND(SN_main_cont0, &sp0k, result);
     fib_closure sp0c(sp0k);
-    sp0c.n = n0;
+    sp0c.n = n;
     spawn<fib_closure> sp0(sp0c);
 
     ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
@@ -119,7 +118,6 @@ THREAD(fib_cont0) {
 THREAD(fib_cont1) {
     fib_cont1_closure *largs = (fib_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->x + largs->y));
-    return;
 }
 THREAD(main_cont0) {
     unsigned long long runtime_ms;
@@ -129,5 +127,4 @@ THREAD(main_cont0) {
     printf("%f\n",(runtime_ms / 1000.));
     fprintf(__stderrp,"Result: %d\n",largs->result);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }

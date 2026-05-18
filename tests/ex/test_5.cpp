@@ -35,7 +35,6 @@ CLOSURE_DEF(main_cont0,
 THREAD(sum_pair) {
     sum_pair_closure *largs = (sum_pair_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->p.x + largs->p.y));
-    return;
 }
 THREAD(dot_product) {
     int s1;
@@ -59,20 +58,20 @@ THREAD(dot_product) {
     return;
 }
 int main() {
-    Pair a0;
-    Pair b0;
+    Pair a;
+    Pair b;
     int result;
-    a0.x = 1;
-    a0.y = 2;
-    b0.x = 3;
-    b0.y = 4;
+    a.x = 1;
+    a.y = 2;
+    b.x = 3;
+    b.y = 4;
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     cont sp0k;
     SN_BIND(SN_main_cont0, &sp0k, result);
     dot_product_closure sp0c(sp0k);
-    sp0c.a = a0;
-    sp0c.b = b0;
+    sp0c.a = a;
+    sp0c.b = b;
     spawn<dot_product_closure> sp0(sp0c);
 
     // Original sync was here
@@ -81,11 +80,9 @@ int main() {
 THREAD(dot_product_cont0) {
     dot_product_cont0_closure *largs = (dot_product_cont0_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->s1 * largs->s2));
-    return;
 }
 THREAD(main_cont0) {
     main_cont0_closure *largs = (main_cont0_closure*)(args.get());
     printf("result = %d\n",largs->result);
     SEND_ARGUMENT(largs->k, 0);
-    return;
 }
