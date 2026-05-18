@@ -572,12 +572,12 @@ THREAD(schur) {
         sp3c.nb = hnb;
         spawn<schur_closure> sp3(sp3c);
 
+        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->hnb = hnb;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->W10 = W10;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->V11 = V11;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->W11 = W11;
-        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->V01 = V01;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M10 = M10;
-        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->hnb = hnb;
+        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->V01 = V01;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M11 = M11;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M01 = M01;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M00 = M00;
@@ -757,14 +757,14 @@ THREAD(schur_cont0) {
     schur_cont0_closure *largs = (schur_cont0_closure*)(args.get());
     schur_cont1_closure SN_schur_cont1c(largs->k);
     spawn_next<schur_cont1_closure> SN_schur_cont1(SN_schur_cont1c);
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W10 = largs->W10;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W11 = largs->W11;
     ((schur_cont1_closure*)SN_schur_cont1.cls.get())->V11 = largs->V11;
     ((schur_cont1_closure*)SN_schur_cont1.cls.get())->V01 = largs->V01;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W10 = largs->W10;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M10 = largs->M10;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W11 = largs->W11;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M11 = largs->M11;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M01 = largs->M01;
     ((schur_cont1_closure*)SN_schur_cont1.cls.get())->hnb = largs->hnb;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M01 = largs->M01;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M11 = largs->M11;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M10 = largs->M10;
     ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M00 = largs->M00;
     // Original sync was here
     return;

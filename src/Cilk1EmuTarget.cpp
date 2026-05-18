@@ -5,7 +5,9 @@
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendAction.h>
 #include <clang/Rewrite/Core/Rewriter.h>
+#include <cstring>
 #include <llvm/Support/raw_ostream.h>
+#include <set>
 
 #include "Cilk1EmuTarget.hpp"
 #include "IR.hpp"
@@ -230,6 +232,7 @@ private:
   IRPrintContext &C;
   int SpawnCtr = 0;
   int IndentLvl = 1;
+  std::set<ClosureDeclIRStmt *> DeclaredClosures;
 
 public:
   bool LastReturnPrinted = false;
@@ -267,6 +270,9 @@ private:
   }
 
   void handleSpawnNextDecl(ClosureDeclIRStmt *DS, IRFunction *F) {
+    if (DeclaredClosures.count(DS))
+      return;
+    DeclaredClosures.insert(DS);
     const std::string &SpawnNextFnName = DS->Fn->getName();
     Indent() << SpawnNextFnName << "_closure "
              << "SN_" << SpawnNextFnName << "c";
@@ -280,10 +286,33 @@ private:
         << "SN_" << SpawnNextFnName << "(SN_" << SpawnNextFnName << "c);\n";
   }
 
-  void handleSpawnNext(SpawnNextIRStmt *S, IRFunction *F) {
+  void handleSpawnNext(SpawnNextIRStmt *S, IRFunction *F,
+                       IRBasicBlock *SNBlock) {
     const std::string &SpawnNextFnName = S->Fn->getName();
+    std::set<IRVarRef> UnconditionalEphemeralVars;
+    for (auto &B : *F) {
+      for (auto &Stmt : *B) {
+        if (auto *ES = dyn_cast<ESpawnIRStmt>(Stmt.get())) {
+          if (ES->SN == S && ES->Local && ES->Dest) {
+            if (auto *ID = dyn_cast<IdentIRExpr>(ES->Dest.get()))
+              if (B.get() == SNBlock)
+                UnconditionalEphemeralVars.insert(ID->Ident);
+          }
+        }
+      }
+    }
     for (auto &[SrcVar, DstVar] : S->Decl->Caller2Callee) {
-      if (!SrcVar->IsEphemeral) {
+      if (SrcVar->IsEphemeral && UnconditionalEphemeralVars.count(SrcVar))
+        continue;
+      if (SrcVar->Type->isArrayType()) {
+        Indent() << "std::memcpy(((" << SpawnNextFnName << "_closure*)SN_"
+                 << SpawnNextFnName << ".cls.get())->" << GetSym(DstVar->Name)
+                 << ", ";
+        C.IdentCB(Out, SrcVar);
+        Out << ", sizeof(";
+        C.IdentCB(Out, SrcVar);
+        Out << "));\n";
+      } else {
         Indent() << "((" << SpawnNextFnName << "_closure*)SN_"
                  << SpawnNextFnName;
         Out << ".cls.get())->" << GetSym(DstVar->Name) << " = ";
@@ -298,6 +327,8 @@ private:
     const std::string &SpawnFnName = ES->Fn->getName();
     if (ES->SN) {
       Indent() << "cont sp" << SpawnCtr << "k;\n";
+      if (ES->SN->Decl)
+        handleSpawnNextDecl(ES->SN->Decl, F);
       const std::string &SpawnNextFnName = ES->SN->Fn->getName();
       if (ES->Dest) {
         if (ES->Local) {
@@ -340,10 +371,18 @@ private:
           DstArgIt++;
         assert(DstArgIt != ES->Fn->Vars.end());
         auto &DstArg = *DstArgIt;
-        Indent() << "sp" << SpawnCtr << "c." << GetSym(DstArg.Name);
-        Out << " = ";
-        Arg->print(Out, C);
-        Out << ";\n";
+        if (DstArg.Type->isArrayType()) {
+          Indent() << "std::memcpy(sp" << SpawnCtr << "c."
+                   << GetSym(DstArg.Name) << ", ";
+          Arg->print(Out, C);
+          Out << ", sizeof(sp" << SpawnCtr << "c." << GetSym(DstArg.Name)
+              << "));\n";
+        } else {
+          Indent() << "sp" << SpawnCtr << "c." << GetSym(DstArg.Name);
+          Out << " = ";
+          Arg->print(Out, C);
+          Out << ";\n";
+        }
         DstArgIt++;
       }
     } else {
@@ -365,10 +404,18 @@ private:
           DstArgIt++;
         assert(DstArgIt != ES->Fn->Vars.end());
         auto &DstArg = *DstArgIt;
-        Indent() << "sp" << SpawnCtr << "c->" << GetSym(DstArg.Name);
-        Out << " = ";
-        Arg->print(Out, C);
-        Out << ";\n";
+        if (DstArg.Type->isArrayType()) {
+          Indent() << "std::memcpy(sp" << SpawnCtr << "c->"
+                   << GetSym(DstArg.Name) << ", ";
+          Arg->print(Out, C);
+          Out << ", sizeof(sp" << SpawnCtr << "c->" << GetSym(DstArg.Name)
+              << "));\n";
+        } else {
+          Indent() << "sp" << SpawnCtr << "c->" << GetSym(DstArg.Name);
+          Out << " = ";
+          Arg->print(Out, C);
+          Out << ";\n";
+        }
         DstArgIt++;
       }
     }
@@ -395,7 +442,7 @@ private:
       handleSpawn(ES, F);
       SpawnCtr++;
     } else if (auto *SNS = dyn_cast<SpawnNextIRStmt>(S)) {
-      handleSpawnNext(SNS, F);
+      handleSpawnNext(SNS, F, B);
     } else if (auto *CDS = dyn_cast<ClosureDeclIRStmt>(S)) {
       handleSpawnNextDecl(CDS, F);
     } else if (auto *RS = dyn_cast<ReturnIRStmt>(S)) {
@@ -548,31 +595,31 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
         VarRenameMap[V.ASTDecl] = GetSym(V.Name);
     }
 
-    auto IRC =
-        IRPrintContext{.ASTCtx = C,
-                       .NewlineSymbol = "\n",
-                       .GraphVizEscapeChars = false,
-                       .VarRenames = std::move(VarRenameMap),
-                       .IdentCB = [&](llvm::raw_ostream &Out, IRVarRef VR) {
-                         switch (VR->DeclLoc) {
-                         case IRVarDecl::ARG: {
-                           if (F->Info.IsTask) {
-                             Out << "largs->" << GetSym(VR->Name);
-                           } else {
-                             Out << GetSym(VR->Name);
-                           }
-                           break;
-                         }
-                         case IRVarDecl::LOCAL: {
-                           Out << GetSym(VR->Name);
-                           break;
-                         }
-                         default:
-                           PANIC("unsupported");
-                         }
-                       },
-                       .TaskContinuationKey =
-                           F->Info.IsTask ? std::string("largs->k") : ""};
+    auto IRC = IRPrintContext{
+        .ASTCtx = C,
+        .NewlineSymbol = "\n",
+        .GraphVizEscapeChars = false,
+        .VarRenames = std::move(VarRenameMap),
+        .IdentCB =
+            [&](llvm::raw_ostream &Out, IRVarRef VR) {
+              switch (VR->DeclLoc) {
+              case IRVarDecl::ARG: {
+                if (F->Info.IsTask) {
+                  Out << "largs->" << GetSym(VR->Name);
+                } else {
+                  Out << GetSym(VR->Name);
+                }
+                break;
+              }
+              case IRVarDecl::LOCAL: {
+                Out << GetSym(VR->Name);
+                break;
+              }
+              default:
+                PANIC("unsupported");
+              }
+            },
+        .TaskContinuationKey = F->Info.IsTask ? std::string("largs->k") : ""};
     Cilk1EmuPrinter Printer(out, IRC);
     Printer.traverse(*F);
     if (F->Info.IsTask) {

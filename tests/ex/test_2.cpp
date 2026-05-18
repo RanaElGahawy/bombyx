@@ -489,10 +489,12 @@ THREAD(compute) {
             sp1c.n0 = largs->width;
             spawn<cube_closure> sp1(sp1c);
 
-            ((compute_cont2_closure*)SN_compute_cont2.cls.get())->depth = largs->depth;
+            ((compute_cont2_closure*)SN_compute_cont2.cls.get())->x = x;
+            ((compute_cont2_closure*)SN_compute_cont2.cls.get())->pre_c = pre_c;
             ((compute_cont2_closure*)SN_compute_cont2.cls.get())->result = result;
             ((compute_cont2_closure*)SN_compute_cont2.cls.get())->threshold = largs->threshold;
             ((compute_cont2_closure*)SN_compute_cont2.cls.get())->width = largs->width;
+            ((compute_cont2_closure*)SN_compute_cont2.cls.get())->depth = largs->depth;
             // Original sync was here
         } else {
             compute_cont1_closure SN_compute_cont1c(largs->k);
@@ -503,10 +505,13 @@ THREAD(compute) {
             sp2c.n0 = largs->threshold;
             spawn<cube_closure> sp2(sp2c);
 
-            ((compute_cont1_closure*)SN_compute_cont1.cls.get())->depth = largs->depth;
+            ((compute_cont1_closure*)SN_compute_cont1.cls.get())->x = x;
+            ((compute_cont1_closure*)SN_compute_cont1.cls.get())->pre_b = pre_b;
             ((compute_cont1_closure*)SN_compute_cont1.cls.get())->result = result;
             ((compute_cont1_closure*)SN_compute_cont1.cls.get())->threshold = largs->threshold;
             ((compute_cont1_closure*)SN_compute_cont1.cls.get())->width = largs->width;
+            ((compute_cont1_closure*)SN_compute_cont1.cls.get())->pre_a = pre_a;
+            ((compute_cont1_closure*)SN_compute_cont1.cls.get())->depth = largs->depth;
             // Original sync was here
         }
     } else {
@@ -518,9 +523,12 @@ THREAD(compute) {
         sp3c.n = (largs->width + largs->threshold);
         spawn<square_closure> sp3(sp3c);
 
+        ((compute_cont0_closure*)SN_compute_cont0.cls.get())->pre_c = pre_c;
+        ((compute_cont0_closure*)SN_compute_cont0.cls.get())->pre_b = pre_b;
+        ((compute_cont0_closure*)SN_compute_cont0.cls.get())->acc = acc;
         ((compute_cont0_closure*)SN_compute_cont0.cls.get())->threshold = largs->threshold;
         ((compute_cont0_closure*)SN_compute_cont0.cls.get())->width = largs->width;
-        ((compute_cont0_closure*)SN_compute_cont0.cls.get())->acc = acc;
+        ((compute_cont0_closure*)SN_compute_cont0.cls.get())->pre_a = pre_a;
         ((compute_cont0_closure*)SN_compute_cont0.cls.get())->depth = largs->depth;
         // Original sync was here
     }
@@ -653,24 +661,24 @@ THREAD(compute_reentry0_reentry1) {
         spawn<cube_closure> sp1(sp1c);
 
         ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->x = largs->x;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->q0 = largs->q0;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->a0 = largs->a0;
         ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->j = largs->j;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->q = largs->q;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->p = largs->p;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->pre_c = largs->pre_c;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->i = largs->i;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->pre_b = largs->pre_b;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->d = largs->d;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->acc = largs->acc;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->q0 = largs->q0;
         ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->b0 = largs->b0;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->w = largs->w;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->p0 = largs->p0;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->result = largs->result;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->width = largs->width;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->threshold = largs->threshold;
-        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->pre_a = largs->pre_a;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->a0 = largs->a0;
         ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->i0 = largs->i0;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->pre_c = largs->pre_c;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->q = largs->q;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->i = largs->i;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->p = largs->p;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->d = largs->d;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->w = largs->w;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->pre_a = largs->pre_a;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->p0 = largs->p0;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->threshold = largs->threshold;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->width = largs->width;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->result = largs->result;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->acc = largs->acc;
+        ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->pre_b = largs->pre_b;
         ((compute_reentry0_reentry1_cont0_closure*)SN_compute_reentry0_reentry1_cont0.cls.get())->depth = largs->depth;
         // Original sync was here
     } else {
@@ -749,26 +757,26 @@ THREAD(compute_reentry0_reentry1_reentry2) {
         sp1c.n0 = (largs->b + largs->i);
         spawn<cube_closure> sp1(sp1c);
 
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->p0 = largs->p0;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->b0 = largs->b0;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->x = largs->x;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->j = largs->j;
         ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->a0 = largs->a0;
         ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->pre_c = largs->pre_c;
         ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->i = largs->i;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->result = largs->result;
         ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->a = largs->a;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->j = largs->j;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->pre_b = largs->pre_b;
         ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->w = largs->w;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->d = largs->d;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->pre_a = largs->pre_a;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->threshold = largs->threshold;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->x = largs->x;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->acc = largs->acc;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->i0 = largs->i0;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->width = largs->width;
-        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->b = largs->b;
         ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->q0 = largs->q0;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->i0 = largs->i0;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->pre_b = largs->pre_b;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->pre_a = largs->pre_a;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->p0 = largs->p0;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->b = largs->b;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->result = largs->result;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->threshold = largs->threshold;
         ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->depth = largs->depth;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->d = largs->d;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->b0 = largs->b0;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->acc = largs->acc;
+        ((compute_reentry0_reentry1_reentry2_cont0_closure*)SN_compute_reentry0_reentry1_reentry2_cont0.cls.get())->width = largs->width;
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<compute_reentry0_reentry1_exit2_closure>(largs->k);
@@ -846,26 +854,26 @@ THREAD(compute_reentry3) {
         sp1c.n0 = (largs->i0 + largs->width);
         spawn<cube_closure> sp1(sp1c);
 
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->i0 = largs->i0;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->pre_c = largs->pre_c;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->q = largs->q;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->pre_a = largs->pre_a;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->acc = largs->acc;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->pre_b = largs->pre_b;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->threshold = largs->threshold;
         ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->x = largs->x;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->q0 = largs->q0;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->q = largs->q;
         ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->i = largs->i;
         ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->a = largs->a;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->j = largs->j;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->p = largs->p;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->result = largs->result;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->p0 = largs->p0;
         ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->w = largs->w;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->width = largs->width;
-        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->b = largs->b;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->j = largs->j;
         ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->d = largs->d;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->q0 = largs->q0;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->p = largs->p;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->pre_b = largs->pre_b;
         ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->depth = largs->depth;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->threshold = largs->threshold;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->acc = largs->acc;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->b = largs->b;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->i0 = largs->i0;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->pre_c = largs->pre_c;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->result = largs->result;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->pre_a = largs->pre_a;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->p0 = largs->p0;
+        ((compute_reentry3_cont0_closure*)SN_compute_reentry3_cont0.cls.get())->width = largs->width;
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<compute_exit3_closure>(largs->k);
@@ -943,26 +951,26 @@ THREAD(compute_reentry3_reentry4) {
         sp1c.n0 = (largs->b0 + largs->j);
         spawn<cube_closure> sp1(sp1c);
 
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->x = largs->x;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->j = largs->j;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->b0 = largs->b0;
         ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->a0 = largs->a0;
         ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->i0 = largs->i0;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->pre_c = largs->pre_c;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->q = largs->q;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->x = largs->x;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->p = largs->p;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->b = largs->b;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->w = largs->w;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->j = largs->j;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->depth = largs->depth;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->pre_b = largs->pre_b;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->pre_a = largs->pre_a;
         ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->i = largs->i;
         ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->acc = largs->acc;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->result = largs->result;
         ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->a = largs->a;
         ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->d = largs->d;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->b0 = largs->b0;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->b = largs->b;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->p = largs->p;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->pre_a = largs->pre_a;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->pre_c = largs->pre_c;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->width = largs->width;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->w = largs->w;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->pre_b = largs->pre_b;
         ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->threshold = largs->threshold;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->q = largs->q;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->result = largs->result;
-        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->depth = largs->depth;
+        ((compute_reentry3_reentry4_cont0_closure*)SN_compute_reentry3_reentry4_cont0.cls.get())->width = largs->width;
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<compute_reentry3_exit4_closure>(largs->k);

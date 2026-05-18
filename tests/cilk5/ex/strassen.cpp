@@ -732,16 +732,16 @@ THREAD(OptimizedStrassenMultiply) {
         sp6c.RowWidthB2 = QuadrantSize0;
         spawn<OptimizedStrassenMultiply_closure> sp6(sp6c);
 
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->StartHeap = StartHeap;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->RowIncrementC1 = RowIncrementC1;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->T1sMULT = T1sMULT;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->M5 = M5;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->M2 = M2;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C4 = largs->C4;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C21 = C21;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->QuadrantSize0 = QuadrantSize0;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C12 = C12;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C22 = C22;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C21 = C21;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->RowIncrementC1 = RowIncrementC1;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C12 = C12;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->QuadrantSize0 = QuadrantSize0;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->StartHeap = StartHeap;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C4 = largs->C4;
         // Original sync was here
     }
     return;
@@ -864,13 +864,13 @@ int main(int argc, char **argv) {
             sp0c.RowWidthB2 = n7;
             spawn<OptimizedStrassenMultiply_closure> sp0(sp0c);
 
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->A8 = A8;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->C5 = C5;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->B5 = B5;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->n7 = n7;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->rand_check = rand_check;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->verify = verify;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->C5 = C5;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->B5 = B5;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->rand_check = rand_check;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->A8 = A8;
             // Original sync was here
         }
     }
@@ -879,15 +879,15 @@ THREAD(OptimizedStrassenMultiply_cont0) {
     OptimizedStrassenMultiply_cont0_closure *largs = (OptimizedStrassenMultiply_cont0_closure*)(args.get());
     OptimizedStrassenMultiply_cont1_closure SN_OptimizedStrassenMultiply_cont1c(largs->k);
     spawn_next<OptimizedStrassenMultiply_cont1_closure> SN_OptimizedStrassenMultiply_cont1(SN_OptimizedStrassenMultiply_cont1c);
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C22 = largs->C22;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C21 = largs->C21;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->RowIncrementC1 = largs->RowIncrementC1;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C12 = largs->C12;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->StartHeap = largs->StartHeap;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->T1sMULT = largs->T1sMULT;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M2 = largs->M2;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->QuadrantSize0 = largs->QuadrantSize0;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->StartHeap = largs->StartHeap;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C22 = largs->C22;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->RowIncrementC1 = largs->RowIncrementC1;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C21 = largs->C21;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C12 = largs->C12;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M5 = largs->M5;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->QuadrantSize0 = largs->QuadrantSize0;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C4 = largs->C4;
     // Original sync was here
     return;

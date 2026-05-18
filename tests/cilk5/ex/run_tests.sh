@@ -56,3 +56,11 @@ compile_with_getoptions heat.cpp heat ""
 printf "\n >> strassen \n"
 compile_with_getoptions strassen.cpp strassen ""
 ./strassen -n 1024 -c
+
+printf "\n >> fft \n"
+compile_with_getoptions fft.cpp fft ""
+./fft -c
+
+printf "\n >> cholesky \n"
+compile_with_getoptions cholesky.cpp fft ""
+./cholesky -c

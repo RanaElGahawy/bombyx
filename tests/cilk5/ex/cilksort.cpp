@@ -503,14 +503,14 @@ THREAD(cilksort) {
         sp3c.size = (largs->size - (3 * quarter));
         spawn<cilksort_closure> sp3(sp3c);
 
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpC = tmpC;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpA = tmpA;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->C = C;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->low6 = largs->low6;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->B = B;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->D = D;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->A = A;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->low6 = largs->low6;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->size = largs->size;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpC = tmpC;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpA = tmpA;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->C = C;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->quarter = quarter;
         // Original sync was here
     }
@@ -587,9 +587,9 @@ int main(int argc, char **argv) {
         sp0c.size = size2;
         spawn<cilksort_closure> sp0(sp0c);
 
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->check = check;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->tmp3 = tmp3;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->array = array;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->size2 = size2;
         // Original sync was here
@@ -613,13 +613,13 @@ THREAD(cilksort_cont0) {
     spawn_next<cilksort_cont1_closure> SN_cilksort_cont1(SN_cilksort_cont1c);
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpC = largs->tmpC;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpA = largs->tmpA;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->quarter = largs->quarter;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->size = largs->size;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->D = largs->D;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->B = largs->B;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->A = largs->A;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->C = largs->C;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->low6 = largs->low6;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->B = largs->B;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->A = largs->A;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->quarter = largs->quarter;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->size = largs->size;
     // Original sync was here
     return;
 }

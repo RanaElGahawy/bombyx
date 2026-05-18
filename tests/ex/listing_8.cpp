@@ -72,6 +72,8 @@ THREAD(fun) {
         sp1c.n = (largs->n - 2);
         spawn<fun_closure> sp1(sp1c);
 
+        ((fun_cont1_closure*)SN_fun_cont1.cls.get())->y0 = y0;
+        ((fun_cont1_closure*)SN_fun_cont1.cls.get())->x0 = x0;
         ((fun_cont1_closure*)SN_fun_cont1.cls.get())->n = largs->n;
         // Original sync was here
     } else {
@@ -90,6 +92,8 @@ THREAD(fun) {
             sp3c.n = (largs->n - 2);
             spawn<fun_closure> sp3(sp3c);
 
+            ((fun_cont0_closure*)SN_fun_cont0.cls.get())->y = y;
+            ((fun_cont0_closure*)SN_fun_cont0.cls.get())->x = x;
             ((fun_cont0_closure*)SN_fun_cont0.cls.get())->n = largs->n;
             // Original sync was here
         } else {

@@ -203,6 +203,36 @@ static BinopIRExpr::BinopOp astOpToIROp(clang::BinaryOperatorKind K) {
   }
 }
 
+struct SpawnFinder : clang::RecursiveASTVisitor<SpawnFinder> {
+  bool Found = false;
+  bool VisitCilkSpawnExpr(CilkSpawnExpr *) { return Found = true, false; }
+  bool VisitCilkSpawnStmt(CilkSpawnStmt *) { return Found = true, false; }
+};
+static bool containsSpawn(clang::Stmt *S) {
+  SpawnFinder F;
+  F.TraverseStmt(S);
+  return F.Found;
+}
+
+struct VarRefCollector : clang::RecursiveASTVisitor<VarRefCollector> {
+  std::set<const clang::NamedDecl *> Refs;
+  bool VisitDeclRefExpr(clang::DeclRefExpr *E) {
+    Refs.insert(E->getDecl());
+    return true;
+  }
+};
+static std::unordered_map<const clang::NamedDecl *, std::string>
+buildRenames(clang::Stmt *S,
+             const std::unordered_map<ASTVarRef, IRVarRef> &VarLookup) {
+  VarRefCollector Collector;
+  Collector.TraverseStmt(S);
+  std::unordered_map<const clang::NamedDecl *, std::string> Renames;
+  for (auto &[ASTDecl, IRVar] : VarLookup)
+    if (Collector.Refs.count(ASTDecl))
+      Renames[ASTDecl] = GetSym(IRVar->Name);
+  return Renames;
+}
+
 class Stmt2IRVisitor : public clang::StmtVisitor<Stmt2IRVisitor> {
 private:
   IRBasicBlock *CurrB;
@@ -450,9 +480,17 @@ public:
     if (Node->getDecl()->getName() == "__bombyx_dae_here") {
       pushIRStmt(new ScopeAnnotIRStmt(ScopeAnnot::SA_DAE_HERE));
       handleStmt(Node->getSubStmt());
-    } else {
-      PANIC("unsupported: label statement")
+      return;
     }
+    if (!containsSpawn(Node)) {
+      pushIRStmt(new ASTStmtWrapIRStmt(Node, buildRenames(Node, VarLookup)));
+      return;
+    }
+    PANIC("unsupported: label statement with cilk_spawn")
+  }
+
+  void VisitGotoStmt(GotoStmt *Node) {
+    pushIRStmt(new ASTStmtWrapIRStmt(Node));
   }
 
   void VisitNullStmt(NullStmt *Node) {}
@@ -630,6 +668,11 @@ public:
   }
 
   void VisitDoStmt(DoStmt *DS) {
+    if (!containsSpawn(DS)) {
+      pushIRStmt(new ASTStmtWrapIRStmt(DS, buildRenames(DS, VarLookup)));
+      return;
+    }
+
     auto *DoAnnot = new ScopeAnnotIRStmt(ScopeAnnot::SA_DO);
     pushIRStmt((IRStmt *)DoAnnot);
 
@@ -642,10 +685,6 @@ public:
     handleStmt(DS->getBody());
     CurrB->Succs.insert(LoopB);
     CurrB->Succs.insert(JoinB);
-
-    // probably unneeded?
-    // auto *CloseAnnot = new ScopeAnnotIRStmt(ScopeAnnot::SA_CLOSE);
-    // CurrB->pushStmtBack((IRStmt*)DoAnnot);
 
     IRExpr *Cond = getExpr(DS->getCond());
     auto *WhileS = new LoopIRStmt(Cond, nullptr, nullptr);
@@ -666,16 +705,7 @@ public:
   }
 
   void VisitSwitchStmt(SwitchStmt *SS) {
-    // Emit the entire switch opaquely — the ScopedIRTraverser in downstream
-    // passes cannot handle the multi-predecessor join that an if-else
-    // desugaring would produce.  The switch body contains no cilk_spawn, so
-    // verbatim output is semantically correct. Build a rename map so IR-renamed
-    // vars (e.g. size→size2) are printed correctly inside the opaque switch
-    // body.
-    std::unordered_map<const clang::NamedDecl *, std::string> Renames;
-    for (auto &[ASTDecl, IRVar] : VarLookup)
-      Renames[ASTDecl] = GetSym(IRVar->Name);
-    pushIRStmt(new ASTStmtWrapIRStmt(SS, std::move(Renames)));
+    pushIRStmt(new ASTStmtWrapIRStmt(SS, buildRenames(SS, VarLookup)));
   }
 
   void VisitCilkSyncStmt(CilkSyncStmt *Node) {
@@ -744,6 +774,10 @@ public:
   void VisitStringLiteral(StringLiteral *Node) {
     auto *LE = new ASTLiteralIRExpr(Node);
     ExprStack.push_back((IRExpr *)LE);
+  }
+
+  void VisitGNUNullExpr(GNUNullExpr *Node) {
+    ExprStack.push_back(new ASTLiteralIRExpr(Node));
   }
 
   void VisitInitListExpr(InitListExpr *Node) {

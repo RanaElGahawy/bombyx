@@ -130,6 +130,7 @@ THREAD(original_reentry0) {
 
             ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->total = largs->total;
             ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->i = largs->i;
+            ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->b = largs->b;
             ((original_reentry0_cont1_closure*)SN_original_reentry0_cont1.cls.get())->n = largs->n;
             // Original sync was here
         } else {
@@ -144,6 +145,7 @@ THREAD(original_reentry0) {
 
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->total = largs->total;
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->i = largs->i;
+            ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->a = largs->a;
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->n = largs->n;
             // Original sync was here
         }

@@ -367,13 +367,13 @@ THREAD(rec_matmulAdd) {
                 sp2c.ld = largs->ld;
                 spawn<rec_matmulAdd_closure> sp2(sp2c);
 
-                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->p = largs->p;
-                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->C0 = largs->C0;
-                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->B1 = largs->B1;
+                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->n1 = n1;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->ld = largs->ld;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->n6 = largs->n6;
-                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->n1 = n1;
+                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->p = largs->p;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->m = largs->m;
+                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->C0 = largs->C0;
+                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->B1 = largs->B1;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->A3 = largs->A3;
                 // Original sync was here
             }
@@ -477,13 +477,13 @@ THREAD(rec_matmul) {
                 sp2c.ld0 = largs->ld0;
                 spawn<rec_matmul_closure> sp2(sp2c);
 
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->ld0 = largs->ld0;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->p0 = largs->p0;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->n7 = largs->n7;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->m0 = largs->m0;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->C1 = largs->C1;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->B2 = largs->B2;
                 ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->n10 = n10;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->p0 = largs->p0;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->m0 = largs->m0;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->n7 = largs->n7;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->B2 = largs->B2;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->ld0 = largs->ld0;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->C1 = largs->C1;
                 ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->A4 = largs->A4;
                 // Original sync was here
             }
@@ -614,16 +614,16 @@ int main(int argc, char **argv) {
     sp0c.ld0 = n9;
     spawn<rec_matmul_closure> sp0(sp0c);
 
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->P2 = P2;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->R0 = R0;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->P1 = P1;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->C3 = C3;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->B3 = B3;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->A6 = A6;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->rand_check = rand_check;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->P2 = P2;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->P1 = P1;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->A6 = A6;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->C2 = C2;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->R0 = R0;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->rand_check = rand_check;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->B3 = B3;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->check = check;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->C3 = C3;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->n9 = n9;
     // Original sync was here
     return 0;

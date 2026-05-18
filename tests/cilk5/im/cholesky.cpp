@@ -57,21 +57,6 @@
 #define RAND_MAX 32767
 #endif
 
-unsigned long long todval(struct timeval *tp) {
-  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
-}
-
-unsigned long rand_nxt = 0;
-
-int cilk_rand(void) {
-  int result;
-  rand_nxt = rand_nxt * 1103515245 + 12345;
-  result = (rand_nxt >> 16) % ((unsigned int)RAND_MAX + 1);
-  return result;
-}
-
-void cilk_srand(unsigned int seed) { rand_nxt = seed; }
-
 /*************************************************************\
  * Basic types
 \*************************************************************/
@@ -105,6 +90,20 @@ typedef struct {
 
 typedef InternalNode *Matrix;
 
+unsigned long long todval(struct timeval *tp) {
+  return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
+}
+
+unsigned long rand_nxt = 0;
+
+int cilk_rand(void) {
+  int result;
+  rand_nxt = rand_nxt * 1103515245 + 12345;
+  result = (rand_nxt >> 16) % ((unsigned int)RAND_MAX + 1);
+  return result;
+}
+
+void cilk_srand(unsigned int seed) { rand_nxt = seed; }
 /*************************************************************\
  * Linear algebra on blocks
  \*************************************************************/

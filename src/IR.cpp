@@ -35,6 +35,7 @@ Sym PutSym(std::string Name) {
     } while (GSymTable.DupCnt.count(Candidate) ||
              GSymTable.Reserved.count(Candidate));
     GSymTable.DupCnt[Name] = Ctr;
+    GSymTable.DupCnt[Candidate] = 0;
     GSymTable.Table.push_back(Candidate);
   }
   return GSymTable.Table.size() - 1;
@@ -769,11 +770,16 @@ void IRFunction::moveBlock(IRBasicBlock *B, IRFunction *Dest) {
 
 void IRFunction::cleanVars() {
   std::set<IRVarRef> accessed;
+  std::set<std::string> opaqueNames;
 
   for (auto &B : *this) {
     auto VisitF = [&](auto &VR, bool lhs) { accessed.insert(VR); };
     for (auto &S : *B) {
       ExprIdentifierVisitor _(S.get(), VisitF);
+      if (auto *ASW = dyn_cast<ASTStmtWrapIRStmt>(S.get())) {
+        for (auto &[ND, Name] : ASW->VarRenames)
+          opaqueNames.insert(Name);
+      }
     }
     if (B->Term) {
       ExprIdentifierVisitor _(B->Term, VisitF);
@@ -783,8 +789,9 @@ void IRFunction::cleanVars() {
   auto it = Vars.begin();
   while (it != Vars.end()) {
     auto *VR = &(*it);
-    if (accessed.find(VR) == accessed.end() && VR->DeclLoc != IRVarDecl::ARG) {
-      // Remove variable declaration
+    bool usedInOpaque = opaqueNames.count(GetSym(VR->Name));
+    if (accessed.find(VR) == accessed.end() && !usedInOpaque &&
+        VR->DeclLoc != IRVarDecl::ARG) {
       auto itc = it;
       it++;
       Vars.erase(itc);
