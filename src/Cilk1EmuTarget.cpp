@@ -323,6 +323,30 @@ private:
     Indent() << "// Original sync was here\n";
   }
 
+  void emitSpawnArgList(ESpawnIRStmt *ES, const std::string &accessor) {
+    auto DstArgIt = ES->Fn->Vars.begin();
+    for (auto &Arg : ES->Args) {
+      while (DstArgIt != ES->Fn->Vars.end() &&
+             DstArgIt->DeclLoc != IRVarDecl::ARG)
+        DstArgIt++;
+      assert(DstArgIt != ES->Fn->Vars.end());
+      auto &DstArg = *DstArgIt;
+      if (DstArg.Type->isArrayType()) {
+        Indent() << "std::memcpy(sp" << SpawnCtr << "c" << accessor
+                 << GetSym(DstArg.Name) << ", ";
+        Arg->print(Out, C);
+        Out << ", sizeof(sp" << SpawnCtr << "c" << accessor
+            << GetSym(DstArg.Name) << "));\n";
+      } else {
+        Indent() << "sp" << SpawnCtr << "c" << accessor << GetSym(DstArg.Name)
+                 << " = ";
+        Arg->print(Out, C);
+        Out << ";\n";
+      }
+      DstArgIt++;
+    }
+  }
+
   void handleSpawn(ESpawnIRStmt *ES, IRFunction *F) {
     const std::string &SpawnFnName = ES->Fn->getName();
     if (ES->SN) {
@@ -364,27 +388,7 @@ private:
     if (ES->SN) {
       Indent() << SpawnFnName << "_closure sp" << SpawnCtr << "c(sp" << SpawnCtr
                << "k);\n";
-      auto DstArgIt = ES->Fn->Vars.begin();
-      for (auto &Arg : ES->Args) {
-        while (DstArgIt != ES->Fn->Vars.end() &&
-               DstArgIt->DeclLoc != IRVarDecl::ARG)
-          DstArgIt++;
-        assert(DstArgIt != ES->Fn->Vars.end());
-        auto &DstArg = *DstArgIt;
-        if (DstArg.Type->isArrayType()) {
-          Indent() << "std::memcpy(sp" << SpawnCtr << "c."
-                   << GetSym(DstArg.Name) << ", ";
-          Arg->print(Out, C);
-          Out << ", sizeof(sp" << SpawnCtr << "c." << GetSym(DstArg.Name)
-              << "));\n";
-        } else {
-          Indent() << "sp" << SpawnCtr << "c." << GetSym(DstArg.Name);
-          Out << " = ";
-          Arg->print(Out, C);
-          Out << ";\n";
-        }
-        DstArgIt++;
-      }
+      emitSpawnArgList(ES, ".");
     } else {
       // Fire-and-forget spawn (no spawn_next). Pass the parent's k
       // continuation so the spawned task can eventually SEND_ARGUMENT
@@ -397,27 +401,7 @@ private:
         Out << "CONT_DUMMY";
       }
       Out << ");\n";
-      auto DstArgIt = ES->Fn->Vars.begin();
-      for (auto &Arg : ES->Args) {
-        while (DstArgIt != ES->Fn->Vars.end() &&
-               DstArgIt->DeclLoc != IRVarDecl::ARG)
-          DstArgIt++;
-        assert(DstArgIt != ES->Fn->Vars.end());
-        auto &DstArg = *DstArgIt;
-        if (DstArg.Type->isArrayType()) {
-          Indent() << "std::memcpy(sp" << SpawnCtr << "c->"
-                   << GetSym(DstArg.Name) << ", ";
-          Arg->print(Out, C);
-          Out << ", sizeof(sp" << SpawnCtr << "c->" << GetSym(DstArg.Name)
-              << "));\n";
-        } else {
-          Indent() << "sp" << SpawnCtr << "c->" << GetSym(DstArg.Name);
-          Out << " = ";
-          Arg->print(Out, C);
-          Out << ";\n";
-        }
-        DstArgIt++;
-      }
+      emitSpawnArgList(ES, "->");
     }
 
     // we do not create spawn destination functions.

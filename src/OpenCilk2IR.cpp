@@ -1166,6 +1166,7 @@ public:
     }
     // Only process the actual definition, not a forward declaration.
     if (Decl->doesThisDeclarationHaveABody()) {
+      GSymTable.DupCnt.clear();
       IRFunction *F =
           P.createFunc(Decl->getName().str(), Decl->getDeclaredReturnType());
       F->Info.RootFun = Decl;
