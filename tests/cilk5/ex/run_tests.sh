@@ -2,7 +2,7 @@
 
 set -e
 
-CLANGXX="xcrun /opt/opencilk/bin/clang++"
+CLANGXX="/opt/opencilk/bin/clang++"
 
 COMMON_FLAGS="-fopencilk -Wno-backend-plugin"
 CXX_FLAGS="$COMMON_FLAGS -Wno-parentheses-equality"
@@ -62,5 +62,5 @@ compile_with_getoptions fft.cpp fft ""
 ./fft -c
 
 printf "\n >> cholesky \n"
-compile_with_getoptions cholesky.cpp fft ""
+compile_with_getoptions cholesky.cpp cholesky ""
 ./cholesky -c

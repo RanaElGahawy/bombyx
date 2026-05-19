@@ -2,8 +2,8 @@
 
 set -e  # stop on first error (you can remove if you want all to run)
 
-CLANG="xcrun /opt/opencilk/bin/clang"
-CLANGCPP="xcrun /opt/opencilk/bin/clang++"
+CLANG="/opt/opencilk/bin/clang"
+CLANGCPP="/opt/opencilk/bin/clang++"
 FLAGS="-fopencilk"
 
 echo "=== Running OpenCilk tests ==="

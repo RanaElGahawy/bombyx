@@ -502,14 +502,14 @@ THREAD(cilksort) {
         sp3c.size = (largs->size - (3 * quarter));
         spawn<cilksort_closure> sp3(sp3c);
 
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpA = tmpA;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->D = D;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpC = tmpC;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->A = A;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->C = C;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->quarter = quarter;
-        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->size = largs->size;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->B = B;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->A = A;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->quarter = quarter;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpC = tmpC;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->size = largs->size;
+        ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->tmpA = tmpA;
         ((cilksort_cont0_closure*)SN_cilksort_cont0.cls.get())->low = largs->low;
         // Original sync was here
     }
@@ -535,12 +535,12 @@ void fill_array(ELM *arr, unsigned long size) {
     scramble_array(arr,size);
 }
 int usage() {
-    fprintf(__stderrp,"\nUsage: cilksort [<cilk-options>] [-n size] [-c] [-benchmark] [-h]\n\n");
-    fprintf(__stderrp,"Cilksort is a parallel sorting algorithm, donned \"Multisort\", which\n");
-    fprintf(__stderrp,"is a variant of ordinary mergesort.  Multisort begins by dividing an\n");
-    fprintf(__stderrp,"array of elements in half and sorting each half.  It then merges the\n");
-    fprintf(__stderrp,"two sorted halves back together, but in a divide-and-conquer approach\n");
-    fprintf(__stderrp,"rather than the usual serial merge.\n\n");
+    fprintf(stderr,"\nUsage: cilksort [<cilk-options>] [-n size] [-c] [-benchmark] [-h]\n\n");
+    fprintf(stderr,"Cilksort is a parallel sorting algorithm, donned \"Multisort\", which\n");
+    fprintf(stderr,"is a variant of ordinary mergesort.  Multisort begins by dividing an\n");
+    fprintf(stderr,"array of elements in half and sorting each half.  It then merges the\n");
+    fprintf(stderr,"two sorted halves back together, but in a divide-and-conquer approach\n");
+    fprintf(stderr,"rather than the usual serial merge.\n\n");
     return (-1);
 }
 int main(int argc, char **argv) {
@@ -585,9 +585,9 @@ int main(int argc, char **argv) {
         sp0c.size = size;
         spawn<cilksort_closure> sp0(sp0c);
 
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->check = check;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->tmp = tmp;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->array = array;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->size = size;
         // Original sync was here
@@ -608,14 +608,14 @@ THREAD(cilksort_cont0) {
     cilksort_cont0_closure *largs = (cilksort_cont0_closure*)(args.get());
     cilksort_cont1_closure SN_cilksort_cont1c(largs->k);
     spawn_next<cilksort_cont1_closure> SN_cilksort_cont1(SN_cilksort_cont1c);
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpC = largs->tmpC;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpA = largs->tmpA;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->D = largs->D;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->C = largs->C;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->A = largs->A;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->B = largs->B;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->A = largs->A;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->quarter = largs->quarter;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->size = largs->size;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpC = largs->tmpC;
-    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->D = largs->D;
     ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->low = largs->low;
     // Original sync was here
     return;
@@ -644,9 +644,9 @@ THREAD(cilksort_cont1) {
     sp1c.lowdest = largs->tmpC;
     spawn<cilkmerge_closure> sp1(sp1c);
 
+    ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->tmpC = largs->tmpC;
     ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->tmpA = largs->tmpA;
     ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->A = largs->A;
-    ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->tmpC = largs->tmpC;
     ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->size = largs->size;
     // Original sync was here
     return;
@@ -700,13 +700,13 @@ THREAD(main_cont0) {
             }
         }
         if ((!success)) {
-            fprintf(__stderrp,"SORTING FAILURE!");
+            fprintf(stderr,"SORTING FAILURE!");
         } else {
-            fprintf(__stderrp,"Sorting successful.");
+            fprintf(stderr,"Sorting successful.");
         }
     }
-    fprintf(__stderrp,"\nCilk Example: cilksort\n");
-    fprintf(__stderrp,"options: number of elements = %ld\n\n",largs->size);
+    fprintf(stderr,"\nCilk Example: cilksort\n");
+    fprintf(stderr,"options: number of elements = %ld\n\n",largs->size);
     free(largs->array);
     free(largs->tmp);
     SEND_ARGUMENT(largs->k, 0);

@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.15)
 project(bombyx-cc)
 
 # Platform-specific default install path
-set(DEFAULT_OPENCILK_HOME "/opt/OpenCilk") # Linux/macOS default
+set(DEFAULT_OPENCILK_HOME "/opt/opencilk") # Linux/macOS default
 
 set(OPENCILK_HOME "${DEFAULT_OPENCILK_HOME}" CACHE PATH "OpenCilk installation root directory")
 

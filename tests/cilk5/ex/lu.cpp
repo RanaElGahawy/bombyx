@@ -574,11 +574,11 @@ THREAD(schur) {
 
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->hnb = hnb;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->W11 = W11;
-        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M11 = M11;
-        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M10 = M10;
+        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->W10 = W10;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->V11 = V11;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->V01 = V01;
-        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->W10 = W10;
+        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M11 = M11;
+        ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M10 = M10;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M01 = M01;
         ((schur_cont0_closure*)SN_schur_cont0.cls.get())->M00 = M00;
         // Original sync was here
@@ -605,8 +605,8 @@ THREAD(aux_lower_solve) {
     spawn<lower_solve_closure> sp0(sp0c);
 
     ((aux_lower_solve_cont0_closure*)SN_aux_lower_solve_cont0.cls.get())->L11 = L11;
-    ((aux_lower_solve_cont0_closure*)SN_aux_lower_solve_cont0.cls.get())->L10 = L10;
     ((aux_lower_solve_cont0_closure*)SN_aux_lower_solve_cont0.cls.get())->nb = largs->nb;
+    ((aux_lower_solve_cont0_closure*)SN_aux_lower_solve_cont0.cls.get())->L10 = L10;
     ((aux_lower_solve_cont0_closure*)SN_aux_lower_solve_cont0.cls.get())->Mb = largs->Mb;
     ((aux_lower_solve_cont0_closure*)SN_aux_lower_solve_cont0.cls.get())->Ma = largs->Ma;
     // Original sync was here
@@ -744,9 +744,9 @@ void lu(Matrix M, int nb) {
         spawn<lower_solve_closure> sp0(sp0c);
 
         upper_solve(M10,M00,hnb);
+        ((lu_cont0_closure*)SN_lu_cont0.cls.get())->hnb = hnb;
         ((lu_cont0_closure*)SN_lu_cont0.cls.get())->M11 = M11;
         ((lu_cont0_closure*)SN_lu_cont0.cls.get())->M10 = M10;
-        ((lu_cont0_closure*)SN_lu_cont0.cls.get())->hnb = hnb;
         ((lu_cont0_closure*)SN_lu_cont0.cls.get())->M01 = M01;
         // Original sync was here
     }
@@ -755,15 +755,15 @@ THREAD(schur_cont0) {
     schur_cont0_closure *largs = (schur_cont0_closure*)(args.get());
     schur_cont1_closure SN_schur_cont1c(largs->k);
     spawn_next<schur_cont1_closure> SN_schur_cont1(SN_schur_cont1c);
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W10 = largs->W10;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->V11 = largs->V11;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M00 = largs->M00;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->V01 = largs->V01;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M10 = largs->M10;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M01 = largs->M01;
     ((schur_cont1_closure*)SN_schur_cont1.cls.get())->hnb = largs->hnb;
     ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W11 = largs->W11;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W10 = largs->W10;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->V11 = largs->V11;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->V01 = largs->V01;
     ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M11 = largs->M11;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M10 = largs->M10;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M01 = largs->M01;
+    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M00 = largs->M00;
     // Original sync was here
     return;
 }

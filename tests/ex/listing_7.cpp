@@ -113,8 +113,8 @@ THREAD(fun_cont0) {
     sp1c.n = (largs->n - 2);
     spawn<fun_closure> sp1(sp1c);
 
-    ((fun_cont1_closure*)SN_fun_cont1.cls.get())->x = largs->x;
     ((fun_cont1_closure*)SN_fun_cont1.cls.get())->y = largs->y;
+    ((fun_cont1_closure*)SN_fun_cont1.cls.get())->x = largs->x;
     ((fun_cont1_closure*)SN_fun_cont1.cls.get())->n = largs->n;
     // Original sync was here
     return;

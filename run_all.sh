@@ -9,75 +9,99 @@ BOMBYX="$BASE/build/bin/bombyx-cc"
 
 echo "Running all Bombyx tests..."
 
-echo ">> nqueens"
-$BOMBYX "$BASE/tests/im/nqueens.c" "$BASE/tests/ex/nqueens.cpp"
-echo ">> fib"
-$BOMBYX "$BASE/tests/im/fib.c" "$BASE/tests/ex/fib.cpp"
-echo ">> listing_7"
-$BOMBYX "$BASE/tests/im/listing_7.cpp" "$BASE/tests/ex/listing_7.cpp"
-echo ">> listing_8"
-$BOMBYX "$BASE/tests/im/listing_8.cpp" "$BASE/tests/ex/listing_8.cpp"
-echo ">> listing_9"
-$BOMBYX "$BASE/tests/im/listing_9.cpp" "$BASE/tests/ex/listing_9.cpp"
-echo ">> listing_10"
-$BOMBYX "$BASE/tests/im/listing_10.cpp" "$BASE/tests/ex/listing_10.cpp"
-echo ">> listing_11"
-$BOMBYX "$BASE/tests/im/listing_11.cpp" "$BASE/tests/ex/listing_11.cpp"
-echo ">> listing_13"
-$BOMBYX "$BASE/tests/im/listing_13.cpp" "$BASE/tests/ex/listing_13.cpp"
-echo ">> test0"
-$BOMBYX "$BASE/tests/im/test_0.cpp" "$BASE/tests/ex/test_0.cpp"
-echo ">> test1"
-$BOMBYX "$BASE/tests/im/test_1.cpp" "$BASE/tests/ex/test_1.cpp"
-echo ">> test2"
-$BOMBYX "$BASE/tests/im/test_2.cpp" "$BASE/tests/ex/test_2.cpp"
-echo ">> test3"
-$BOMBYX "$BASE/tests/im/test_3.cpp" "$BASE/tests/ex/test_3.cpp"
-echo ">> test4"
-$BOMBYX "$BASE/tests/im/test_4.cpp" "$BASE/tests/ex/test_4.cpp"
-echo ">> test5"
-$BOMBYX "$BASE/tests/im/test_5.cpp" "$BASE/tests/ex/test_5.cpp"
-echo ">> test6"
-$BOMBYX "$BASE/tests/im/test_6.cpp" "$BASE/tests/ex/test_6.cpp"
-echo ">> test7"
-$BOMBYX "$BASE/tests/im/test_7.cpp" "$BASE/tests/ex/test_7.cpp"
-echo ">> test8"
-$BOMBYX "$BASE/tests/im/test_8.cpp" "$BASE/tests/ex/test_8.cpp"
-echo ">> Pagerank"
-$BOMBYX "$BASE/Bombyx_OpenCilk_Examples/pageRank/main.cpp" \
-        "$BASE/Bombyx_OpenCilk_Examples/pageRank/output/main.cpp"
-echo ">> Randomwalk"
-$BOMBYX "$BASE/Bombyx_OpenCilk_Examples/randomWalk/main.cpp" \
-        "$BASE/Bombyx_OpenCilk_Examples/randomWalk/output/main.cpp"
-echo ">> TriangleCount"
-$BOMBYX "$BASE/Bombyx_OpenCilk_Examples/triangleCount/main.cpp" \
-        "$BASE/Bombyx_OpenCilk_Examples/triangleCount/output/main.cpp"
-echo ">> BarnesHut"
-$BOMBYX "$BASE/Bombyx_OpenCilk_Examples/barnes-hut/main.cpp" \
-        "$BASE/Bombyx_OpenCilk_Examples/barnes-hut//output/main.cpp"
+run_test() {
+  NAME="$1"
+  IN="$2"
+  OUT="$3"
 
-echo ">> nqueens"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/nqueens.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/nqueens.cpp"
-echo ">> fib"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/fib.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/fib.cpp" 
-echo ">> cilksort"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/cilksort.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/cilksort.cpp"
-echo ">> qsort"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/qsort.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/qsort.cpp"
-echo ">> matmul"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/matmul.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/matmul.cpp" 
-echo ">> rectmul"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/rectmul.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/rectmul.cpp"
-echo ">> rectmulred"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/rectmulred.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/rectmulred.cpp"
-echo ">> lu"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/lu.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/lu.cpp" 
-echo ">> heat"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/heat.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/heat.cpp" 
-echo ">> strassen"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/strassen.c" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/strassen.cpp" 
-echo ">> fft"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/fft.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/fft.cpp"
-echo ">> cholesky"
-./build/bin/bombyx-cc "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/im/cholesky.cpp" "/Users/ranaelgahawy/Desktop/ResearchScholar/bombyx/tests/cilk5/ex/cholesky.cpp"
+  echo ">> $NAME"
+  "$BOMBYX" "$BASE/$IN" "$BASE/$OUT"
+}
+
+# Main tests
+run_test "nqueens"   "tests/im/nqueens.c"      "tests/ex/nqueens.cpp"
+run_test "fib"       "tests/im/fib.c"          "tests/ex/fib.cpp"
+run_test "listing_7" "tests/im/listing_7.cpp"  "tests/ex/listing_7.cpp"
+run_test "listing_8" "tests/im/listing_8.cpp"  "tests/ex/listing_8.cpp"
+run_test "listing_9" "tests/im/listing_9.cpp"  "tests/ex/listing_9.cpp"
+run_test "listing_10" "tests/im/listing_10.cpp" "tests/ex/listing_10.cpp"
+run_test "listing_11" "tests/im/listing_11.cpp" "tests/ex/listing_11.cpp"
+run_test "listing_13" "tests/im/listing_13.cpp" "tests/ex/listing_13.cpp"
+
+run_test "test0" "tests/im/test_0.cpp" "tests/ex/test_0.cpp"
+run_test "test1" "tests/im/test_1.cpp" "tests/ex/test_1.cpp"
+run_test "test2" "tests/im/test_2.cpp" "tests/ex/test_2.cpp"
+run_test "test3" "tests/im/test_3.cpp" "tests/ex/test_3.cpp"
+run_test "test4" "tests/im/test_4.cpp" "tests/ex/test_4.cpp"
+run_test "test5" "tests/im/test_5.cpp" "tests/ex/test_5.cpp"
+run_test "test6" "tests/im/test_6.cpp" "tests/ex/test_6.cpp"
+run_test "test7" "tests/im/test_7.cpp" "tests/ex/test_7.cpp"
+run_test "test8" "tests/im/test_8.cpp" "tests/ex/test_8.cpp"
+
+# Bombyx OpenCilk examples
+run_test "Pagerank" \
+  "Bombyx_OpenCilk_Examples/pageRank/main.cpp" \
+  "Bombyx_OpenCilk_Examples/pageRank/output/main.cpp"
+
+run_test "Randomwalk" \
+  "Bombyx_OpenCilk_Examples/randomWalk/main.cpp" \
+  "Bombyx_OpenCilk_Examples/randomWalk/output/main.cpp"
+
+run_test "TriangleCount" \
+  "Bombyx_OpenCilk_Examples/triangleCount/main.cpp" \
+  "Bombyx_OpenCilk_Examples/triangleCount/output/main.cpp"
+
+run_test "BarnesHut" \
+  "Bombyx_OpenCilk_Examples/barnes-hut/main.cpp" \
+  "Bombyx_OpenCilk_Examples/barnes-hut/output/main.cpp"
+
+# Cilk5 tests
+run_test "cilk5/nqueens" \
+  "tests/cilk5/im/nqueens.c" \
+  "tests/cilk5/ex/nqueens.cpp"
+
+run_test "cilk5/fib" \
+  "tests/cilk5/im/fib.cpp" \
+  "tests/cilk5/ex/fib.cpp"
+
+run_test "cilk5/cilksort" \
+  "tests/cilk5/im/cilksort.cpp" \
+  "tests/cilk5/ex/cilksort.cpp"
+
+run_test "cilk5/qsort" \
+  "tests/cilk5/im/qsort.cpp" \
+  "tests/cilk5/ex/qsort.cpp"
+
+run_test "cilk5/matmul" \
+  "tests/cilk5/im/matmul.c" \
+  "tests/cilk5/ex/matmul.cpp"
+
+run_test "cilk5/rectmul" \
+  "tests/cilk5/im/rectmul.c" \
+  "tests/cilk5/ex/rectmul.cpp"
+
+run_test "cilk5/rectmulred" \
+  "tests/cilk5/im/rectmulred.c" \
+  "tests/cilk5/ex/rectmulred.cpp"
+
+run_test "cilk5/lu" \
+  "tests/cilk5/im/lu.c" \
+  "tests/cilk5/ex/lu.cpp"
+
+run_test "cilk5/heat" \
+  "tests/cilk5/im/heat.c" \
+  "tests/cilk5/ex/heat.cpp"
+
+run_test "cilk5/strassen" \
+  "tests/cilk5/im/strassen.c" \
+  "tests/cilk5/ex/strassen.cpp"
+
+run_test "cilk5/fft" \
+  "tests/cilk5/im/fft.cpp" \
+  "tests/cilk5/ex/fft.cpp"
+
+run_test "cilk5/cholesky" \
+  "tests/cilk5/im/cholesky.cpp" \
+  "tests/cilk5/ex/cholesky.cpp"
+
 echo "✅ Done!"

@@ -1,4 +1,5 @@
 #include "cilk_explicit.hh"
+#include <cstring>
 /*
  * Sparse Cholesky code with little blocks at the leaves of the Quad tree
  * Keith Randall -- Aske Plaat
@@ -760,9 +761,9 @@ void free_matrix(int depth, Matrix a) {
 Real get_matrix(int depth, Matrix a, int r, int c) {
     LeafNode *A;
     int mid;
-    __builtin_expect(!(depth >= 2), 0) ? __assert_rtn(__func__, "cholesky.cpp", 342, "depth >= BLOCK_DEPTH") : (void)0;
-    __builtin_expect(!(r < (1 << depth)), 0) ? __assert_rtn(__func__, "cholesky.cpp", 343, "r < (1 << depth)") : (void)0;
-    __builtin_expect(!(c < (1 << depth)), 0) ? __assert_rtn(__func__, "cholesky.cpp", 344, "c < (1 << depth)") : (void)0;
+    static_cast<bool>(depth >= 2) ? void(0) : __assert_fail("depth >= BLOCK_DEPTH", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+    static_cast<bool>(r < (1 << depth)) ? void(0) : __assert_fail("r < (1 << depth)", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+    static_cast<bool>(c < (1 << depth)) ? void(0) : __assert_fail("c < (1 << depth)", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     if ((a == __null)) {
         return 0.;
     } else {
@@ -791,9 +792,9 @@ Real get_matrix(int depth, Matrix a, int r, int c) {
 Matrix set_matrix(int depth, Matrix a, int r, int c, Real value) {
     LeafNode *A;
     int mid;
-    __builtin_expect(!(depth >= 2), 0) ? __assert_rtn(__func__, "cholesky.cpp", 378, "depth >= BLOCK_DEPTH") : (void)0;
-    __builtin_expect(!(r < (1 << depth)), 0) ? __assert_rtn(__func__, "cholesky.cpp", 379, "r < (1 << depth)") : (void)0;
-    __builtin_expect(!(c < (1 << depth)), 0) ? __assert_rtn(__func__, "cholesky.cpp", 380, "c < (1 << depth)") : (void)0;
+    static_cast<bool>(depth >= 2) ? void(0) : __assert_fail("depth >= BLOCK_DEPTH", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+    static_cast<bool>(r < (1 << depth)) ? void(0) : __assert_fail("r < (1 << depth)", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+    static_cast<bool>(c < (1 << depth)) ? void(0) : __assert_fail("c < (1 << depth)", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     if ((depth == 2)) {
         if ((a == __null)) {
             a = new_block_leaf();
@@ -908,7 +909,7 @@ THREAD(mul_and_subT) {
     Matrix r10;
     Matrix r11;
     mul_and_subT_closure *largs = (mul_and_subT_closure*)(args.get());
-    __builtin_expect(!(largs->a != __null && largs->b != __null), 0) ? __assert_rtn(__func__, "cholesky.cpp", 535, "a != NULL && b != NULL") : (void)0;
+    static_cast<bool>(largs->a != __null && largs->b != __null) ? void(0) : __assert_fail("a != NULL && b != NULL", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     if ((largs->depth == 2)) {
         A = ((LeafNode *) largs->a);
         B = ((LeafNode *) largs->b);
@@ -988,13 +989,13 @@ THREAD(mul_and_subT) {
             spawn<mul_and_subT_closure> sp3(sp3c);
 
         }
+        ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->r11 = r11;
         ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->r10 = r10;
         ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->r01 = r01;
         ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->r00 = r00;
-        ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->r11 = r11;
-        ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->a = largs->a;
         ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->r = largs->r;
         ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->b = largs->b;
+        ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->a = largs->a;
         ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->lower = largs->lower;
         ((mul_and_subT_cont0_closure*)SN_mul_and_subT_cont0.cls.get())->depth = largs->depth;
         // Original sync was here
@@ -1011,8 +1012,8 @@ THREAD(backsub) {
     Matrix l10;
     Matrix l11;
     backsub_closure *largs = (backsub_closure*)(args.get());
-    __builtin_expect(!(largs->a != __null), 0) ? __assert_rtn(__func__, "cholesky.cpp", 641, "a != NULL") : (void)0;
-    __builtin_expect(!(largs->l != __null), 0) ? __assert_rtn(__func__, "cholesky.cpp", 642, "l != NULL") : (void)0;
+    static_cast<bool>(largs->a != __null) ? void(0) : __assert_fail("a != NULL", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+    static_cast<bool>(largs->l != __null) ? void(0) : __assert_fail("l != NULL", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     if ((largs->depth == 2)) {
         A = ((LeafNode *) largs->a);
         L = ((LeafNode *) largs->l);
@@ -1027,7 +1028,7 @@ THREAD(backsub) {
         l00 = largs->l->child[0];
         l10 = largs->l->child[2];
         l11 = largs->l->child[3];
-        __builtin_expect(!(l00 && l11), 0) ? __assert_rtn(__func__, "cholesky.cpp", 666, "l00 && l11") : (void)0;
+        static_cast<bool>(l00 && l11) ? void(0) : __assert_fail("l00 && l11", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
         backsub_cont0_closure SN_backsub_cont0c(largs->k);
         spawn_next<backsub_cont0_closure> SN_backsub_cont0(SN_backsub_cont0c);
         if (a00) {
@@ -1050,13 +1051,13 @@ THREAD(backsub) {
             spawn<backsub_closure> sp1(sp1c);
 
         }
-        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a11 = a11;
-        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a = largs->a;
-        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a01 = a01;
-        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a10 = a10;
         ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->l11 = l11;
-        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a00 = a00;
         ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->l10 = l10;
+        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a11 = a11;
+        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a10 = a10;
+        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a01 = a01;
+        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a00 = a00;
+        ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->a = largs->a;
         ((backsub_cont0_closure*)SN_backsub_cont0.cls.get())->depth = largs->depth;
         // Original sync was here
     }
@@ -1067,7 +1068,7 @@ THREAD(cholesky) {
     Matrix a10;
     Matrix a11;
     cholesky_closure *largs = (cholesky_closure*)(args.get());
-    __builtin_expect(!(largs->a != __null), 0) ? __assert_rtn(__func__, "cholesky.cpp", 705, "a != NULL") : (void)0;
+    static_cast<bool>(largs->a != __null) ? void(0) : __assert_fail("a != NULL", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     if ((largs->depth == 2)) {
         A = ((LeafNode *) largs->a);
         block_cholesky(A->block);
@@ -1077,7 +1078,7 @@ THREAD(cholesky) {
         a00 = largs->a->child[0];
         a10 = largs->a->child[2];
         a11 = largs->a->child[3];
-        __builtin_expect(!(a00), 0) ? __assert_rtn(__func__, "cholesky.cpp", 722, "a00") : (void)0;
+        static_cast<bool>(a00) ? void(0) : __assert_fail("a00", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
         if ((!a10)) {
             cholesky_cont4_closure SN_cholesky_cont4c(largs->k);
             spawn_next<cholesky_cont4_closure> SN_cholesky_cont4(SN_cholesky_cont4c);
@@ -1096,8 +1097,8 @@ THREAD(cholesky) {
             spawn<cholesky_closure> sp1(sp1c);
 
             ((cholesky_cont4_closure*)SN_cholesky_cont4.cls.get())->A = A;
-            ((cholesky_cont4_closure*)SN_cholesky_cont4.cls.get())->a10 = a10;
             ((cholesky_cont4_closure*)SN_cholesky_cont4.cls.get())->a = largs->a;
+            ((cholesky_cont4_closure*)SN_cholesky_cont4.cls.get())->a10 = a10;
             ((cholesky_cont4_closure*)SN_cholesky_cont4.cls.get())->depth = largs->depth;
             // Original sync was here
         } else {
@@ -1110,10 +1111,10 @@ THREAD(cholesky) {
             sp2c.a = a00;
             spawn<cholesky_closure> sp2(sp2c);
 
-            ((cholesky_cont0_closure*)SN_cholesky_cont0.cls.get())->a11 = a11;
             ((cholesky_cont0_closure*)SN_cholesky_cont0.cls.get())->A = A;
-            ((cholesky_cont0_closure*)SN_cholesky_cont0.cls.get())->a10 = a10;
+            ((cholesky_cont0_closure*)SN_cholesky_cont0.cls.get())->a11 = a11;
             ((cholesky_cont0_closure*)SN_cholesky_cont0.cls.get())->a = largs->a;
+            ((cholesky_cont0_closure*)SN_cholesky_cont0.cls.get())->a10 = a10;
             ((cholesky_cont0_closure*)SN_cholesky_cont0.cls.get())->depth = largs->depth;
             // Original sync was here
         }
@@ -1128,8 +1129,8 @@ int logarithm(int size) {
     return k0;
 }
 int usage() {
-    fprintf(__stderrp,"\nUsage: cholesky [<cilk-options>] [-n size] [-z nonzeros]\n                [-f filename] [-benchmark] [-h]\n\nDefault: cholesky -n 500 -z 1000\n\nThis program performs a divide and conquer Cholesky factorization of a\nsparse symmetric positive definite matrix (A=LL^T).  Using the fact\nthat the matrix is symmetric, Cholesky does half the number of\noperations of LU.  The method used is the same as with LU, with work\nTheta(n^3) and critical path Theta(n lg(n)) for the dense case.  A\n");
-    fprintf(__stderrp,"quad-tree is used to store the nonzero entries of the sparse\nmatrix. Actual work and critical path are influenced by the sparsity\n pattern of the matrix.\n\nThe input matrix is either read from the provided file or generated\nrandomly with size and nonzero-elements as specified.\n\n");
+    fprintf(stderr,"\nUsage: cholesky [<cilk-options>] [-n size] [-z nonzeros]\n                [-f filename] [-benchmark] [-h]\n\nDefault: cholesky -n 500 -z 1000\n\nThis program performs a divide and conquer Cholesky factorization of a\nsparse symmetric positive definite matrix (A=LL^T).  Using the fact\nthat the matrix is symmetric, Cholesky does half the number of\noperations of LU.  The method used is the same as with LU, with work\nTheta(n^3) and critical path Theta(n lg(n)) for the dense case.  A\n");
+    fprintf(stderr,"quad-tree is used to store the nonzero entries of the sparse\nmatrix. Actual work and critical path are influenced by the sparsity\n pattern of the matrix.\n\nThe input matrix is either read from the provided file or generated\nrandomly with size and nonzero-elements as specified.\n\n");
     return 1;
 }
 int main(int argc, char **argv) {
@@ -1201,7 +1202,7 @@ int main(int argc, char **argv) {
 while (buf[0] == '%');
 ;
                 sscanf(buf,"%d %d",&(sizex),&(sizey));
-                __builtin_expect(!(sizex == sizey), 0) ? __assert_rtn(__func__, "cholesky.cpp", 843, "sizex == sizey") : (void)0;
+                static_cast<bool>(sizex == sizey) ? void(0) : __assert_fail("sizex == sizey", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
                 size = sizex;
                 depth = logarithm(size);
                 srand(61066);
@@ -1226,9 +1227,9 @@ while (buf[0] == '%');
                         r = c;
                         c = t;
                     }
-                    __builtin_expect(!(r >= c), 0) ? __assert_rtn(__func__, "cholesky.cpp", 884, "r >= c") : (void)0;
-                    __builtin_expect(!(r < size), 0) ? __assert_rtn(__func__, "cholesky.cpp", 885, "r < size") : (void)0;
-                    __builtin_expect(!(c < size), 0) ? __assert_rtn(__func__, "cholesky.cpp", 886, "c < size") : (void)0;
+                    static_cast<bool>(r >= c) ? void(0) : __assert_fail("r >= c", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+                    static_cast<bool>(r < size) ? void(0) : __assert_fail("r < size", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+                    static_cast<bool>(c < size) ? void(0) : __assert_fail("c < size", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
                     A = set_matrix(depth,A,r,c,val);
                     (nonzeros++);
                 }
@@ -1266,45 +1267,45 @@ r0 = cilk_rand() % size;
 
         ((main_cont0_closure*)SN_main_cont0.cls.get())->c0 = c0;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->r0 = r0;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->t = t;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->rnd = rnd;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->val = val;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->sizey = sizey;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->res = res;
-        std::memcpy(((main_cont0_closure*)SN_main_cont0.cls.get())->filename, filename, sizeof(filename));
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->f = f;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->fc = fc;
-        std::memcpy(((main_cont0_closure*)SN_main_cont0.cls.get())->buf, buf, sizeof(buf));
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->fr = fr;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->sizex = sizex;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->benchmark = benchmark;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->size = size;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->val = val;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->c = c;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->r = r;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->help = help;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->i = i;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->check = check;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->nonzeros = nonzeros;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->f = f;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->sizey = sizey;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->rnd = rnd;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->sizex = sizex;
+        std::memcpy(((main_cont0_closure*)SN_main_cont0.cls.get())->filename, filename, sizeof(filename));
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->t = t;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->argc = argc;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->depth = depth;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->argv = argv;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->nonzeros = nonzeros;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->A = A;
         ((main_cont0_closure*)SN_main_cont0.cls.get())->error = error;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->c = c;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->argv = argv;
-        ((main_cont0_closure*)SN_main_cont0.cls.get())->argc = argc;
+        std::memcpy(((main_cont0_closure*)SN_main_cont0.cls.get())->buf, buf, sizeof(buf));
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->size = size;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->i = i;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->benchmark = benchmark;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->fr = fr;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->help = help;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->fc = fc;
+        ((main_cont0_closure*)SN_main_cont0.cls.get())->check = check;
         // Original sync was here
     }
 }
 THREAD(main_afterif0) {
     main_afterif0_closure *largs = (main_afterif0_closure*)(args.get());
-    fprintf(__stderrp,"\nCilk Example: cholesky\n");
+    fprintf(stderr,"\nCilk Example: cholesky\n");
     if (largs->check) {
         printf("Error: %f\n\n",largs->error);
     }
-    fprintf(__stderrp,"Options: original size     = %d\n",largs->size);
-    fprintf(__stderrp,"         original nonzeros = %d\n",largs->nonzeros);
-    fprintf(__stderrp,"         input nonzeros    = %d\n",largs->input_nonzeros);
-    fprintf(__stderrp,"         input blocks      = %d\n",largs->input_blocks);
-    fprintf(__stderrp,"         output nonzeros   = %d\n",largs->output_nonzeros);
-    fprintf(__stderrp,"         output blocks     = %d\n\n",largs->output_blocks);
+    fprintf(stderr,"Options: original size     = %d\n",largs->size);
+    fprintf(stderr,"         original nonzeros = %d\n",largs->nonzeros);
+    fprintf(stderr,"         input nonzeros    = %d\n",largs->input_nonzeros);
+    fprintf(stderr,"         input blocks      = %d\n",largs->input_blocks);
+    fprintf(stderr,"         output nonzeros   = %d\n",largs->output_nonzeros);
+    fprintf(stderr,"         output blocks     = %d\n\n",largs->output_blocks);
     free_matrix(largs->depth,largs->A);
     free_matrix(largs->depth,largs->R);
     SEND_ARGUMENT(largs->k, 0);
@@ -1386,9 +1387,9 @@ THREAD(mul_and_subT_cont0) {
 
     }
     ((mul_and_subT_cont1_closure*)SN_mul_and_subT_cont1.cls.get())->r11 = largs->r11;
+    ((mul_and_subT_cont1_closure*)SN_mul_and_subT_cont1.cls.get())->r10 = largs->r10;
     ((mul_and_subT_cont1_closure*)SN_mul_and_subT_cont1.cls.get())->r01 = largs->r01;
     ((mul_and_subT_cont1_closure*)SN_mul_and_subT_cont1.cls.get())->r00 = largs->r00;
-    ((mul_and_subT_cont1_closure*)SN_mul_and_subT_cont1.cls.get())->r10 = largs->r10;
     ((mul_and_subT_cont1_closure*)SN_mul_and_subT_cont1.cls.get())->r = largs->r;
     // Original sync was here
     return;
@@ -1400,10 +1401,10 @@ THREAD(mul_and_subT_cont1) {
             largs->r = new_internal(largs->r00,largs->r01,largs->r10,largs->r11);
         }
     } else {
-        __builtin_expect(!(largs->r->child[0] == __null || largs->r->child[0] == largs->r00), 0) ? __assert_rtn(__func__, "cholesky.cpp", 622, "r->child[_00] == NULL || r->child[_00] == r00") : (void)0;
-        __builtin_expect(!(largs->r->child[1] == __null || largs->r->child[1] == largs->r01), 0) ? __assert_rtn(__func__, "cholesky.cpp", 623, "r->child[_01] == NULL || r->child[_01] == r01") : (void)0;
-        __builtin_expect(!(largs->r->child[2] == __null || largs->r->child[2] == largs->r10), 0) ? __assert_rtn(__func__, "cholesky.cpp", 624, "r->child[_10] == NULL || r->child[_10] == r10") : (void)0;
-        __builtin_expect(!(largs->r->child[3] == __null || largs->r->child[3] == largs->r11), 0) ? __assert_rtn(__func__, "cholesky.cpp", 625, "r->child[_11] == NULL || r->child[_11] == r11") : (void)0;
+        static_cast<bool>(largs->r->child[0] == __null || largs->r->child[0] == largs->r00) ? void(0) : __assert_fail("r->child[_00] == NULL || r->child[_00] == r00", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+        static_cast<bool>(largs->r->child[1] == __null || largs->r->child[1] == largs->r01) ? void(0) : __assert_fail("r->child[_01] == NULL || r->child[_01] == r01", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+        static_cast<bool>(largs->r->child[2] == __null || largs->r->child[2] == largs->r10) ? void(0) : __assert_fail("r->child[_10] == NULL || r->child[_10] == r10", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
+        static_cast<bool>(largs->r->child[3] == __null || largs->r->child[3] == largs->r11) ? void(0) : __assert_fail("r->child[_11] == NULL || r->child[_11] == r11", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
         largs->r->child[0] = largs->r00;
         largs->r->child[1] = largs->r01;
         largs->r->child[2] = largs->r10;
@@ -1442,8 +1443,8 @@ THREAD(backsub_cont0) {
     ((backsub_cont1_closure*)SN_backsub_cont1.cls.get())->l11 = largs->l11;
     ((backsub_cont1_closure*)SN_backsub_cont1.cls.get())->a11 = largs->a11;
     ((backsub_cont1_closure*)SN_backsub_cont1.cls.get())->a10 = largs->a10;
-    ((backsub_cont1_closure*)SN_backsub_cont1.cls.get())->a00 = largs->a00;
     ((backsub_cont1_closure*)SN_backsub_cont1.cls.get())->a01 = largs->a01;
+    ((backsub_cont1_closure*)SN_backsub_cont1.cls.get())->a00 = largs->a00;
     ((backsub_cont1_closure*)SN_backsub_cont1.cls.get())->a = largs->a;
     ((backsub_cont1_closure*)SN_backsub_cont1.cls.get())->depth = largs->depth;
     // Original sync was here
@@ -1491,7 +1492,7 @@ THREAD(backsub_cont2) {
 }
 THREAD(cholesky_cont0) {
     cholesky_cont0_closure *largs = (cholesky_cont0_closure*)(args.get());
-    __builtin_expect(!(largs->a00), 0) ? __assert_rtn(__func__, "cholesky.cpp", 731, "a00") : (void)0;
+    static_cast<bool>(largs->a00) ? void(0) : __assert_fail("a00", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     cholesky_cont1_closure SN_cholesky_cont1c(largs->k);
     spawn_next<cholesky_cont1_closure> SN_cholesky_cont1(SN_cholesky_cont1c);
     cont sp0k;
@@ -1503,8 +1504,8 @@ THREAD(cholesky_cont0) {
     spawn<backsub_closure> sp0(sp0c);
 
     ((cholesky_cont1_closure*)SN_cholesky_cont1.cls.get())->a11 = largs->a11;
-    ((cholesky_cont1_closure*)SN_cholesky_cont1.cls.get())->A = largs->A;
     ((cholesky_cont1_closure*)SN_cholesky_cont1.cls.get())->a00 = largs->a00;
+    ((cholesky_cont1_closure*)SN_cholesky_cont1.cls.get())->A = largs->A;
     ((cholesky_cont1_closure*)SN_cholesky_cont1.cls.get())->a = largs->a;
     ((cholesky_cont1_closure*)SN_cholesky_cont1.cls.get())->depth = largs->depth;
     // Original sync was here
@@ -1512,7 +1513,7 @@ THREAD(cholesky_cont0) {
 }
 THREAD(cholesky_cont1) {
     cholesky_cont1_closure *largs = (cholesky_cont1_closure*)(args.get());
-    __builtin_expect(!(largs->a10), 0) ? __assert_rtn(__func__, "cholesky.cpp", 734, "a10") : (void)0;
+    static_cast<bool>(largs->a10) ? void(0) : __assert_fail("a10", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     cholesky_cont2_closure SN_cholesky_cont2c(largs->k);
     spawn_next<cholesky_cont2_closure> SN_cholesky_cont2(SN_cholesky_cont2c);
     cont sp0k;
@@ -1535,7 +1536,7 @@ THREAD(cholesky_cont1) {
 }
 THREAD(cholesky_cont2) {
     cholesky_cont2_closure *largs = (cholesky_cont2_closure*)(args.get());
-    __builtin_expect(!(largs->a11), 0) ? __assert_rtn(__func__, "cholesky.cpp", 737, "a11") : (void)0;
+    static_cast<bool>(largs->a11) ? void(0) : __assert_fail("a11", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     cholesky_cont3_closure SN_cholesky_cont3c(largs->k);
     spawn_next<cholesky_cont3_closure> SN_cholesky_cont3(SN_cholesky_cont3c);
     cont sp0k;
@@ -1545,17 +1546,17 @@ THREAD(cholesky_cont2) {
     sp0c.a = largs->a11;
     spawn<cholesky_closure> sp0(sp0c);
 
-    ((cholesky_cont3_closure*)SN_cholesky_cont3.cls.get())->depth = largs->depth;
-    ((cholesky_cont3_closure*)SN_cholesky_cont3.cls.get())->a = largs->a;
     ((cholesky_cont3_closure*)SN_cholesky_cont3.cls.get())->a10 = largs->a10;
     ((cholesky_cont3_closure*)SN_cholesky_cont3.cls.get())->a00 = largs->a00;
     ((cholesky_cont3_closure*)SN_cholesky_cont3.cls.get())->A = largs->A;
+    ((cholesky_cont3_closure*)SN_cholesky_cont3.cls.get())->a = largs->a;
+    ((cholesky_cont3_closure*)SN_cholesky_cont3.cls.get())->depth = largs->depth;
     // Original sync was here
     return;
 }
 THREAD(cholesky_cont3) {
     cholesky_cont3_closure *largs = (cholesky_cont3_closure*)(args.get());
-    __builtin_expect(!(largs->a11), 0) ? __assert_rtn(__func__, "cholesky.cpp", 740, "a11") : (void)0;
+    static_cast<bool>(largs->a11) ? void(0) : __assert_fail("a11", __builtin_FILE(), __builtin_LINE(), __extension__ __PRETTY_FUNCTION__);
     auto sp0c = std::make_shared<cholesky_afterif1_closure>(largs->k);
     sp0c->depth = largs->depth;
     sp0c->a = largs->a;
@@ -1571,10 +1572,10 @@ THREAD(cholesky_cont4) {
     cholesky_cont5_closure SN_cholesky_cont5c(largs->k);
     spawn_next<cholesky_cont5_closure> SN_cholesky_cont5(SN_cholesky_cont5c);
     ((cholesky_cont5_closure*)SN_cholesky_cont5.cls.get())->a11 = largs->a11;
-    ((cholesky_cont5_closure*)SN_cholesky_cont5.cls.get())->a00 = largs->a00;
-    ((cholesky_cont5_closure*)SN_cholesky_cont5.cls.get())->a = largs->a;
     ((cholesky_cont5_closure*)SN_cholesky_cont5.cls.get())->a10 = largs->a10;
+    ((cholesky_cont5_closure*)SN_cholesky_cont5.cls.get())->a00 = largs->a00;
     ((cholesky_cont5_closure*)SN_cholesky_cont5.cls.get())->A = largs->A;
+    ((cholesky_cont5_closure*)SN_cholesky_cont5.cls.get())->a = largs->a;
     ((cholesky_cont5_closure*)SN_cholesky_cont5.cls.get())->depth = largs->depth;
     // Original sync was here
     return;
@@ -1607,36 +1608,36 @@ THREAD(main_cont0) {
     sp0c.a = largs->R;
     spawn<cholesky_closure> sp0(sp0c);
 
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->t1 = largs->t1;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->r0 = largs->r0;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->t = largs->t;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->c = largs->c;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->r = largs->r;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->fc = largs->fc;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->res = largs->res;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->argv = largs->argv;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->depth = largs->depth;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->fr = largs->fr;
     ((main_cont1_closure*)SN_main_cont1.cls.get())->t2 = largs->t2;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->t1 = largs->t1;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->check = largs->check;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->help = largs->help;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->benchmark = largs->benchmark;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->i = largs->i;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->nonzeros = largs->nonzeros;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->depth = largs->depth;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->input_blocks = input_blocks;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->argv = largs->argv;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->size = largs->size;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->input_nonzeros = input_nonzeros;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->argc = largs->argc;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->A = largs->A;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->error = largs->error;
+    std::memcpy(((main_cont1_closure*)SN_main_cont1.cls.get())->buf, largs->buf, sizeof(largs->buf));
+    std::memcpy(((main_cont1_closure*)SN_main_cont1.cls.get())->filename, largs->filename, sizeof(largs->filename));
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->sizex = largs->sizex;
     ((main_cont1_closure*)SN_main_cont1.cls.get())->sizey = largs->sizey;
     ((main_cont1_closure*)SN_main_cont1.cls.get())->f = largs->f;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->c0 = largs->c0;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->benchmark = largs->benchmark;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->error = largs->error;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->input_nonzeros = input_nonzeros;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->fr = largs->fr;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->fc = largs->fc;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->r = largs->r;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->c = largs->c;
     ((main_cont1_closure*)SN_main_cont1.cls.get())->val = largs->val;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->help = largs->help;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->check = largs->check;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->res = largs->res;
     ((main_cont1_closure*)SN_main_cont1.cls.get())->rnd = largs->rnd;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->argc = largs->argc;
-    std::memcpy(((main_cont1_closure*)SN_main_cont1.cls.get())->filename, largs->filename, sizeof(largs->filename));
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->nonzeros = largs->nonzeros;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->size = largs->size;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->i = largs->i;
-    std::memcpy(((main_cont1_closure*)SN_main_cont1.cls.get())->buf, largs->buf, sizeof(largs->buf));
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->input_blocks = input_blocks;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->sizex = largs->sizex;
-    ((main_cont1_closure*)SN_main_cont1.cls.get())->A = largs->A;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->t = largs->t;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->r0 = largs->r0;
+    ((main_cont1_closure*)SN_main_cont1.cls.get())->c0 = largs->c0;
     // Original sync was here
     return;
 }
@@ -1668,34 +1669,34 @@ THREAD(main_cont1) {
         ((main_cont2_closure*)SN_main_cont2.cls.get())->t2 = largs->t2;
         ((main_cont2_closure*)SN_main_cont2.cls.get())->t1 = largs->t1;
         ((main_cont2_closure*)SN_main_cont2.cls.get())->c0 = largs->c0;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->val = largs->val;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->r0 = largs->r0;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->c = largs->c;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->nonzeros = largs->nonzeros;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->fc = largs->fc;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->fr = largs->fr;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->f = largs->f;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->sizey = largs->sizey;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->sizex = largs->sizex;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->input_blocks = largs->input_blocks;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->input_nonzeros = largs->input_nonzeros;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->check = largs->check;
         ((main_cont2_closure*)SN_main_cont2.cls.get())->help = largs->help;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->benchmark = largs->benchmark;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->i = largs->i;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->nonzeros = largs->nonzeros;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->depth = largs->depth;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->size = largs->size;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->R = largs->R;
         ((main_cont2_closure*)SN_main_cont2.cls.get())->output_blocks = output_blocks;
         ((main_cont2_closure*)SN_main_cont2.cls.get())->output_nonzeros = output_nonzeros;
-        std::memcpy(((main_cont2_closure*)SN_main_cont2.cls.get())->filename, largs->filename, sizeof(largs->filename));
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->i = largs->i;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->input_blocks = largs->input_blocks;
-        std::memcpy(((main_cont2_closure*)SN_main_cont2.cls.get())->buf, largs->buf, sizeof(largs->buf));
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->input_nonzeros = largs->input_nonzeros;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->R = largs->R;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->benchmark = largs->benchmark;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->size = largs->size;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->r = largs->r;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->t = largs->t;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->depth = largs->depth;
         ((main_cont2_closure*)SN_main_cont2.cls.get())->argv = largs->argv;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->rnd = largs->rnd;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->check = largs->check;
-        ((main_cont2_closure*)SN_main_cont2.cls.get())->res = largs->res;
         ((main_cont2_closure*)SN_main_cont2.cls.get())->argc = largs->argc;
+        std::memcpy(((main_cont2_closure*)SN_main_cont2.cls.get())->buf, largs->buf, sizeof(largs->buf));
+        std::memcpy(((main_cont2_closure*)SN_main_cont2.cls.get())->filename, largs->filename, sizeof(largs->filename));
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->sizex = largs->sizex;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->sizey = largs->sizey;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->f = largs->f;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->fr = largs->fr;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->fc = largs->fc;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->r = largs->r;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->c = largs->c;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->val = largs->val;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->res = largs->res;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->rnd = largs->rnd;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->t = largs->t;
+        ((main_cont2_closure*)SN_main_cont2.cls.get())->r0 = largs->r0;
         // Original sync was here
     } else {
         auto sp1c = std::make_shared<main_afterif0_closure>(largs->k);

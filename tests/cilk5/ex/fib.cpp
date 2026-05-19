@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     if ((argc != 2)) {
-        fprintf(__stderrp,"Usage: fib [<cilk options>] <n>\n");
+        fprintf(stderr,"Usage: fib [<cilk options>] <n>\n");
         exit(1);
     }
     n = atoi(argv[1]);
@@ -125,6 +125,6 @@ THREAD(main_cont0) {
     gettimeofday(&(largs->t2),0);
     runtime_ms = ((todval(&(largs->t2)) - todval(&(largs->t1))) / 1000);
     printf("%f\n",(runtime_ms / 1000.));
-    fprintf(__stderrp,"Result: %d\n",largs->result);
+    fprintf(stderr,"Result: %d\n",largs->result);
     SEND_ARGUMENT(largs->k, 0);
 }

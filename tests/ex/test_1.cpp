@@ -290,11 +290,11 @@ THREAD(fun_reentry0_reentry1) {
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->y = largs->y;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->z = largs->z;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->v = largs->v;
-        ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->n = largs->n;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->x = largs->x;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->sum = largs->sum;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->result = largs->result;
         ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->w = largs->w;
+        ((fun_reentry0_reentry1_cont0_closure*)SN_fun_reentry0_reentry1_cont0.cls.get())->n = largs->n;
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<fun_reentry0_exit1_closure>(largs->k);
@@ -336,10 +336,10 @@ THREAD(fun_exit0_reentry2) {
 
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->v = largs->v;
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->x = largs->x;
-        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->sum = largs->sum;
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->val_1 = largs->val_1;
-        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->w = largs->w;
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->val_0 = largs->val_0;
+        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->sum = largs->sum;
+        ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->w = largs->w;
         ((fun_exit0_reentry2_cont0_closure*)SN_fun_exit0_reentry2_cont0.cls.get())->n = largs->n;
         // Original sync was here
     } else {

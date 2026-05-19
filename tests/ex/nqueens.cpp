@@ -95,13 +95,13 @@ THREAD(nqueens) {
         SEND_ARGUMENT(largs->k, 1);
     } else {
         count = ((int *) __builtin_alloca((largs->n * sizeof(int))));
-        ((void) __builtin___memset_chk(count,0,(largs->n * sizeof(int)),__builtin_object_size(count,0)));
+        ((void) memset(count,0,(largs->n * sizeof(int))));
         nqueens_cont0_closure SN_nqueens_cont0c(largs->k);
         spawn_next<nqueens_cont0_closure> SN_nqueens_cont0(SN_nqueens_cont0c);
         for (i = 0;(i < largs->n);i = (i + 1)) {
             b_alloc = ((char *) __builtin_alloca((((largs->j + 1) * sizeof(char)) + 31)));
             b = ((char *) ((((uintptr_t) b_alloc) + 31) & (~31)));
-            __builtin___memcpy_chk(b,largs->a,(largs->j * sizeof(char)),__builtin_object_size(b,0));
+            memcpy(b,largs->a,(largs->j * sizeof(char)));
             b[largs->j] = i;
             if (ok((largs->j + 1),b)) {
                 cont sp0k;
@@ -114,8 +114,8 @@ THREAD(nqueens) {
 
             }
         }
-        ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->count = count;
         ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->solNum = solNum;
+        ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->count = count;
         ((nqueens_cont0_closure*)SN_nqueens_cont0.cls.get())->n = largs->n;
         // Original sync was here
     }

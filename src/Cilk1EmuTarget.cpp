@@ -236,6 +236,7 @@ private:
 
 public:
   bool LastReturnPrinted = false;
+  bool UsesMemcpy = false;
 
 private:
   llvm::raw_ostream &Indent() {
@@ -305,6 +306,7 @@ private:
       if (SrcVar->IsEphemeral && UnconditionalEphemeralVars.count(SrcVar))
         continue;
       if (SrcVar->Type->isArrayType()) {
+        UsesMemcpy = true;
         Indent() << "std::memcpy(((" << SpawnNextFnName << "_closure*)SN_"
                  << SpawnNextFnName << ".cls.get())->" << GetSym(DstVar->Name)
                  << ", ";
@@ -332,6 +334,7 @@ private:
       assert(DstArgIt != ES->Fn->Vars.end());
       auto &DstArg = *DstArgIt;
       if (DstArg.Type->isArrayType()) {
+        UsesMemcpy = true;
         Indent() << "std::memcpy(sp" << SpawnCtr << "c" << accessor
                  << GetSym(DstArg.Name) << ", ";
         Arg->print(Out, C);
@@ -533,40 +536,43 @@ void printOriginalSourceSplit(IRProgram &P, llvm::raw_ostream &OutA,
 void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
                    clang::CompilerInstance &CI) {
 
+  std::string Buf;
+  llvm::raw_string_ostream BufStream(Buf);
+
   // 1. Print forward declarations of each function, include Cilk1 emulation
   // file.
-  out << "#include \"cilk_explicit.hh\"\n";
-
   std::string PartB;
   llvm::raw_string_ostream PartBStream(PartB);
-  printOriginalSourceSplit(P, out, PartBStream, C, CI);
+  printOriginalSourceSplit(P, BufStream, PartBStream, C, CI);
 
   for (auto &F : P) {
-    printFunDecl(F.get(), out, C);
-    out << ";\n";
+    printFunDecl(F.get(), BufStream, C);
+    BufStream << ";\n";
   }
-  out << "\n";
+  BufStream << "\n";
   for (auto &F : P) {
     if (F->Info.IsTask) {
-      printClosureDecl(F.get(), out, C);
+      printClosureDecl(F.get(), BufStream, C);
     }
   }
 
   // 2. Print the original source file with the original root functions
   // removed.
-  out << PartBStream.str();
-  out << "\n";
+  BufStream << PartBStream.str();
+  BufStream << "\n";
+
+  bool UsesMemcpy = false;
   // 3. Print the implementation of each function.
   for (auto &F : P) {
 
-    printFunDecl(F.get(), out, C);
-    out << " {\n";
+    printFunDecl(F.get(), BufStream, C);
+    BufStream << " {\n";
 
-    printLocals(F.get(), C, out);
+    printLocals(F.get(), C, BufStream);
 
     if (F->Info.IsTask) {
-      out << TAB << F->getName() << "_closure *largs = (" << F->getName()
-          << "_closure*)(args.get());\n";
+      BufStream << TAB << F->getName() << "_closure *largs = (" << F->getName()
+                << "_closure*)(args.get());\n";
     }
 
     std::unordered_map<const clang::NamedDecl *, std::string> VarRenameMap;
@@ -604,18 +610,24 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
               }
             },
         .TaskContinuationKey = F->Info.IsTask ? std::string("largs->k") : ""};
-    Cilk1EmuPrinter Printer(out, IRC);
+    Cilk1EmuPrinter Printer(BufStream, IRC);
     Printer.traverse(*F);
+    UsesMemcpy |= Printer.UsesMemcpy;
     if (F->Info.IsTask && !Printer.LastReturnPrinted) {
-      out << "    return;\n";
+      BufStream << "    return;\n";
     } else if (!Printer.LastReturnPrinted && F->Info.RootFun &&
                !F->Info.RootFun->getReturnType()->isVoidType()) {
       auto RetTy = F->Info.RootFun->getReturnType();
       if (RetTy->isIntegerType())
-        out << "    return 0;\n";
+        BufStream << "    return 0;\n";
       else
-        out << "    return {};\n";
+        BufStream << "    return {};\n";
     }
-    out << "}\n";
+    BufStream << "}\n";
   }
+
+  out << "#include \"cilk_explicit.hh\"\n";
+  if (UsesMemcpy)
+    out << "#include <cstring>\n";
+  out << BufStream.str();
 }

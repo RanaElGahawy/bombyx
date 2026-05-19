@@ -2,7 +2,7 @@
 
 set -e  # stop on first error (remove if you want all tests to continue)
 
-CLANG="xcrun /opt/opencilk/bin/clang++"
+CLANG="/opt/opencilk/bin/clang++"
 FLAGS="-fopencilk -Wno-backend-plugin -Wno-parentheses-equality"
 BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

@@ -93,12 +93,12 @@ THREAD(nqueens) {
         SEND_ARGUMENT(largs->k, 1);
     } else {
         count = ((int *) __builtin_alloca((largs->n * sizeof(int))));
-        ((void) __builtin___memset_chk(count,0,(largs->n * sizeof(int)),__builtin_object_size(count,0)));
+        ((void) memset(count,0,(largs->n * sizeof(int))));
         nqueens_cont0_closure SN_nqueens_cont0c(largs->k);
         spawn_next<nqueens_cont0_closure> SN_nqueens_cont0(SN_nqueens_cont0c);
         for (i = 0;(i < largs->n);(i++)) {
             b = ((char *) __builtin_alloca(((largs->j + 1) * sizeof(char))));
-            __builtin___memcpy_chk(b,largs->a,(largs->j * sizeof(char)),__builtin_object_size(b,0));
+            memcpy(b,largs->a,(largs->j * sizeof(char)));
             b[largs->j] = i;
             if (ok((largs->j + 1),b)) {
                 cont sp0k;
@@ -126,11 +126,11 @@ int main(int argc, char **argv) {
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     if ((argc < 2)) {
-        fprintf(__stderrp,"Usage: %s [<cilk-options>] <n>\n",argv[0]);
-        fprintf(__stderrp,"Use default board size, n = 13.\n");
+        fprintf(stderr,"Usage: %s [<cilk-options>] <n>\n",argv[0]);
+        fprintf(stderr,"Use default board size, n = 13.\n");
     } else {
         n = atoi(argv[1]);
-        fprintf(__stderrp,"Running %s with n = %d.\n",argv[0],n);
+        fprintf(stderr,"Running %s with n = %d.\n",argv[0],n);
     }
     a = ((char *) __builtin_alloca((n * sizeof(char))));
     res = 0;
@@ -162,9 +162,9 @@ THREAD(main_cont0) {
     runtime_ms = ((todval(&(largs->t2)) - todval(&(largs->t1))) / 1000);
     printf("%f\n",(runtime_ms / 1000.));
     if ((largs->res == 0)) {
-        fprintf(__stderrp,"No solution found.\n");
+        fprintf(stderr,"No solution found.\n");
     } else {
-        fprintf(__stderrp,"Total number of solutions : %d\n",largs->res);
+        fprintf(stderr,"Total number of solutions : %d\n",largs->res);
     }
     SEND_ARGUMENT(largs->k, 0);
 }

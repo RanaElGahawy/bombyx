@@ -367,13 +367,13 @@ THREAD(rec_matmulAdd) {
                 sp2c.ld = largs->ld;
                 spawn<rec_matmulAdd_closure> sp2(sp2c);
 
-                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->n1 = n1;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->ld = largs->ld;
+                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->n1 = n1;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->p = largs->p;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->n = largs->n;
-                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->B = largs->B;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->m = largs->m;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->C = largs->C;
+                ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->B = largs->B;
                 ((rec_matmulAdd_cont1_closure*)SN_rec_matmulAdd_cont1.cls.get())->A = largs->A;
                 // Original sync was here
             }
@@ -476,13 +476,13 @@ THREAD(rec_matmul) {
                 sp2c.ld = largs->ld;
                 spawn<rec_matmul_closure> sp2(sp2c);
 
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->p = largs->p;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->C = largs->C;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->n = largs->n;
                 ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->ld = largs->ld;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->B = largs->B;
-                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->m = largs->m;
                 ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->n1 = n1;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->p = largs->p;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->n = largs->n;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->m = largs->m;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->C = largs->C;
+                ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->B = largs->B;
                 ((rec_matmul_cont1_closure*)SN_rec_matmul_cont1.cls.get())->A = largs->A;
                 // Original sync was here
             }
@@ -576,9 +576,9 @@ int main(int argc, char **argv) {
     main_cont0_closure SN_main_cont0c(CONT_DUMMY);
     spawn_next<main_cont0_closure> SN_main_cont0(SN_main_cont0c);
     if (help) {
-        fprintf(__stderrp,"Usage: matmul [-n size] [-c] [-rc] [-h] [<cilk options>]\n");
-        fprintf(__stderrp,"if -c is set, check result against iterative matrix multiply O(n^3).\n");
-        fprintf(__stderrp,"if -rc is set, check result against randomlized algo. due to Freivalds O(n^2).\n");
+        fprintf(stderr,"Usage: matmul [-n size] [-c] [-rc] [-h] [<cilk options>]\n");
+        fprintf(stderr,"if -c is set, check result against iterative matrix multiply O(n^3).\n");
+        fprintf(stderr,"if -rc is set, check result against randomlized algo. due to Freivalds O(n^2).\n");
         exit(1);
     }
     A = ((float *) malloc(((n * n) * sizeof(float))));
@@ -597,7 +597,7 @@ int main(int argc, char **argv) {
     }
     init(A,n);
     init(B,n);
-    fprintf(__stderrp,"\nCalculate using recursive method ... (timing start here)\n");
+    fprintf(stderr,"\nCalculate using recursive method ... (timing start here)\n");
     zero(C,n);
     gettimeofday(&(t1),0);
     cont sp0k;
@@ -612,16 +612,16 @@ int main(int argc, char **argv) {
     sp0c.ld = n;
     spawn<rec_matmul_closure> sp0(sp0c);
 
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->C2 = C2;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->P2 = P2;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->P1 = P1;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->R = R;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->C = C;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->B = B;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->check = check;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->A = A;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->C2 = C2;
-    ((main_cont0_closure*)SN_main_cont0.cls.get())->P2 = P2;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->rand_check = rand_check;
+    ((main_cont0_closure*)SN_main_cont0.cls.get())->check = check;
     ((main_cont0_closure*)SN_main_cont0.cls.get())->n = n;
     // Original sync was here
     return 0;
@@ -700,16 +700,16 @@ THREAD(main_cont0) {
         mat_vec_mul(largs->A,largs->P1,largs->P2,largs->n,largs->n,largs->n,0);
         mat_vec_mul(largs->C,largs->R,largs->P1,largs->n,largs->n,largs->n,0);
         err = maxerror_vec(largs->P1,largs->P2,largs->n);
-        fprintf(__stderrp,"Max error     = %g\n",err);
+        fprintf(stderr,"Max error     = %g\n",err);
     } else {
         if (largs->check) {
             iter_matmul(largs->A,largs->B,largs->C2,largs->n);
             err = maxerror(largs->C,largs->C2,largs->n);
-            fprintf(__stderrp,"Max error     = %g\n",err);
+            fprintf(stderr,"Max error     = %g\n",err);
         }
     }
-    fprintf(__stderrp,"\nCilk Example: matmul\n");
-    fprintf(__stderrp,"Options: size = %d\n",largs->n);
+    fprintf(stderr,"\nCilk Example: matmul\n");
+    fprintf(stderr,"Options: size = %d\n",largs->n);
     free(largs->C);
     free(largs->B);
     free(largs->A);

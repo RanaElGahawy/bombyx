@@ -192,10 +192,10 @@ THREAD(fun) {
 
                 ((fun_cont0_closure*)SN_fun_cont0.cls.get())->y0 = y0;
                 ((fun_cont0_closure*)SN_fun_cont0.cls.get())->v = v;
-                ((fun_cont0_closure*)SN_fun_cont0.cls.get())->z0 = z0;
                 ((fun_cont0_closure*)SN_fun_cont0.cls.get())->x = x;
                 ((fun_cont0_closure*)SN_fun_cont0.cls.get())->val_1 = val_1;
                 ((fun_cont0_closure*)SN_fun_cont0.cls.get())->val_0 = val_0;
+                ((fun_cont0_closure*)SN_fun_cont0.cls.get())->z0 = z0;
                 ((fun_cont0_closure*)SN_fun_cont0.cls.get())->sum = sum;
                 ((fun_cont0_closure*)SN_fun_cont0.cls.get())->w = w;
                 ((fun_cont0_closure*)SN_fun_cont0.cls.get())->n = largs->n;
@@ -327,14 +327,14 @@ THREAD(fun_reentry0) {
         spawn<worker_closure> sp1(sp1c);
 
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->y0 = largs->y0;
-        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->w = largs->w;
+        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->z0 = largs->z0;
+        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->v = largs->v;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->x = largs->x;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->sum = largs->sum;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->z = largs->z;
-        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->v = largs->v;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->y = largs->y;
-        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->z0 = largs->z0;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->result = largs->result;
+        ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->w = largs->w;
         ((fun_reentry0_cont0_closure*)SN_fun_reentry0_cont0.cls.get())->n = largs->n;
         // Original sync was here
     } else {
@@ -378,12 +378,12 @@ THREAD(fun_exit0_reentry1) {
         spawn<worker_closure> sp1(sp1c);
 
         ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->v = largs->v;
-        ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->val_1 = largs->val_1;
-        ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->z = largs->z;
-        ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->val_0 = largs->val_0;
-        ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->y = largs->y;
         ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->x = largs->x;
+        ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->val_1 = largs->val_1;
+        ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->val_0 = largs->val_0;
         ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->sum = largs->sum;
+        ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->z = largs->z;
+        ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->y = largs->y;
         ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->w = largs->w;
         ((fun_exit0_reentry1_cont0_closure*)SN_fun_exit0_reentry1_cont0.cls.get())->n = largs->n;
         // Original sync was here

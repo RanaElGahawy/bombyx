@@ -1,4 +1,5 @@
 #include "cilk_explicit.hh"
+#include <cstring>
 /*
  * this is a cilk FFT code.  Most of the code is machine-generated.
  * We use it to find bugs in cilk2c.
@@ -4414,15 +4415,15 @@ THREAD(fft_aux) {
                                 sp0c.m = m;
                                 spawn<fft_unshuffle_32_closure> sp0(sp0c);
 
+                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->k0 = k0;
+                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->k1 = k1;
                                 ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->m = m;
                                 ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->r = r;
-                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->k0 = k0;
-                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->W = largs->W;
-                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->out = largs->out;
                                 ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->nW = largs->nW;
-                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->in = largs->in;
-                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->k1 = k1;
+                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->W = largs->W;
                                 ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->factors = largs->factors;
+                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->out = largs->out;
+                                ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->in = largs->in;
                                 ((fft_aux_cont5_closure*)SN_fft_aux_cont5.cls.get())->n = largs->n;
                                 // Original sync was here
                             } else {
@@ -4439,15 +4440,15 @@ THREAD(fft_aux) {
                                     sp1c.m = m;
                                     spawn<fft_unshuffle_16_closure> sp1(sp1c);
 
+                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->k0 = k0;
+                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->k1 = k1;
                                     ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->m = m;
                                     ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->r = r;
-                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->k0 = k0;
-                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->W = largs->W;
-                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->out = largs->out;
                                     ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->nW = largs->nW;
-                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->in = largs->in;
-                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->k1 = k1;
+                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->W = largs->W;
                                     ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->factors = largs->factors;
+                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->out = largs->out;
+                                    ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->in = largs->in;
                                     ((fft_aux_cont4_closure*)SN_fft_aux_cont4.cls.get())->n = largs->n;
                                     // Original sync was here
                                 } else {
@@ -4464,15 +4465,15 @@ THREAD(fft_aux) {
                                         sp2c.m = m;
                                         spawn<fft_unshuffle_8_closure> sp2(sp2c);
 
+                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->k0 = k0;
+                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->k1 = k1;
                                         ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->m = m;
                                         ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->r = r;
-                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->k0 = k0;
-                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->W = largs->W;
-                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->out = largs->out;
                                         ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->nW = largs->nW;
-                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->in = largs->in;
-                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->k1 = k1;
+                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->W = largs->W;
                                         ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->factors = largs->factors;
+                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->out = largs->out;
+                                        ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->in = largs->in;
                                         ((fft_aux_cont3_closure*)SN_fft_aux_cont3.cls.get())->n = largs->n;
                                         // Original sync was here
                                     } else {
@@ -4489,15 +4490,15 @@ THREAD(fft_aux) {
                                             sp3c.m = m;
                                             spawn<fft_unshuffle_4_closure> sp3(sp3c);
 
+                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->k0 = k0;
+                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->k1 = k1;
                                             ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->m = m;
                                             ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->r = r;
-                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->k0 = k0;
-                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->W = largs->W;
-                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->out = largs->out;
                                             ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->nW = largs->nW;
-                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->in = largs->in;
-                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->k1 = k1;
+                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->W = largs->W;
                                             ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->factors = largs->factors;
+                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->out = largs->out;
+                                            ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->in = largs->in;
                                             ((fft_aux_cont2_closure*)SN_fft_aux_cont2.cls.get())->n = largs->n;
                                             // Original sync was here
                                         } else {
@@ -4514,15 +4515,15 @@ THREAD(fft_aux) {
                                                 sp4c.m = m;
                                                 spawn<fft_unshuffle_2_closure> sp4(sp4c);
 
+                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->k0 = k0;
+                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->k1 = k1;
                                                 ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->m = m;
                                                 ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->r = r;
-                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->k0 = k0;
-                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->W = largs->W;
-                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->out = largs->out;
                                                 ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->nW = largs->nW;
-                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->in = largs->in;
-                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->k1 = k1;
+                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->W = largs->W;
                                                 ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->factors = largs->factors;
+                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->out = largs->out;
+                                                ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->in = largs->in;
                                                 ((fft_aux_cont1_closure*)SN_fft_aux_cont1.cls.get())->n = largs->n;
                                                 // Original sync was here
                                             } else {
@@ -4539,15 +4540,15 @@ THREAD(fft_aux) {
                                                 sp5c.m = m;
                                                 spawn<unshuffle_closure> sp5(sp5c);
 
+                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->k0 = k0;
+                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->k1 = k1;
                                                 ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->m = m;
                                                 ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->r = r;
-                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->k0 = k0;
-                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->W = largs->W;
-                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->out = largs->out;
                                                 ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->nW = largs->nW;
-                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->in = largs->in;
-                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->k1 = k1;
+                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->W = largs->W;
                                                 ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->factors = largs->factors;
+                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->out = largs->out;
+                                                ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->in = largs->in;
                                                 ((fft_aux_cont0_closure*)SN_fft_aux_cont0.cls.get())->n = largs->n;
                                                 // Original sync was here
                                             }
@@ -4604,8 +4605,8 @@ void cilk_fft(int n, COMPLEX *in, COMPLEX *out) {
 ;
     ((cilk_fft_cont0_closure*)SN_cilk_fft_cont0.cls.get())->W = W;
     std::memcpy(((cilk_fft_cont0_closure*)SN_cilk_fft_cont0.cls.get())->factors, factors, sizeof(factors));
-    ((cilk_fft_cont0_closure*)SN_cilk_fft_cont0.cls.get())->in = in;
     ((cilk_fft_cont0_closure*)SN_cilk_fft_cont0.cls.get())->out = out;
+    ((cilk_fft_cont0_closure*)SN_cilk_fft_cont0.cls.get())->in = in;
     ((cilk_fft_cont0_closure*)SN_cilk_fft_cont0.cls.get())->n = n;
     // Original sync was here
 }
@@ -4665,14 +4666,14 @@ THREAD(fft_aux_afterif0) {
         spawn<fft_twiddle_2_closure> sp0(sp0c);
 
         ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->k1 = largs->k1;
+        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->k0 = largs->k0;
         ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->m = largs->m;
+        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->r = largs->r;
         ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->nW = largs->nW;
+        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->W = largs->W;
         ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->factors = largs->factors;
         ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->out = largs->out;
         ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->in = largs->in;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->r = largs->r;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->W = largs->W;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->k0 = largs->k0;
         ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->n = largs->n;
         // Original sync was here
     } else {
@@ -4693,14 +4694,14 @@ THREAD(fft_aux_afterif0) {
             spawn<fft_twiddle_4_closure> sp1(sp1c);
 
             ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->k1 = largs->k1;
+            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->k0 = largs->k0;
             ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->m = largs->m;
+            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->r = largs->r;
             ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->nW = largs->nW;
+            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->W = largs->W;
             ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->factors = largs->factors;
             ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->out = largs->out;
             ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->in = largs->in;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->r = largs->r;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->W = largs->W;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->k0 = largs->k0;
             ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->n = largs->n;
             // Original sync was here
         } else {
@@ -4721,14 +4722,14 @@ THREAD(fft_aux_afterif0) {
                 spawn<fft_twiddle_8_closure> sp2(sp2c);
 
                 ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->k1 = largs->k1;
+                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->k0 = largs->k0;
                 ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->m = largs->m;
+                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->r = largs->r;
                 ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->nW = largs->nW;
+                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->W = largs->W;
                 ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->factors = largs->factors;
                 ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->out = largs->out;
                 ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->in = largs->in;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->r = largs->r;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->W = largs->W;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->k0 = largs->k0;
                 ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->n = largs->n;
                 // Original sync was here
             } else {
@@ -4749,14 +4750,14 @@ THREAD(fft_aux_afterif0) {
                     spawn<fft_twiddle_16_closure> sp3(sp3c);
 
                     ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->k1 = largs->k1;
+                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->k0 = largs->k0;
                     ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->m = largs->m;
+                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->r = largs->r;
                     ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->nW = largs->nW;
+                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->W = largs->W;
                     ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->factors = largs->factors;
                     ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->out = largs->out;
                     ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->in = largs->in;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->r = largs->r;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->W = largs->W;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->k0 = largs->k0;
                     ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->n = largs->n;
                     // Original sync was here
                 } else {
@@ -4777,14 +4778,14 @@ THREAD(fft_aux_afterif0) {
                         spawn<fft_twiddle_32_closure> sp4(sp4c);
 
                         ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->k1 = largs->k1;
+                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->k0 = largs->k0;
                         ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->m = largs->m;
+                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->r = largs->r;
                         ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->nW = largs->nW;
+                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->W = largs->W;
                         ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->factors = largs->factors;
                         ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->out = largs->out;
                         ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->in = largs->in;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->r = largs->r;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->W = largs->W;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->k0 = largs->k0;
                         ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->n = largs->n;
                         // Original sync was here
                     } else {
@@ -4805,14 +4806,14 @@ THREAD(fft_aux_afterif0) {
                         spawn<fft_twiddle_gen_closure> sp5(sp5c);
 
                         ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->k1 = largs->k1;
+                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->k0 = largs->k0;
                         ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->m = largs->m;
+                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->r = largs->r;
                         ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->nW = largs->nW;
+                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->W = largs->W;
                         ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->factors = largs->factors;
                         ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->out = largs->out;
                         ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->in = largs->in;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->r = largs->r;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->W = largs->W;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->k0 = largs->k0;
                         ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->n = largs->n;
                         // Original sync was here
                     }
@@ -4908,15 +4909,15 @@ THREAD(fft_aux_afterif6) {
 
     }
     ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->k1 = largs->k1;
+    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->k0 = largs->k0;
     ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->m = largs->m;
     ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->r = largs->r;
     ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->nW = largs->nW;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->n = largs->n;
     ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->W = largs->W;
     ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->factors = largs->factors;
     ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->out = largs->out;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->k0 = largs->k0;
     ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->in = largs->in;
+    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->n = largs->n;
     // Original sync was here
     return;
 }

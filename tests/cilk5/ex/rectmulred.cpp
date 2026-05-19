@@ -670,7 +670,7 @@ void check_block(block *R, DTYPE v, int *errorf) {
     for (i = 0;(i < (16 * 16));(i++)) {
         if ((((DTYPE *) R)[i] != v)) {
             if ((i == 0)) {
-                fprintf(__stderrp,"R[%d]: %lf != %lf.\n",i,((DTYPE *) R)[i],v);
+                fprintf(stderr,"R[%d]: %lf != %lf.\n",i,((DTYPE *) R)[i],v);
             }
             (error++);
         }
@@ -712,13 +712,13 @@ THREAD(check_matrix) {
             sp1c.errorf = largs->errorf;
             spawn<check_matrix_closure> sp1(sp1c);
 
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->a = a;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->errorf = largs->errorf;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->v = largs->v;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->o = largs->o;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->y = largs->y;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->x = largs->x;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->b = b;
+            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->y = largs->y;
+            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->a = a;
+            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->x = largs->x;
             ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->R = largs->R;
             // Original sync was here
         } else {
@@ -746,13 +746,13 @@ THREAD(check_matrix) {
             sp3c.errorf = largs->errorf;
             spawn<check_matrix_closure> sp3(sp3c);
 
-            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->a = a;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->errorf = largs->errorf;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->v = largs->v;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->o = largs->o;
-            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->y = largs->y;
-            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->x = largs->x;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->b = b;
+            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->y = largs->y;
+            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->a = a;
+            ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->x = largs->x;
             ((check_matrix_cont0_closure*)SN_check_matrix_cont0.cls.get())->R = largs->R;
             // Original sync was here
         }
@@ -800,8 +800,8 @@ THREAD(add_matrix) {
             spawn<add_matrix_closure> sp1(sp1c);
 
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->y = largs->y;
-            ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->orr = largs->orr;
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->x = largs->x;
+            ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->orr = largs->orr;
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->R = largs->R;
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->ot = largs->ot;
             ((add_matrix_cont1_closure*)SN_add_matrix_cont1.cls.get())->T = largs->T;
@@ -832,8 +832,8 @@ THREAD(add_matrix) {
             spawn<add_matrix_closure> sp3(sp3c);
 
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->y = largs->y;
-            ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->orr = largs->orr;
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->x = largs->x;
+            ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->orr = largs->orr;
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->R = largs->R;
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->ot = largs->ot;
             ((add_matrix_cont0_closure*)SN_add_matrix_cont0.cls.get())->T = largs->T;
@@ -877,9 +877,9 @@ THREAD(init_matrix) {
             spawn<init_matrix_closure> sp1(sp1c);
 
             ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->v = largs->v;
+            ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->o = largs->o;
             ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->y = largs->y;
             ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->x = largs->x;
-            ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->o = largs->o;
             ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->R = largs->R;
             // Original sync was here
         } else {
@@ -906,9 +906,9 @@ THREAD(init_matrix) {
             spawn<init_matrix_closure> sp3(sp3c);
 
             ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->v = largs->v;
+            ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->o = largs->o;
             ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->y = largs->y;
             ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->x = largs->x;
-            ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->o = largs->o;
             ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->R = largs->R;
             // Original sync was here
         }
@@ -957,15 +957,15 @@ THREAD(multiply_matrix) {
             sp1c.add = largs->add;
             spawn<multiply_matrix_closure> sp1(sp1c);
 
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->R = largs->R;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->add = largs->add;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->orr = largs->orr;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->R = largs->R;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->z = largs->z;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->y = largs->y;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->x = largs->x;
+            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->ob = largs->ob;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->B = largs->B;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->oa = largs->oa;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->x = largs->x;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->orr = largs->orr;
-            ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->ob = largs->ob;
             ((multiply_matrix_cont3_closure*)SN_multiply_matrix_cont3.cls.get())->A = largs->A;
             // Original sync was here
         } else {
@@ -987,15 +987,15 @@ THREAD(multiply_matrix) {
                 sp2c.add = largs->add;
                 spawn<multiply_matrix_closure> sp2(sp2c);
 
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->R = largs->R;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->add = largs->add;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->orr = largs->orr;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->R = largs->R;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->z = largs->z;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->y = largs->y;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->x = largs->x;
+                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->ob = largs->ob;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->B = largs->B;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->oa = largs->oa;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->x = largs->x;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->orr = largs->orr;
-                ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->ob = largs->ob;
                 ((multiply_matrix_cont1_closure*)SN_multiply_matrix_cont1.cls.get())->A = largs->A;
                 // Original sync was here
             } else {
@@ -1031,15 +1031,15 @@ THREAD(multiply_matrix) {
                 sp4c.add = largs->add;
                 spawn<multiply_matrix_closure> sp4(sp4c);
 
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->R = largs->R;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->add = largs->add;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->orr = largs->orr;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->R = largs->R;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->z = largs->z;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->y = largs->y;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->x = largs->x;
+                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->ob = largs->ob;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->B = largs->B;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->oa = largs->oa;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->x = largs->x;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->orr = largs->orr;
-                ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->ob = largs->ob;
                 ((multiply_matrix_cont0_closure*)SN_multiply_matrix_cont0.cls.get())->A = largs->A;
                 // Original sync was here
             }
@@ -1085,12 +1085,12 @@ int run(long x, long y, long z, int check) {
     sp2c.v = 0.;
     spawn<init_matrix_closure> sp2(sp2c);
 
-    ((run_cont0_closure*)SN_run_cont0.cls.get())->R = R;
-    ((run_cont0_closure*)SN_run_cont0.cls.get())->B = B;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->A = A;
-    ((run_cont0_closure*)SN_run_cont0.cls.get())->z = z;
-    ((run_cont0_closure*)SN_run_cont0.cls.get())->y = y;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->check = check;
+    ((run_cont0_closure*)SN_run_cont0.cls.get())->z = z;
+    ((run_cont0_closure*)SN_run_cont0.cls.get())->R = R;
+    ((run_cont0_closure*)SN_run_cont0.cls.get())->y = y;
+    ((run_cont0_closure*)SN_run_cont0.cls.get())->B = B;
     ((run_cont0_closure*)SN_run_cont0.cls.get())->x = x;
     // Original sync was here
     return 0;
@@ -1101,10 +1101,10 @@ THREAD(run_afterif0) {
         printf("WRONG RESULT!\n");
         printf("check: %d\n",largs->check);
     } else {
-        fprintf(__stderrp,"\nCilk Example: rectmul\n");
-        fprintf(__stderrp,"Options: x = %ld\n",(16 * largs->x));
-        fprintf(__stderrp,"         y = %ld\n",(16 * largs->y));
-        fprintf(__stderrp,"         z = %ld\n\n",(16 * largs->z));
+        fprintf(stderr,"\nCilk Example: rectmul\n");
+        fprintf(stderr,"Options: x = %ld\n",(16 * largs->x));
+        fprintf(stderr,"         y = %ld\n",(16 * largs->y));
+        fprintf(stderr,"         z = %ld\n\n",(16 * largs->z));
     }
     free(largs->A);
     free(largs->B);
@@ -1156,12 +1156,12 @@ THREAD(check_matrix_cont0) {
     check_matrix_cont0_closure *largs = (check_matrix_cont0_closure*)(args.get());
     check_matrix_cont1_closure SN_check_matrix_cont1c(largs->k);
     spawn_next<check_matrix_cont1_closure> SN_check_matrix_cont1(SN_check_matrix_cont1c);
+    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->b = largs->b;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->a = largs->a;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->errorf = largs->errorf;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->y = largs->y;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->v = largs->v;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->o = largs->o;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->b = largs->b;
+    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->y = largs->y;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->x = largs->x;
     ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->R = largs->R;
     // Original sync was here
@@ -1185,13 +1185,13 @@ THREAD(check_matrix_cont2) {
     check_matrix_cont2_closure *largs = (check_matrix_cont2_closure*)(args.get());
     check_matrix_cont3_closure SN_check_matrix_cont3c(largs->k);
     spawn_next<check_matrix_cont3_closure> SN_check_matrix_cont3(SN_check_matrix_cont3c);
+    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->b = largs->b;
+    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->a = largs->a;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->errorf = largs->errorf;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->v = largs->v;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->a = largs->a;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->o = largs->o;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->x = largs->x;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->b = largs->b;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->y = largs->y;
+    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->x = largs->x;
     ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->R = largs->R;
     // Original sync was here
     return;
@@ -1293,13 +1293,13 @@ THREAD(multiply_matrix_cont1) {
 
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->add = largs->add;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->orr = largs->orr;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->y = largs->y;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->oa = largs->oa;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->x = largs->x;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->z = largs->z;
-    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->ob = largs->ob;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->R = largs->R;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->z = largs->z;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->y = largs->y;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->x = largs->x;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->ob = largs->ob;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->B = largs->B;
+    ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->oa = largs->oa;
     ((multiply_matrix_cont2_closure*)SN_multiply_matrix_cont2.cls.get())->A = largs->A;
     // Original sync was here
     return;
@@ -1341,13 +1341,13 @@ THREAD(run_cont0) {
     run_cont1_closure SN_run_cont1c(largs->k);
     spawn_next<run_cont1_closure> SN_run_cont1(SN_run_cont1c);
     ((run_cont1_closure*)SN_run_cont1.cls.get())->t2 = largs->t2;
+    ((run_cont1_closure*)SN_run_cont1.cls.get())->t1 = largs->t1;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->R = largs->R;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->B = largs->B;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->y = largs->y;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->A = largs->A;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->check = largs->check;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->t1 = largs->t1;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->z = largs->z;
+    ((run_cont1_closure*)SN_run_cont1.cls.get())->y = largs->y;
     ((run_cont1_closure*)SN_run_cont1.cls.get())->x = largs->x;
     // Original sync was here
     return;
@@ -1373,13 +1373,13 @@ THREAD(run_cont1) {
     spawn<multiply_matrix_closure> sp0(sp0c);
 
     ((run_cont2_closure*)SN_run_cont2.cls.get())->t2 = largs->t2;
+    ((run_cont2_closure*)SN_run_cont2.cls.get())->t1 = largs->t1;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->R = largs->R;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->B = largs->B;
-    ((run_cont2_closure*)SN_run_cont2.cls.get())->y = largs->y;
+    ((run_cont2_closure*)SN_run_cont2.cls.get())->A = largs->A;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->check = largs->check;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->z = largs->z;
-    ((run_cont2_closure*)SN_run_cont2.cls.get())->A = largs->A;
-    ((run_cont2_closure*)SN_run_cont2.cls.get())->t1 = largs->t1;
+    ((run_cont2_closure*)SN_run_cont2.cls.get())->y = largs->y;
     ((run_cont2_closure*)SN_run_cont2.cls.get())->x = largs->x;
     // Original sync was here
     return;
@@ -1409,11 +1409,11 @@ THREAD(run_cont2) {
         ((run_cont3_closure*)SN_run_cont3.cls.get())->runtime_ms = runtime_ms;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->t2 = largs->t2;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->t1 = largs->t1;
+        ((run_cont3_closure*)SN_run_cont3.cls.get())->R = largs->R;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->B = largs->B;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->A = largs->A;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->z = largs->z;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->check = largs->check;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->R = largs->R;
+        ((run_cont3_closure*)SN_run_cont3.cls.get())->z = largs->z;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->y = largs->y;
         ((run_cont3_closure*)SN_run_cont3.cls.get())->x = largs->x;
         // Original sync was here

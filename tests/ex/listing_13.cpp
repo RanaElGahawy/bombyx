@@ -139,8 +139,8 @@ THREAD(original_reentry0) {
             sp1c.x = largs->i;
             spawn<g_closure> sp1(sp1c);
 
-            ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->total = largs->total;
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->a = largs->a;
+            ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->total = largs->total;
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->i = largs->i;
             ((original_reentry0_cont0_closure*)SN_original_reentry0_cont0.cls.get())->n = largs->n;
             // Original sync was here

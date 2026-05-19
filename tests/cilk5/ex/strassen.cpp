@@ -732,15 +732,15 @@ THREAD(OptimizedStrassenMultiply) {
         sp6c.RowWidthB = QuadrantSize;
         spawn<OptimizedStrassenMultiply_closure> sp6(sp6c);
 
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->StartHeap = StartHeap;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->RowIncrementC = RowIncrementC;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->M5 = M5;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C21 = C21;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C12 = C12;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->QuadrantSize = QuadrantSize;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->T1sMULT = T1sMULT;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->M2 = M2;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C22 = C22;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->StartHeap = StartHeap;
-        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->T1sMULT = T1sMULT;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C12 = C12;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->M5 = M5;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C21 = C21;
+        ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->QuadrantSize = QuadrantSize;
         ((OptimizedStrassenMultiply_cont0_closure*)SN_OptimizedStrassenMultiply_cont0.cls.get())->C = largs->C;
         // Original sync was here
     }
@@ -805,7 +805,7 @@ void free_matrix(REAL *A) {
     free(A);
 }
 int usage() {
-    fprintf(__stderrp,"\nUsage: strassen [<cilk-options>] [-n #] [-c] [-rc]\n\nMultiplies two randomly generated n x n matrices. To check for\ncorrectness use -c using iterative matrix multiply or use -rc \nusing randomized algorithm due to Freivalds.\n\n");
+    fprintf(stderr,"\nUsage: strassen [<cilk-options>] [-n #] [-c] [-rc]\n\nMultiplies two randomly generated n x n matrices. To check for\ncorrectness use -c using iterative matrix multiply or use -rc \nusing randomized algorithm due to Freivalds.\n\n");
     return 1;
 }
 int main(int argc, char **argv) {
@@ -865,10 +865,10 @@ int main(int argc, char **argv) {
 
             ((main_cont0_closure*)SN_main_cont0.cls.get())->t1 = t1;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->n = n;
-            ((main_cont0_closure*)SN_main_cont0.cls.get())->B = B;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->rand_check = rand_check;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->verify = verify;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->C = C;
+            ((main_cont0_closure*)SN_main_cont0.cls.get())->B = B;
             ((main_cont0_closure*)SN_main_cont0.cls.get())->A = A;
             // Original sync was here
         }
@@ -883,11 +883,11 @@ THREAD(OptimizedStrassenMultiply_cont0) {
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->T1sMULT = largs->T1sMULT;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M5 = largs->M5;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M2 = largs->M2;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C = largs->C;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C21 = largs->C21;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C22 = largs->C22;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C21 = largs->C21;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C12 = largs->C12;
     ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->QuadrantSize = largs->QuadrantSize;
+    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C = largs->C;
     // Original sync was here
     return;
 }
@@ -984,7 +984,7 @@ THREAD(main_cont0) {
         free_vec(V2);
     } else {
         if (largs->verify) {
-            fprintf(__stderrp,"Checking results ... \n");
+            fprintf(stderr,"Checking results ... \n");
             C2 = alloc_matrix(largs->n);
             matrixmul(largs->n,largs->A,largs->n,largs->B,largs->n,C2,largs->n);
             largs->verify = compare_matrix(largs->n,largs->C,largs->n,C2,largs->n);
@@ -992,10 +992,10 @@ THREAD(main_cont0) {
         }
     }
     if ((largs->rand_check || largs->verify)) {
-        fprintf(__stderrp,"WRONG RESULT!\n");
+        fprintf(stderr,"WRONG RESULT!\n");
     } else {
-        fprintf(__stderrp,"\nCilk Example: strassen\n");
-        fprintf(__stderrp,"Options: n = %d\n\n",largs->n);
+        fprintf(stderr,"\nCilk Example: strassen\n");
+        fprintf(stderr,"Options: n = %d\n\n",largs->n);
     }
     free_matrix(largs->A);
     free_matrix(largs->B);
