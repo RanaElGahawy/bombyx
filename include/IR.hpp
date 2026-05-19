@@ -683,7 +683,7 @@ public:
   virtual IRStmt *clone() override;
 };
 
-// Wraps an arbitrary Clang Stmt* opaquely.
+// Wraps an arbitrary Clang Stmt*.
 // The statement is printed using Clang's pretty-printer, with
 // variable renames applied so that IR-renamed vars are printed correctly.
 struct ASTStmtWrapIRStmt : IRStmt {

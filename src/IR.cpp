@@ -379,7 +379,6 @@ struct VarRenamePrinterHelper : clang::PrinterHelper {
     }
     // For lambda expressions, rewrite any captured variable that has been
     // renamed (e.g. end -> largs->end) as an init-capture [end = largs->end]
-    // so the capture list compiles in the transformed function body.
     if (auto *Lambda = llvm::dyn_cast<clang::LambdaExpr>(E)) {
       bool AnyRenamed = false;
       for (const auto &Cap : Lambda->captures()) {
@@ -389,7 +388,7 @@ struct VarRenamePrinterHelper : clang::PrinterHelper {
         }
       }
       if (!AnyRenamed)
-        return false; // let printPretty handle it normally
+        return false;
       // Print capture list with init-captures for renamed vars.
       OS << "[";
       bool First = true;
