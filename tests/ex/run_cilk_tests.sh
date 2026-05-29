@@ -10,32 +10,33 @@ echo "=== Running OpenCilk tests ==="
 
 run_test () {
   NAME=$1
+  BASE_NAME="${NAME%_cilk1}"
 
   echo ">> $NAME"
 
   $CLANG $NAME.cpp $FLAGS -o $NAME
   ./$NAME > ${NAME}.txt
 
-  diff "$BASE/ex/${NAME}.txt" "$BASE/im/${NAME}.txt" || echo "❌ $NAME output differs"
+  diff "$BASE/ex/${NAME}.txt" "$BASE/im/${BASE_NAME}.txt" || echo "❌ $NAME output differs"
 }
 
 # Tests with expected outputs
-run_test "nqueens"
-run_test "fib"
-run_test "listing_7"
-run_test "listing_8"
-run_test "listing_9"
-run_test "listing_10"
-run_test "listing_11"
-run_test "listing_13"
-run_test "test_0"
-run_test "test_1"
-run_test "test_2"
-run_test "test_3"
-run_test "test_4"
-run_test "test_5"
-run_test "test_6"
-run_test "test_7"
-run_test "test_8"
+run_test "nqueens_cilk1"
+run_test "fib_cilk1"
+run_test "listing_7_cilk1"
+run_test "listing_8_cilk1"
+run_test "listing_9_cilk1"
+run_test "listing_10_cilk1"
+run_test "listing_11_cilk1"
+run_test "listing_13_cilk1"
+run_test "test_0_cilk1"
+run_test "test_1_cilk1"
+run_test "test_2_cilk1"
+run_test "test_3_cilk1"
+run_test "test_4_cilk1"
+run_test "test_5_cilk1"
+run_test "test_6_cilk1"
+run_test "test_7_cilk1"
+run_test "test_8_cilk1"
 
 echo "✅ Done"

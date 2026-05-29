@@ -38,6 +38,8 @@ struct ConvertOpts {
   // default: TC_CILK1EMU
   enum { TG_CILK1EMU, TG_HARDCILK } Target = TG_CILK1EMU;
   bool HCGenDriver = false;
+  std::string OutputDir; // -d flag: override base output directory
+  std::string AppName;   // stem of input file
 };
 
 ConvertOpts GOpts;
@@ -93,7 +95,7 @@ public:
               OutDir = ".";
 
             std::filesystem::path Src =
-                std::filesystem::path("support") / "cilk_explicit.hh";
+                std::filesystem::path(BOMBYX_SUPPORT_DIR) / "cilk_explicit.hh";
             std::filesystem::path Dest = OutDir / "cilk_explicit.hh";
 
             std::error_code CopyEC;
@@ -109,7 +111,7 @@ public:
           case ConvertOpts::TG_HARDCILK: {
             std::filesystem::path OutPath(OutFilename.str());
             std::filesystem::create_directories(OutPath);
-            std::string AppName = OutPath.stem().string();
+            std::string AppName = GOpts.AppName;
             printFullIRProgram(llvm::errs(), P, Context);
             HardCilkTarget HT(P, AppName);
             std::string DescJsonName =
@@ -297,7 +299,7 @@ int main(int argc, char *argv[]) {
       {"target", required_argument, 0, 0},
   };
   int option_index = -1;
-  while ((c = getopt_long(argc, argv, "vVt:", long_options, &option_index)) !=
+  while ((c = getopt_long(argc, argv, "vVt:d:", long_options, &option_index)) !=
          -1) {
     switch (c) {
     case 0:
@@ -329,6 +331,9 @@ int main(int argc, char *argv[]) {
     case 't':
       set_target(optarg);
       break;
+    case 'd':
+      GOpts.OutputDir = optarg;
+      break;
     case 'v':
       VERBOSITY = 1;
       break;
@@ -338,10 +343,11 @@ int main(int argc, char *argv[]) {
     default: /* '?' */
       fprintf(
           stderr,
-          "Usage: %s [OPTION]... INFILE OUTNAME\n"
-          "OUTNAME can be a file or folder depending on TARGET.\n"
+          "Usage: %s [OPTION]... INFILE\n"
+          "Output is placed next to INFILE (or in DIR if -d is given).\n"
           "   -v                      \t verbose\n"
           "   -V                      \t very verbose\n"
+          "   -d <DIR>                \t base output directory\n"
           "       --fdump-dot=<PASSES>\t Indices of passes to dump GraphViz "
           "output after, comma separated\n"
           "       --fgen-driver       \t (HardCilk only) generate driver code\n"
@@ -352,9 +358,8 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (argc - optind < 2) {
-    std::cerr << "Expected path to input OpenCilk (C++) file and output file."
-              << std::endl;
+  if (argc - optind < 1) {
+    std::cerr << "Expected path to input OpenCilk (C++) file." << std::endl;
     return 1;
   }
 
@@ -364,6 +369,36 @@ int main(int argc, char *argv[]) {
                endsWith(Input, ".cxx") || endsWith(Input, ".C") ||
                endsWith(Input, ".hpp") || endsWith(Input, ".hh") ||
                endsWith(Input, ".hxx");
+
+  // Derive output path from input stem.
+  // Default base dir = parent directory of the input file.
+  std::filesystem::path InputPath(Input);
+  std::string Stem = InputPath.stem().string();
+  GOpts.AppName = Stem;
+
+  std::filesystem::path InputParent = InputPath.parent_path();
+  if (InputParent.empty())
+    InputParent = ".";
+
+  std::filesystem::path BaseOutDir =
+      GOpts.OutputDir.empty() ? InputParent
+                              : std::filesystem::path(GOpts.OutputDir);
+
+  std::string OutFilename;
+  if (GOpts.Target == ConvertOpts::TG_CILK1EMU) {
+    if (!GOpts.OutputDir.empty()) {
+      std::error_code MkEC;
+      std::filesystem::create_directories(BaseOutDir, MkEC);
+      if (MkEC) {
+        llvm::errs() << "error: could not create output directory "
+                     << BaseOutDir.string() << ": " << MkEC.message() << "\n";
+        return 1;
+      }
+    }
+    OutFilename = (BaseOutDir / (Stem + "_cilk1.cpp")).string();
+  } else {
+    OutFilename = (BaseOutDir / (Stem + "_HardCilk")).string();
+  }
 
   std::vector<std::string> compilationFlags = {
       IsCpp ? OPENCILK_HOME "/bin/clang++" : OPENCILK_HOME "/bin/clang",
@@ -377,7 +412,7 @@ int main(int argc, char *argv[]) {
       "-Wno-unused",
   };
 
-  compilationFlags.push_back(argv[optind]);
+  compilationFlags.push_back(Input);
 
   std::shared_ptr<clang::PCHContainerOperations> PCHContainerOps =
       std::make_shared<clang::PCHContainerOperations>();
@@ -387,7 +422,7 @@ int main(int argc, char *argv[]) {
       new clang::FileManager(FSOpts));
 
   clang::tooling::ToolInvocation invocation(
-      compilationFlags, std::make_unique<CilkConvertAction>(argv[optind + 1]),
+      compilationFlags, std::make_unique<CilkConvertAction>(OutFilename),
       Files.get(), PCHContainerOps);
   return !invocation.run();
 }

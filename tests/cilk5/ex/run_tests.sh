@@ -18,49 +18,49 @@ compile_with_getoptions() {
 }
 
 printf ">> nqueens \n"
-compile_with_getoptions nqueens.cpp nqueens ""
+compile_with_getoptions nqueens_cilk1.cpp nqueens ""
 ./nqueens 13
 
 printf "\n >> fib \n"
-compile_with_getoptions fib.cpp fib ""
+compile_with_getoptions fib_cilk1.cpp fib ""
 ./fib 35
 
 printf "\n >> cilksort \n"
-compile_with_getoptions cilksort.cpp cilksort ""
+compile_with_getoptions cilksort_cilk1.cpp cilksort ""
 ./cilksort -n 100000000 -c
 
 printf "\n >> qsort \n"
-$CLANGXX $CXX_FLAGS qsort.cpp -o qsort
+$CLANGXX $CXX_FLAGS qsort_cilk1.cpp -o qsort
 ./qsort 80000000 -c
 
 printf "\n >> matmul \n"
-compile_with_getoptions matmul.cpp matmul ""
+compile_with_getoptions matmul_cilk1.cpp matmul ""
 ./matmul -n 1000 -c
 
 printf "\n >> rectmul \n"
-compile_with_getoptions rectmul.cpp rectmul "-Wdeprecated -Wunneeded-internal-declaration"
+compile_with_getoptions rectmul_cilk1.cpp rectmul "-Wdeprecated -Wunneeded-internal-declaration"
 ./rectmul -benchmark long -c
 
 printf "\n >> rectmulred \n"
-compile_with_getoptions rectmulred.cpp rectmulred ""
+compile_with_getoptions rectmulred_cilk1.cpp rectmulred ""
 ./rectmulred -benchmark long -c
 
 printf "\n >> lu \n"
-compile_with_getoptions lu.cpp lu ""
+compile_with_getoptions lu_cilk1.cpp lu ""
 ./lu -n 1024 -c
 
 printf "\n >> heat \n"
-compile_with_getoptions heat.cpp heat ""
+compile_with_getoptions heat_cilk1.cpp heat ""
 ./heat -benchmark long
 
 printf "\n >> strassen \n"
-compile_with_getoptions strassen.cpp strassen ""
+compile_with_getoptions strassen_cilk1.cpp strassen ""
 ./strassen -n 1024 -c
 
 printf "\n >> fft \n"
-compile_with_getoptions fft.cpp fft ""
+compile_with_getoptions fft_cilk1.cpp fft ""
 ./fft -c
 
 printf "\n >> cholesky \n"
-compile_with_getoptions cholesky.cpp cholesky ""
+compile_with_getoptions cholesky_cilk1.cpp cholesky ""
 ./cholesky -c
