@@ -112,7 +112,7 @@ public:
             std::filesystem::path OutPath(OutFilename.str());
             std::filesystem::create_directories(OutPath);
             std::string AppName = GOpts.AppName;
-            printFullIRProgram(llvm::errs(), P, Context);
+            // printFullIRProgram(llvm::errs(), P, Context);
             HardCilkTarget HT(P, AppName);
             std::string DescJsonName =
                 OutFilename.str() + "/" + AppName + "_descriptors.json";
@@ -130,6 +130,12 @@ public:
                 OutFilename.str() + "/" + AppName + "_defs.h";
             llvm::raw_fd_ostream Defs(DefsName, EC, llvm::sys::fs::OF_Text);
             HT.PrintDefs(Defs);
+
+            std::string DriverHName =
+                OutFilename.str() + "/" + AppName + "Driver.h";
+            llvm::raw_fd_ostream DriverH(DriverHName, EC,
+                                         llvm::sys::fs::OF_Text);
+            HT.PrintDriverHeader(DriverH, Context);
 
             if (GOpts.HCGenDriver) {
               std::string DriverName =

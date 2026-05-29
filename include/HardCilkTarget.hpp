@@ -101,4 +101,5 @@ public:
   void PrintDescJson(llvm::raw_ostream &out);
   void PrintDriver(llvm::raw_ostream &out);
   void PrintDefs(llvm::raw_ostream &out);
+  void PrintDriverHeader(llvm::raw_ostream &out, clang::ASTContext &C);
 };
