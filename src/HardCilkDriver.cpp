@@ -1,10 +1,41 @@
 #include "HardCilkTarget.hpp"
 #include "IR.hpp"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Lex/Lexer.h"
 #include "llvm/Support/raw_ostream.h"
+
+// Derive the count/size expression for a pointer variable:
+//   - new T[n]   → extract "n" from the CXXNewExpr
+//   - container  → "basename.size()"
+//   - fallback   → "basename_count"  (user fills in)
+static std::string getSizeExpr(const clang::ValueDecl *VD,
+                               const std::string &BaseName,
+                               const clang::SourceManager &SM,
+                               const clang::LangOptions &LO) {
+  if (VD->getType()->isRecordType())
+    return BaseName + ".size()";
+
+  if (auto *Var = clang::dyn_cast<clang::VarDecl>(VD)) {
+    if (auto *Init = Var->getInit()) {
+      auto *NewExpr =
+          clang::dyn_cast<clang::CXXNewExpr>(Init->IgnoreParenImpCasts());
+      if (NewExpr && NewExpr->isArray()) {
+        if (auto SizeOpt = NewExpr->getArraySize()) {
+          auto Text =
+              clang::Lexer::getSourceText(clang::CharSourceRange::getTokenRange(
+                                              (*SizeOpt)->getSourceRange()),
+                                          SM, LO);
+          if (!Text.empty())
+            return Text.str();
+        }
+      }
+    }
+  }
+  return BaseName + "_count";
+}
 
 void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
                                        clang::ASTContext &C) {
@@ -131,8 +162,8 @@ void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
   // --- allocate + copy for base pointer arguments ---
   Out << "\n";
   std::set<const clang::ValueDecl *> AllocatedBases;
-  std::vector<std::pair<std::string, std::string>>
-      AllocatedPtrs; // (baseName, pointeeType)
+  // (baseName, pointeeType, sizeExpr)
+  std::vector<std::tuple<std::string, std::string, std::string>> AllocatedPtrs;
   if (RootCall) {
     for (size_t i = 0; i < ArgVars.size() && i < RootCall->getNumArgs(); ++i) {
       if (!ArgVars[i]->Type->isPointerType())
@@ -144,13 +175,13 @@ void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
       std::string BaseName = DRE->getDecl()->getName().str();
       std::string PointeeType =
           ArgVars[i]->Type->getPointeeType().getAsString();
-      AllocatedPtrs.push_back({BaseName, PointeeType});
+      std::string SizeExpr = getSizeExpr(DRE->getDecl(), BaseName, SM, LO);
+      AllocatedPtrs.push_back({BaseName, PointeeType, SizeExpr});
       Out << "        uint64_t " << BaseName << "_addr = allocateMemFPGA("
-          << "sizeof(" << PointeeType << ") * " << BaseName
-          << ".size(), 512);\n";
+          << "sizeof(" << PointeeType << ") * " << SizeExpr << ", 512);\n";
       Out << "        memory_->copyToDevice(" << BaseName << "_addr, "
           << "reinterpret_cast<const uint8_t *>(" << BaseName << "), "
-          << "sizeof(" << PointeeType << ") * " << BaseName << ".size());\n";
+          << "sizeof(" << PointeeType << ") * " << SizeExpr << ");\n";
     }
   }
 
@@ -223,14 +254,14 @@ void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
 
   // Read pointer data back from the FPGA after execution.
   Out << "\n";
-  for (auto &[BaseName, PointeeType] : AllocatedPtrs) {
+  for (auto &[BaseName, PointeeType, SizeExpr] : AllocatedPtrs) {
     Out << "        memory_->copyFromDevice("
         << "reinterpret_cast<uint8_t *>(" << BaseName << "), " << BaseName
         << "_addr, "
-        << "sizeof(" << PointeeType << ") * " << BaseName << ".size());\n";
+        << "sizeof(" << PointeeType << ") * " << SizeExpr << ");\n";
   }
 
-  // Copy statements from the caller body that come AFTER the root task call.
+  // Copy statements from the caller body that come after the root task call.
   if (RootCall && CallerFn && CallerFn->Info.RootFun &&
       CallerFn->Info.RootFun->hasBody()) {
     auto *Body =
