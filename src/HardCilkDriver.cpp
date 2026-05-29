@@ -131,6 +131,8 @@ void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
   // --- allocate + copy for base pointer arguments ---
   Out << "\n";
   std::set<const clang::ValueDecl *> AllocatedBases;
+  std::vector<std::pair<std::string, std::string>>
+      AllocatedPtrs; // (baseName, pointeeType)
   if (RootCall) {
     for (size_t i = 0; i < ArgVars.size() && i < RootCall->getNumArgs(); ++i) {
       if (!ArgVars[i]->Type->isPointerType())
@@ -142,6 +144,7 @@ void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
       std::string BaseName = DRE->getDecl()->getName().str();
       std::string PointeeType =
           ArgVars[i]->Type->getPointeeType().getAsString();
+      AllocatedPtrs.push_back({BaseName, PointeeType});
       Out << "        uint64_t " << BaseName << "_addr = allocateMemFPGA("
           << "sizeof(" << PointeeType << ") * " << BaseName
           << ".size(), 512);\n";
@@ -217,6 +220,43 @@ void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
          "end_management - start_management;\n";
   Out << "        std::cout << \"Time taken by management_loop: \" << "
          "management_duration.count() << \" seconds\" << std::endl;\n";
+
+  // Read pointer data back from the FPGA after execution.
+  Out << "\n";
+  for (auto &[BaseName, PointeeType] : AllocatedPtrs) {
+    Out << "        memory_->copyFromDevice("
+        << "reinterpret_cast<uint8_t *>(" << BaseName << "), " << BaseName
+        << "_addr, "
+        << "sizeof(" << PointeeType << ") * " << BaseName << ".size());\n";
+  }
+
+  // Copy statements from the caller body that come AFTER the root task call.
+  if (RootCall && CallerFn && CallerFn->Info.RootFun &&
+      CallerFn->Info.RootFun->hasBody()) {
+    auto *Body =
+        clang::cast<clang::CompoundStmt>(CallerFn->Info.RootFun->getBody());
+    bool PastCall = false;
+    Out << "\n";
+    for (auto *S : Body->body()) {
+      if (!PastCall) {
+        if (SM.isPointWithin(RootCall->getBeginLoc(), S->getBeginLoc(),
+                             S->getEndLoc()))
+          PastCall = true;
+        continue;
+      }
+      if (clang::isa<clang::ReturnStmt>(S))
+        continue;
+      clang::SourceLocation End =
+          clang::Lexer::getLocForEndOfToken(S->getEndLoc(), 0, SM, LO);
+      const char *NextChar = SM.getCharacterData(End);
+      if (NextChar && *NextChar == ';')
+        End = End.getLocWithOffset(1);
+      auto Text = clang::Lexer::getSourceText(
+          clang::CharSourceRange::getCharRange(S->getBeginLoc(), End), SM, LO);
+      Out << "        " << Text << "\n";
+    }
+  }
+
   Out << "\n        return 0;\n";
   Out << "    }\n";
   Out << "};\n";
