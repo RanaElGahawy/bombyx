@@ -111,9 +111,11 @@ static void collectReferencedVars(const std::vector<IRBasicBlock *> &Blocks,
 static IRFunction *
 createTaskFunction(IRProgram *P, const std::string &Name, IRType RetTy,
                    const std::vector<IRVarRef> &ArgVars,
-                   std::unordered_map<IRVarRef, IRVarRef> &Remap) {
+                   std::unordered_map<IRVarRef, IRVarRef> &Remap,
+                   const clang::FunctionDecl *RootFun = nullptr) {
   IRFunction *F = P->createFunc(Name, RetTy);
   F->Info.IsTask = true;
+  F->Info.RootFun = RootFun;
   for (auto *OldVR : ArgVars) {
     F->Vars.push_back(IRVarDecl{
         .Type = OldVR->Type,
@@ -295,7 +297,7 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   auto ExitNeeded = getAllVars(&F);
   std::string ExitName = F.getName() + "_exit" + std::to_string(LoopCounter);
   auto *ExitF = createTaskFunction(F.getParent(), ExitName, F.getReturnType(),
-                                   ExitNeeded, ExitRemap);
+                                   ExitNeeded, ExitRemap, F.Info.RootFun);
   NewFunctions.push_back(ExitF);
 
   // Move after-loop blocks to ExitF
@@ -310,8 +312,9 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
   std::unordered_map<IRVarRef, IRVarRef> ReentryRemap;
   std::string ReentryName =
       F.getName() + "_reentry" + std::to_string(LoopCounter);
-  auto *ReentryF = createTaskFunction(F.getParent(), ReentryName,
-                                      F.getReturnType(), AllVars, ReentryRemap);
+  auto *ReentryF =
+      createTaskFunction(F.getParent(), ReentryName, F.getReturnType(), AllVars,
+                         ReentryRemap, F.Info.RootFun);
   NewFunctions.push_back(ReentryF);
 
   auto *LoopTerm = dyn_cast<LoopIRStmt>(LoopHeader->Term);
@@ -626,8 +629,9 @@ static std::vector<IRFunction *> restructureIfsWithSync(IRFunction &F) {
   std::unordered_map<IRVarRef, IRVarRef> AfterIfRemap;
   std::string AfterIfName =
       F.getName() + "_afterif" + std::to_string(IfCounter);
-  auto *AfterIfF = createTaskFunction(F.getParent(), AfterIfName,
-                                      F.getReturnType(), AllVars, AfterIfRemap);
+  auto *AfterIfF =
+      createTaskFunction(F.getParent(), AfterIfName, F.getReturnType(), AllVars,
+                         AfterIfRemap, F.Info.RootFun);
   NewFunctions.push_back(AfterIfF);
 
   // Move after-if blocks to AfterIfF and remap vars.

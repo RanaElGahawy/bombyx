@@ -1253,7 +1253,8 @@ void finalizeFunction(IRFunction *F, FunLookupTy &FunLookup) {
   }
 }
 
-void OpenCilk2IR(IRProgram &P, clang::ASTContext *Context, SourceManager &SM) {
+void OpenCilk2IR(IRProgram &P, clang::ASTContext *Context, SourceManager &SM,
+                 DriverCallersTy &DriverCallers) {
   CilkAnalyzeVisitor AVisitor;
 
   // Pass 1: identify Tasks and TaskCallers
@@ -1272,6 +1273,41 @@ void OpenCilk2IR(IRProgram &P, clang::ASTContext *Context, SourceManager &SM) {
     llvm::outs() << "taskcallers\n";
     for (auto *Task : AVisitor.TaskCallers) {
       llvm::outs() << Task->getName() << "\n";
+    }
+  }
+
+  // Build DriverCallers: scan IGNORE'd functions for calls to
+  // Tasks/TaskCallers.
+  {
+    struct Scanner : clang::RecursiveASTVisitor<Scanner> {
+      const std::set<FunctionDecl *> &Tasks;
+      const std::set<FunctionDecl *> &TaskCallers;
+      DriverCallersTy &Result;
+      const clang::FunctionDecl *CallerFD;
+      Scanner(const std::set<FunctionDecl *> &T,
+              const std::set<FunctionDecl *> &TC, DriverCallersTy &R,
+              const clang::FunctionDecl *C)
+          : Tasks(T), TaskCallers(TC), Result(R), CallerFD(C) {}
+      bool VisitCallExpr(clang::CallExpr *CE) {
+        auto *Callee = CE->getDirectCallee();
+        if (!Callee)
+          return true;
+        auto *Def = toDefinition(Callee);
+        if (Tasks.count(Def) || TaskCallers.count(Def))
+          Result[Def->getCanonicalDecl()] = CallerFD->getCanonicalDecl();
+        return true;
+      }
+    };
+    for (auto &D : Decls) {
+      auto *FD = clang::dyn_cast<clang::FunctionDecl>(D);
+      if (!FD || !FD->hasBody() || !SM.isInMainFile(FD->getLocation()))
+        continue;
+      if (!FD->getDeclName().isIdentifier() ||
+          !GIgnoreFns.count(FD->getName().str()))
+        continue;
+      auto *Def = toDefinition(FD);
+      Scanner sc(AVisitor.Tasks, AVisitor.TaskCallers, DriverCallers, Def);
+      sc.TraverseStmt(Def->getBody());
     }
   }
 

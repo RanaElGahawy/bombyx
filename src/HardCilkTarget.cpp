@@ -374,7 +374,8 @@ void HardCilkTarget::analyzeSendArguments() {
                                          ParentSendArgList.end());
               // Only propagate SpawnNextList when F is itself a HardCilk task.
               // Entry-point functions (not in TaskInfos) have no parent
-              // continuation in the HardCilk model and must not contribute here.
+              // continuation in the HardCilk model and must not contribute
+              // here.
               if (FInfoIt != TaskInfos.end())
                 ESFInfo.SendArgList.insert(F->Info.SpawnNextList.begin(),
                                            F->Info.SpawnNextList.end());
@@ -423,7 +424,8 @@ void HardCilkTarget::analyzeArgOutWriteBuffers() {
     Info.BufferedArgType = TY_VOID;
     Info.BufferedStoreAllowMap.clear();
 
-    if (Info.IsSynthetic || Info.SendArgList.empty() || !typeIsVoid(*Info.RetTy))
+    if (Info.IsSynthetic || Info.SendArgList.empty() ||
+        !typeIsVoid(*Info.RetTy))
       continue;
 
     HardCilkStmtOrderCollector Collector;
@@ -475,8 +477,8 @@ IRFunction *HardCilkTarget::ensureBaseContinuation() {
     return SyntheticBaseContinuation.get();
   }
 
-  SyntheticBaseContinuation = std::make_unique<IRFunction>(
-      0, "base_continuation", QualType(), &P);
+  SyntheticBaseContinuation =
+      std::make_unique<IRFunction>(0, "base_continuation", QualType(), &P);
   auto *BaseCont = SyntheticBaseContinuation.get();
   auto &BaseContInfo = TaskInfos[BaseCont];
   BaseContInfo.IsCont = true;
@@ -485,8 +487,9 @@ IRFunction *HardCilkTarget::ensureBaseContinuation() {
   return BaseCont;
 }
 
-HardCilkTarget::HardCilkTarget(IRProgram &P, const std::string &AppName)
-    : P(P), AppName(AppName) {
+HardCilkTarget::HardCilkTarget(IRProgram &P, const std::string &AppName,
+                               DriverCallersTy DriverCallers)
+    : P(P), AppName(AppName), DriverCallers(std::move(DriverCallers)) {
 
   // Pass 1: register every espawn target as a task. This determines which
   // functions are reachable as HardCilk tasks (i.e., they appear in some
@@ -706,7 +709,8 @@ static bool emitMemStore(llvm::raw_ostream &Out, IRPrintContext &C,
 static const FieldDecl *getAccessFieldDecl(AccessIRExpr *AE);
 static std::string getAccessStructName(AccessIRExpr *AE);
 
-// Walk every CallIRExpr in F's body and collect the resolved IRFunction* callees.
+// Walk every CallIRExpr in F's body and collect the resolved IRFunction*
+// callees.
 static void collectDirectCallees(IRFunction *F,
                                  std::set<IRFunction *> &Callees) {
   auto visitExpr = [&](auto &&self, IRExpr *E) -> void {
@@ -861,9 +865,10 @@ public:
       : Out(Out), C(C) {}
 };
 
-static void PrintInlinableFunction(llvm::raw_ostream &Out, clang::ASTContext &C,
-                                   IRFunction *Fn,
-                                   const std::set<IRFunction *> &FuncsNeedingMem) {
+static void
+PrintInlinableFunction(llvm::raw_ostream &Out, clang::ASTContext &C,
+                       IRFunction *Fn,
+                       const std::set<IRFunction *> &FuncsNeedingMem) {
   bool HasMem = FuncsNeedingMem.count(Fn) > 0;
 
   bool retIsRef = Fn->getReturnType()->isLValueReferenceType();
@@ -906,10 +911,8 @@ static void PrintInlinableFunction(llvm::raw_ostream &Out, clang::ASTContext &C,
   IRPrintContext IRC{
       .ASTCtx = C,
       .NewlineSymbol = "\n",
-      .IdentCB =
-          [](llvm::raw_ostream &Out, IRVarRef VR) {
-            Out << GetSym(VR->Name);
-          },
+      .IdentCB = [](llvm::raw_ostream &Out,
+                    IRVarRef VR) { Out << GetSym(VR->Name); },
       .ExprCB =
           [&](IRPrintContext *C, llvm::raw_ostream &Out, IRExpr *E) {
             if (auto *CE = dyn_cast<CallIRExpr>(E)) {
@@ -1315,8 +1318,7 @@ static std::string getAccessStructName(AccessIRExpr *AE) {
     StructName.erase(0, 7);
   }
   if (StructName.empty()) {
-    PANIC("Could not resolve accessed struct type for '%s'",
-          AE->Field.c_str());
+    PANIC("Could not resolve accessed struct type for '%s'", AE->Field.c_str());
   }
   return StructName;
 }
@@ -1370,8 +1372,7 @@ static bool emitMemStore(llvm::raw_ostream &Out, IRPrintContext &C,
         if (auto *Field = getAccessFieldDecl(AE);
             Field && Field->getType()->isArrayType()) {
           IRVarRef SR = AE->getStructVarRef();
-          assert(SR &&
-                 "emitMemStore: non-ident struct base not yet supported");
+          assert(SR && "emitMemStore: non-ident struct base not yet supported");
           Out << "MEM_STRUCT_ARR_OUT(mem, ";
           C.IdentCB(Out, SR);
           Out << ", " << getAccessStructName(AE) << ", " << AE->Field << ", ";
@@ -1404,7 +1405,8 @@ static bool emitMemStore(llvm::raw_ostream &Out, IRPrintContext &C,
 }
 
 void handleRef(RefIRExpr *RE, IRPrintContext *C, llvm::raw_ostream &Out) {
-  // &arr[i] is pointer arithmetic — addr of arr + i*sizeof(elem). No memory read.
+  // &arr[i] is pointer arithmetic — addr of arr + i*sizeof(elem). No memory
+  // read.
   if (auto *IE = dyn_cast<IndexIRExpr>(RE->E.get())) {
     Out << "(";
     C->ExprCB(C, Out, IE->Arr.get());
@@ -1556,8 +1558,7 @@ void HardCilkTarget::PrintDef(llvm::raw_ostream &Out, IRFunction *Task,
     }
   }
   if (Info.SendArgList.size() != 0 && taskHasArgDataOut(Info) && OkBaseType) {
-    printHardCilkType(Out << "struct __attribute__((packed)) ", ArgDataTy,
-                      true)
+    printHardCilkType(Out << "struct __attribute__((packed)) ", ArgDataTy, true)
         << "_arg_out {\n";
     Out << "  addr_t addr;\n";
     printHardCilkDecl(Out << "  ", ArgDataTy, "data") << ";\n";

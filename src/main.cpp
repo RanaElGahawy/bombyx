@@ -64,9 +64,11 @@ public:
       exit(EXIT_FAILURE);
     }
 
+    DriverCallersTy DriverCallers;
+
     std::vector<PassFn> Passes{
         [&](IRProgram &P) -> void {
-          OpenCilk2IR(P, &Context, SM);
+          OpenCilk2IR(P, &Context, SM, DriverCallers);
           // printFullIRProgram(llvm::outs(), P, Context);
         },
         [&](IRProgram &P) -> void {
@@ -113,7 +115,7 @@ public:
             std::filesystem::create_directories(OutPath);
             std::string AppName = GOpts.AppName;
             // printFullIRProgram(llvm::errs(), P, Context);
-            HardCilkTarget HT(P, AppName);
+            HardCilkTarget HT(P, AppName, std::move(DriverCallers));
             std::string DescJsonName =
                 OutFilename.str() + "/" + AppName + "_descriptors.json";
             llvm::raw_fd_ostream DescJson(DescJsonName, EC,

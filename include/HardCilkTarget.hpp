@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IR.hpp"
+#include "OpenCilk2IR.hpp"
 #include "clang/AST/ASTContext.h"
 #include <cstdint>
 #include <unordered_map>
@@ -80,11 +81,39 @@ using TaskInfosTy = std::unordered_map<IRFunction *, HCTaskInfo>;
 
 HardCilkType *clangTypeToHardCilk(IRType &Ty);
 
+struct DriverSpec {
+  std::string ClassName;
+  std::string TaskStructName;
+  size_t NumZeroFields = 0;
+  bool HasPadding = false;
+
+  std::vector<std::string> HelperFunctions;
+  std::vector<std::string> ExternGlobals;
+  std::vector<std::string> PreCallStmts;
+  std::vector<std::string> PostCallStmts;
+
+  // Pointer args that need to be copied to and from the FPGA
+  struct PtrArg {
+    std::string BaseName;
+    std::string PointeeType;
+    std::string SizeExpr;
+    bool CopyBack = false;
+  };
+  std::vector<PtrArg> PtrArgs;
+
+  struct FieldAssign {
+    std::string Field;
+    std::string Value;
+  };
+  std::vector<FieldAssign> FieldAssignments;
+};
+
 class HardCilkTarget {
 private:
   IRProgram &P;
   const std::string &AppName;
   TaskInfosTy TaskInfos;
+  DriverCallersTy DriverCallers;
   std::unique_ptr<IRFunction> SyntheticBaseContinuation;
   bool ArgOutImplList[TY_LAST] = {false};
 
@@ -94,8 +123,24 @@ private:
 
   void PrintDef(llvm::raw_ostream &Out, IRFunction *Task, HCTaskInfo &Info);
 
+  // Driver Analysis
+  DriverSpec BuildDriverSpec(clang::ASTContext &C);
+
+  // Driver Printing.
+  void PrintStartSystem(llvm::raw_ostream &Out);
+  void PrintManagementLoop(llvm::raw_ostream &Out);
+  void PrintAllocateMemFPGA(llvm::raw_ostream &Out, const std::string &AddrVar,
+                            const std::string &SizeExpr,
+                            const std::string &Alignment);
+  void PrintCopyToDevice(llvm::raw_ostream &Out, const std::string &Addr,
+                         const std::string &Data, const std::string &SizeExpr);
+  void PrintCopyFromDevice(llvm::raw_ostream &Out, const std::string &Data,
+                           const std::string &Addr,
+                           const std::string &SizeExpr);
+
 public:
-  HardCilkTarget(IRProgram &P, const std::string &AppName);
+  HardCilkTarget(IRProgram &P, const std::string &AppName,
+                 DriverCallersTy DriverCallers);
 
   void PrintHardCilk(llvm::raw_ostream &out, clang::ASTContext &C);
   void PrintDescJson(llvm::raw_ostream &out);
