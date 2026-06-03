@@ -78,7 +78,7 @@ void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
   Out << "class " << ClassName << " : public hardCilkDriver {\n";
   Out << "public:\n";
   Out << "    " << ClassName
-      << "(Memory *memory) : hardCilkDriver(memory) {}\n\n";
+      << "(Memory *memory, char *argv[]) : hardCilkDriver(memory) {}\n\n";
   Out << "    int run_test_bench() override {\n";
 
   // Count fields: _cont + each arg + padding array (if any)
