@@ -5,7 +5,7 @@
 #include <clang/Basic/SourceManager.h>
 #include <unordered_map>
 
-#include "IR.hpp"
+#include "core/IR.hpp"
 
 extern std::set<std::string> GIgnoreFns;
 extern std::vector<clang::RecordDecl *> GRecordDecls;

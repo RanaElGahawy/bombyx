@@ -64,21 +64,28 @@ add_definitions(${LLVM_DEFINITIONS})
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include_directories("include")
-# Source file
+# Source files — grouped by subsystem
 set(SOURCE_FILES
     src/main.cpp
-    src/IR.cpp
-    src/DAE.cpp
-    src/FlattenIR.cpp
-    src/CountSpawns.cpp
-    src/OpenCilk2IR.cpp
-    src/MakeExplicit.cpp
-    src/Cilk1EmuTarget.cpp
-    src/HardCilkAnalysis.cpp
-    src/VitisHLSTarget.cpp
-    src/HardCilkDescGen.cpp
-    src/HardCilkDriver.cpp
-    src/desugarOpenCilk.cpp
+
+    # Compiler core: IR, OpenCilk frontend, IR transformations
+    src/core/IR.cpp
+    src/core/OpenCilk2IR.cpp
+    src/core/FlattenIR.cpp
+    src/core/MakeExplicit.cpp
+    src/core/DAE.cpp
+    src/core/CountSpawns.cpp
+    src/core/desugarOpenCilk.cpp
+    src/core/Cilk1EmuTarget.cpp
+
+    # HardCilk analysis: task/closure/memory analysis, descriptor generation, driver
+    src/hardcilk/HardCilkAnalysis.cpp
+    src/hardcilk/HardCilkDescGen.cpp
+    src/hardcilk/HardCilkDriver.cpp
+
+    # Vitis HLS backend: code generation and TCL synthesis scripts
+    src/vitis/VitisHLSTarget.cpp
+    src/vitis/VitisHLSTclGen.cpp
 )
 
 # Add executable

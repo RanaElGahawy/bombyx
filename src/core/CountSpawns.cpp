@@ -1,5 +1,5 @@
-#include "CountSpawns.hpp"
-#include "IR.hpp"
+#include "core/CountSpawns.hpp"
+#include "core/IR.hpp"
 #include "clang/AST/Expr.h"
 #include <string>
 #include <unordered_map>

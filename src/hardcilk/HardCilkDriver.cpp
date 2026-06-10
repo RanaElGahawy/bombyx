@@ -1,5 +1,5 @@
-#include "VitisHLSTarget.hpp"
-#include "IR.hpp"
+#include "vitis/VitisHLSTarget.hpp"
+#include "core/IR.hpp"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"

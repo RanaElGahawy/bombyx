@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IR.hpp"
+#include "core/IR.hpp"
 #include "clang/AST/ASTContext.h"
 #include <cstdint>
 #include <memory>
@@ -83,6 +83,7 @@ struct HCTaskInfo {
   bool IsCont = false;
   bool IsSynthetic = false;
   bool GenerateArgOutWriteBuffer = false;
+  bool HasAXI = false;
   uint32_t BufferedArgumentBits = 0;
   HardCilkBaseType BufferedArgType = TY_VOID;
   size_t TaskSize;

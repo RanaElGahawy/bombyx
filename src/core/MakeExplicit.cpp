@@ -4,9 +4,9 @@
 #include <set>
 #include <unordered_map>
 
-#include "IR.hpp"
-#include "MakeExplicit.hpp"
-#include "util.hpp"
+#include "core/IR.hpp"
+#include "core/MakeExplicit.hpp"
+#include "core/util.hpp"
 #include "clang/AST/Expr.h"
 
 using namespace llvm;

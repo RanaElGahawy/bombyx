@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IR.hpp"
+#include "core/IR.hpp"
 #include "clang/AST/ASTContext.h"
 #include "clang/Frontend/CompilerInstance.h"
 

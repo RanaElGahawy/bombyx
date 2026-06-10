@@ -1,5 +1,5 @@
-#include "HardCilkAnalysis.hpp"
-#include "IR.hpp"
+#include "hardcilk/HardCilkAnalysis.hpp"
+#include "core/IR.hpp"
 #include "clang/AST/Type.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/MathExtras.h"
@@ -142,6 +142,163 @@ int hardCilkTypeSize(HardCilkType *Ty) {
 
 static uint32_t hardCilkTypeBitWidth(HardCilkBaseType Ty) {
   return hardCilkTypeSize(Ty) * 8;
+}
+
+// ─── AXI / Memory-Access Analysis ───────────────────────────────────────────
+
+static void collectDirectCalleesHCA(IRFunction *F,
+                                    std::set<IRFunction *> &Callees) {
+  auto visitExpr = [&](auto &&self, IRExpr *E) -> void {
+    if (!E)
+      return;
+    if (auto *CE = dyn_cast<CallIRExpr>(E)) {
+      if (auto *FP = std::get_if<IRFunction *>(&CE->Fn))
+        Callees.insert(*FP);
+      for (auto &Arg : CE->Args)
+        self(self, Arg.get());
+    } else if (auto *BE = dyn_cast<BinopIRExpr>(E)) {
+      self(self, BE->Left.get());
+      self(self, BE->Right.get());
+    } else if (auto *UE = dyn_cast<UnopIRExpr>(E)) {
+      self(self, UE->Expr.get());
+    } else if (auto *CE2 = dyn_cast<CastIRExpr>(E)) {
+      self(self, CE2->E.get());
+    } else if (auto *DE = dyn_cast<DRefIRExpr>(E)) {
+      self(self, DE->Expr.get());
+    } else if (auto *IE = dyn_cast<IndexIRExpr>(E)) {
+      self(self, IE->Arr.get());
+      self(self, IE->Ind.get());
+    } else if (auto *RE = dyn_cast<RefIRExpr>(E)) {
+      self(self, RE->E.get());
+    }
+  };
+  auto visitStmt = [&](IRStmt *S) {
+    if (auto *CS = dyn_cast<CopyIRStmt>(S))
+      visitExpr(visitExpr, CS->Src.get());
+    else if (auto *EW = dyn_cast<ExprWrapIRStmt>(S))
+      visitExpr(visitExpr, EW->Expr.get());
+    else if (auto *SS = dyn_cast<StoreIRStmt>(S)) {
+      visitExpr(visitExpr, SS->Dest.get());
+      visitExpr(visitExpr, SS->Src.get());
+    } else if (auto *IS = dyn_cast<IfIRStmt>(S))
+      visitExpr(visitExpr, IS->Cond.get());
+    else if (auto *LS = dyn_cast<LoopIRStmt>(S))
+      visitExpr(visitExpr, LS->Cond.get());
+    else if (auto *RS = dyn_cast<ReturnIRStmt>(S))
+      if (RS->RetVal)
+        visitExpr(visitExpr, RS->RetVal.get());
+  };
+  for (auto &B : *F) {
+    for (auto &S : *B)
+      visitStmt(S.get());
+    if (B->Term)
+      visitStmt(B->Term);
+  }
+}
+
+// Functions that have a pointer-type arg, or transitively call one that does.
+static std::set<IRFunction *> computeMemFunctions(IRProgram &P) {
+  std::set<IRFunction *> Result;
+  for (auto &FPtr : P) {
+    for (auto &Var : FPtr->Vars) {
+      if (Var.DeclLoc != IRVarDecl::ARG)
+        continue;
+      auto *HCT = clangTypeToHardCilk(Var.Type);
+      bool isAddr = false;
+      if (auto *BTy = hctGetIf<HardCilkBaseType>(HCT))
+        isAddr = (*BTy == TY_ADDR);
+      delete HCT;
+      if (isAddr) {
+        Result.insert(FPtr.get());
+        break;
+      }
+    }
+  }
+  bool Changed = true;
+  while (Changed) {
+    Changed = false;
+    for (auto &FPtr : P) {
+      if (Result.count(FPtr.get()))
+        continue;
+      std::set<IRFunction *> Callees;
+      collectDirectCalleesHCA(FPtr.get(), Callees);
+      for (auto *Callee : Callees) {
+        if (Result.count(Callee)) {
+          Result.insert(FPtr.get());
+          Changed = true;
+          break;
+        }
+      }
+    }
+  }
+  return Result;
+}
+
+// True if the task body itself dereferences memory or calls a helper that does.
+static bool taskBodyAccessesMem(IRFunction *Task,
+                                const std::set<IRFunction *> &MemFuncs) {
+  auto checkExpr = [&](auto &&self, IRExpr *E) -> bool {
+    if (!E)
+      return false;
+    if (isa<DRefIRExpr>(E) || isa<IndexIRExpr>(E))
+      return true;
+    if (auto *AE = dyn_cast<AccessIRExpr>(E))
+      return AE->Arrow;
+    if (auto *CE = dyn_cast<CallIRExpr>(E)) {
+      if (auto *FP = std::get_if<IRFunction *>(&CE->Fn))
+        if (MemFuncs.count(*FP))
+          return true;
+      for (auto &Arg : CE->Args)
+        if (self(self, Arg.get()))
+          return true;
+      return false;
+    }
+    if (auto *BE = dyn_cast<BinopIRExpr>(E))
+      return self(self, BE->Left.get()) || self(self, BE->Right.get());
+    if (auto *UE = dyn_cast<UnopIRExpr>(E))
+      return self(self, UE->Expr.get());
+    if (auto *CE2 = dyn_cast<CastIRExpr>(E))
+      return self(self, CE2->E.get());
+    if (auto *RE = dyn_cast<RefIRExpr>(E))
+      return self(self, RE->E.get());
+    return false;
+  };
+  auto checkStmt = [&](IRStmt *S) -> bool {
+    if (auto *CS = dyn_cast<CopyIRStmt>(S))
+      return checkExpr(checkExpr, CS->Src.get());
+    if (auto *EW = dyn_cast<ExprWrapIRStmt>(S))
+      return checkExpr(checkExpr, EW->Expr.get());
+    if (auto *SS = dyn_cast<StoreIRStmt>(S))
+      return checkExpr(checkExpr, SS->Dest.get()) ||
+             checkExpr(checkExpr, SS->Src.get());
+    if (auto *IS = dyn_cast<IfIRStmt>(S))
+      return checkExpr(checkExpr, IS->Cond.get());
+    if (auto *LS = dyn_cast<LoopIRStmt>(S))
+      return checkExpr(checkExpr, LS->Cond.get());
+    if (auto *RS = dyn_cast<ReturnIRStmt>(S))
+      return checkExpr(checkExpr, RS->RetVal.get());
+    if (auto *ES = dyn_cast<ESpawnIRStmt>(S)) {
+      for (auto &Arg : ES->Args)
+        if (checkExpr(checkExpr, Arg.get()))
+          return true;
+      return false;
+    }
+    return false;
+  };
+  for (auto &B : *Task) {
+    for (auto &S : *B)
+      if (checkStmt(S.get()))
+        return true;
+    if (B->Term && checkStmt(B->Term))
+      return true;
+  }
+  return false;
+}
+
+static void analyzeHasAXI(IRProgram &P, TaskInfosTy &TaskInfos) {
+  auto MemFuncs = computeMemFunctions(P);
+  for (auto &[Task, Info] : TaskInfos)
+    Info.HasAXI = taskBodyAccessesMem(Task, MemFuncs);
 }
 
 // ─── Memory Read/Store Helpers ───────────────────────────────────────────────
@@ -458,7 +615,25 @@ HardCilkAnalysisResult RunHardCilkAnalysis(IRProgram &P) {
   }
 
   analyzeSendArguments(P, TaskInfos);
+
+  // Root task continuations signal themselves: the scheduler seeds execution by
+  // creating a base closure of the continuation type, so when that continuation
+  // fires it decrements another instance of its own type.
+  for (auto &FPtr : P) {
+    IRFunction *F = FPtr.get();
+    auto FIt = TaskInfos.find(F);
+    if (FIt == TaskInfos.end() || !FIt->second.IsRoot)
+      continue;
+    for (auto *ContFn : F->Info.SpawnNextList) {
+      auto ContIt = TaskInfos.find(ContFn);
+      if (ContIt == TaskInfos.end())
+        continue;
+      ContIt->second.SendArgList.insert(ContFn);
+    }
+  }
+
   analyzeArgOutWriteBuffers(TaskInfos);
+  analyzeHasAXI(P, TaskInfos);
 
   // Terminal continuation tasks with an empty SendArgList are program exit
   // points. Insert the synthetic base continuation as a placeholder to trigger

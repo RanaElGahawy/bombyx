@@ -1,13 +1,14 @@
-#include "VitisHLSTarget.hpp"
-#include "IR.hpp"
+#include "vitis/VitisHLSTarget.hpp"
+#include "core/IR.hpp"
 #include "clang/AST/Type.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <iostream>
+#include <map>
 
-#include "OpenCilk2IR.hpp"
+#include "core/OpenCilk2IR.hpp"
 
 #define ALIGN(x, A) ((x + A - 1) & -(A))
 #define PADDING(x, A) (ALIGN(x, A) - x)
@@ -385,6 +386,8 @@ private:
   int SpawnCtr = 0;
   int ArgDataCtr = 0;
   int IndentLvl = 1;
+  std::set<SpawnNextIRStmt *> EmittedSpawnNexts;
+  std::map<ClosureDeclIRStmt *, SpawnNextIRStmt *> ClosureToSpawnNext;
 
   llvm::raw_ostream &Indent() {
     for (int i = 0; i < IndentLvl; i++)
@@ -564,9 +567,17 @@ private:
       handleSpawn(ES, F);
       SpawnCtr++;
     } else if (auto *SNS = dyn_cast<SpawnNextIRStmt>(S)) {
-      handleSpawnNext(SNS, F);
+      if (!EmittedSpawnNexts.count(SNS))
+        handleSpawnNext(SNS, F);
     } else if (auto *CDS = dyn_cast<ClosureDeclIRStmt>(S)) {
       handleSpawnNextDecl(CDS, F);
+      // Hoist spawnNext.write() before spawns: the scheduler must receive the
+      // allow-count before any spawned task can complete and decrement it.
+      auto It = ClosureToSpawnNext.find(CDS);
+      if (It != ClosureToSpawnNext.end()) {
+        handleSpawnNext(It->second, F);
+        EmittedSpawnNexts.insert(It->second);
+      }
     } else if (auto *RS = dyn_cast<ReturnIRStmt>(S)) {
       handleSendArg(RS, F);
     } else if (auto *SS = dyn_cast<StoreIRStmt>(S)) {
@@ -595,7 +606,82 @@ public:
   HardCilkPrinter(llvm::raw_ostream &Out, IRPrintContext &C,
                   TaskInfosTy const &TaskInfos)
       : Out(Out), C(C), TaskInfos(TaskInfos) {}
+
+  void prepareForTask(IRFunction *Task) {
+    EmittedSpawnNexts.clear();
+    ClosureToSpawnNext.clear();
+    for (auto &B : *Task) {
+      if (!B->Term)
+        continue;
+      if (auto *SNS = dyn_cast<SpawnNextIRStmt>(B->Term))
+        if (SNS->Decl)
+          ClosureToSpawnNext[SNS->Decl] = SNS;
+    }
+  }
 };
+
+// Returns true only if the task body directly emits a MEM_* access or calls an
+// inlinable function that does. Having addr_t-typed arguments is not sufficient
+// — those are passed through as values in the task struct without dereferencing.
+static bool taskNeedsMem(IRFunction *Task,
+                          const std::set<IRFunction *> &FuncsNeedingMem) {
+  auto checkExpr = [&FuncsNeedingMem](auto &&self, IRExpr *E) -> bool {
+    if (!E)
+      return false;
+    if (isa<DRefIRExpr>(E) || isa<IndexIRExpr>(E))
+      return true;
+    if (auto *AE = dyn_cast<AccessIRExpr>(E))
+      return AE->Arrow;
+    if (auto *CE = dyn_cast<CallIRExpr>(E)) {
+      if (auto *FP = std::get_if<IRFunction *>(&CE->Fn))
+        if (FuncsNeedingMem.count(*FP))
+          return true;
+      for (auto &Arg : CE->Args)
+        if (self(self, Arg.get()))
+          return true;
+      return false;
+    }
+    if (auto *BE = dyn_cast<BinopIRExpr>(E))
+      return self(self, BE->Left.get()) || self(self, BE->Right.get());
+    if (auto *UE = dyn_cast<UnopIRExpr>(E))
+      return self(self, UE->Expr.get());
+    if (auto *CE2 = dyn_cast<CastIRExpr>(E))
+      return self(self, CE2->E.get());
+    if (auto *RE = dyn_cast<RefIRExpr>(E))
+      return self(self, RE->E.get());
+    return false;
+  };
+  auto checkStmt = [&](IRStmt *S) -> bool {
+    if (auto *CS = dyn_cast<CopyIRStmt>(S))
+      return checkExpr(checkExpr, CS->Src.get());
+    if (auto *EW = dyn_cast<ExprWrapIRStmt>(S))
+      return checkExpr(checkExpr, EW->Expr.get());
+    if (auto *SS = dyn_cast<StoreIRStmt>(S))
+      return checkExpr(checkExpr, SS->Dest.get()) ||
+             checkExpr(checkExpr, SS->Src.get());
+    if (auto *IS = dyn_cast<IfIRStmt>(S))
+      return checkExpr(checkExpr, IS->Cond.get());
+    if (auto *LS = dyn_cast<LoopIRStmt>(S))
+      return checkExpr(checkExpr, LS->Cond.get());
+    if (auto *RS = dyn_cast<ReturnIRStmt>(S))
+      return checkExpr(checkExpr, RS->RetVal.get());
+    if (auto *ES = dyn_cast<ESpawnIRStmt>(S)) {
+      for (auto &Arg : ES->Args)
+        if (checkExpr(checkExpr, Arg.get()))
+          return true;
+      return false;
+    }
+    return false;
+  };
+  for (auto &B : *Task) {
+    for (auto &S : *B)
+      if (checkStmt(S.get()))
+        return true;
+    if (B->Term && checkStmt(B->Term))
+      return true;
+  }
+  return false;
+}
 
 static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
                               HardCilkPrinter &Printer, IRFunction *Task,
@@ -609,7 +695,7 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
   std::vector<std::pair<std::string, std::string>> intfs;
   Out << "void " << Task->getName() << " (\n";
   intfs.push_back(std::make_pair("taskIn", Task->getName() + "_task"));
-  bool HasMem = FuncsNeedingMem.count(Task) > 0;
+  bool HasMem = taskNeedsMem(Task, FuncsNeedingMem);
   if (HasMem)
     Out << "  void *mem,\n";
   assert(Task->Info.SpawnList.size() <= 2);
@@ -675,6 +761,7 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
   }
 
   Out << "  " << intfs[0].second << " args = taskIn.read();\n\n";
+  Printer.prepareForTask(Task);
   Printer.traverse(*Task);
   if ((Info.SendArgList.size() > 0 && Task->isVoid() &&
        Task->Info.SpawnNextList.empty()) ||

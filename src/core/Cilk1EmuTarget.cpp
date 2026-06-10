@@ -9,9 +9,9 @@
 #include <llvm/Support/raw_ostream.h>
 #include <set>
 
-#include "Cilk1EmuTarget.hpp"
-#include "IR.hpp"
-#include "util.hpp"
+#include "core/Cilk1EmuTarget.hpp"
+#include "core/IR.hpp"
+#include "core/util.hpp"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"

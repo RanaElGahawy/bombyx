@@ -1,5 +1,5 @@
-#include "IR.hpp"
-#include "util.hpp"
+#include "core/IR.hpp"
+#include "core/util.hpp"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"

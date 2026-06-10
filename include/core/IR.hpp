@@ -14,7 +14,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/Support/Casting.h>
 
-#include "util.hpp"
+#include "core/util.hpp"
 
 using namespace clang;
 

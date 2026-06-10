@@ -1,9 +1,9 @@
 #include <set>
 #include <unordered_map>
 
-#include "FlattenIR.hpp"
-#include "IR.hpp"
-#include "util.hpp"
+#include "core/FlattenIR.hpp"
+#include "core/IR.hpp"
+#include "core/util.hpp"
 #include "clang/AST/Expr.h"
 
 using namespace llvm;

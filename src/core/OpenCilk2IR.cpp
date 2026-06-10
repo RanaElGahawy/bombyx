@@ -4,9 +4,9 @@
 #include <clang/Analysis/CFG.h>
 #include <unordered_map>
 
-#include "IR.hpp"
-#include "OpenCilk2IR.hpp"
-#include "desugarOpenCilk.hpp"
+#include "core/IR.hpp"
+#include "core/OpenCilk2IR.hpp"
+#include "core/desugarOpenCilk.hpp"
 #include "clang/AST/ASTFwd.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"

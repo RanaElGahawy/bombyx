@@ -1,5 +1,5 @@
-#include "DAE.hpp"
-#include "IR.hpp"
+#include "core/DAE.hpp"
+#include "core/IR.hpp"
 
 void DAEAtInd(IRProgram &P, IRBasicBlock *B, int Ind) {
   static int DaeCount = 0;

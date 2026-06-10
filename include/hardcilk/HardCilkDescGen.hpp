@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HardCilkAnalysis.hpp"
+#include "hardcilk/HardCilkAnalysis.hpp"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
 

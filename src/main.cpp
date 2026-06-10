@@ -15,17 +15,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "Cilk1EmuTarget.hpp"
-#include "CountSpawns.hpp"
-#include "DAE.hpp"
-#include "FlattenIR.hpp"
-#include "HardCilkAnalysis.hpp"
-#include "HardCilkDescGen.hpp"
-#include "IR.hpp"
-#include "VitisHLSTarget.hpp"
-#include "MakeExplicit.hpp"
-#include "OpenCilk2IR.hpp"
-#include "util.hpp"
+#include "core/Cilk1EmuTarget.hpp"
+#include "core/CountSpawns.hpp"
+#include "core/DAE.hpp"
+#include "core/FlattenIR.hpp"
+#include "hardcilk/HardCilkAnalysis.hpp"
+#include "hardcilk/HardCilkDescGen.hpp"
+#include "core/IR.hpp"
+#include "vitis/VitisHLSTarget.hpp"
+#include "vitis/VitisHLSTclGen.hpp"
+#include "core/MakeExplicit.hpp"
+#include "core/OpenCilk2IR.hpp"
+#include "core/util.hpp"
 
 using namespace clang;
 using namespace clang::tooling;
@@ -157,6 +158,11 @@ public:
               llvm::raw_fd_ostream Driver(DefsName, EC, llvm::sys::fs::OF_Text);
               HT.PrintDriver(Driver);
             }
+
+            // Generate per-PE Vitis HLS TCL scripts and master build_hls.sh.
+            PrintVitisHLSArtifacts(AppName, HCAnalysis->TaskInfos,
+                                   "ALVEO_U55C", 300,
+                                   OutFilename.str());
             break;
           }
           }

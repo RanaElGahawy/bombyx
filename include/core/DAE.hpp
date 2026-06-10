@@ -1,5 +1,5 @@
 #pragma once
 
-#include "IR.hpp"
+#include "core/IR.hpp"
 
 void DAE(IRProgram &P);

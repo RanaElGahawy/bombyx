@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IR.hpp"
+#include "core/IR.hpp"
 
 void MakeExplicit(IRProgram &P);
 

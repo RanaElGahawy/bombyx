@@ -1,7 +1,7 @@
 #pragma once
 
-#include "HardCilkAnalysis.hpp"
-#include "OpenCilk2IR.hpp"
+#include "hardcilk/HardCilkAnalysis.hpp"
+#include "core/OpenCilk2IR.hpp"
 #include "clang/AST/ASTContext.h"
 #include <string>
 #include <vector>
