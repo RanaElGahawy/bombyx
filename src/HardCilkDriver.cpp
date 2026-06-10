@@ -1,4 +1,4 @@
-#include "HardCilkTarget.hpp"
+#include "VitisHLSTarget.hpp"
 #include "IR.hpp"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ExprCXX.h"
@@ -225,11 +225,11 @@ static std::string findSizeFromCallee(const std::string &VarName,
 // Printer Helpers   //
 ///////////////////////
 
-void HardCilkTarget::PrintStartSystem(llvm::raw_ostream &Out) {
+void VitisHLSTarget::PrintStartSystem(llvm::raw_ostream &Out) {
   Out << "        startSystem();\n";
 }
 
-void HardCilkTarget::PrintManagementLoop(llvm::raw_ostream &Out) {
+void VitisHLSTarget::PrintManagementLoop(llvm::raw_ostream &Out) {
   Out << "        auto start_management = "
          "std::chrono::high_resolution_clock::now();\n";
   Out << "        managementLoop();\n";
@@ -241,7 +241,7 @@ void HardCilkTarget::PrintManagementLoop(llvm::raw_ostream &Out) {
          "management_duration.count() << \" seconds\" << std::endl;\n";
 }
 
-void HardCilkTarget::PrintAllocateMemFPGA(llvm::raw_ostream &Out,
+void VitisHLSTarget::PrintAllocateMemFPGA(llvm::raw_ostream &Out,
                                           const std::string &AddrVar,
                                           const std::string &SizeExpr,
                                           const std::string &Alignment) {
@@ -249,7 +249,7 @@ void HardCilkTarget::PrintAllocateMemFPGA(llvm::raw_ostream &Out,
       << ", " << Alignment << ");\n";
 }
 
-void HardCilkTarget::PrintCopyToDevice(llvm::raw_ostream &Out,
+void VitisHLSTarget::PrintCopyToDevice(llvm::raw_ostream &Out,
                                        const std::string &Addr,
                                        const std::string &Data,
                                        const std::string &SizeExpr) {
@@ -258,7 +258,7 @@ void HardCilkTarget::PrintCopyToDevice(llvm::raw_ostream &Out,
       << ");\n";
 }
 
-void HardCilkTarget::PrintCopyFromDevice(llvm::raw_ostream &Out,
+void VitisHLSTarget::PrintCopyFromDevice(llvm::raw_ostream &Out,
                                          const std::string &Data,
                                          const std::string &Addr,
                                          const std::string &SizeExpr) {
@@ -271,7 +271,7 @@ void HardCilkTarget::PrintCopyFromDevice(llvm::raw_ostream &Out,
 // Build Driver Header  //
 //////////////////////////
 
-DriverSpec HardCilkTarget::BuildDriverSpec(clang::ASTContext &C) {
+DriverSpec VitisHLSTarget::BuildDriverSpec(clang::ASTContext &C) {
   DriverSpec Spec;
 
   // 1. Find the non-synthetic root task.
@@ -507,7 +507,7 @@ DriverSpec HardCilkTarget::BuildDriverSpec(clang::ASTContext &C) {
     if (Var.DeclLoc == IRVarDecl::ARG)
       ArgVars.push_back(&Var);
   Spec.NumZeroFields = 1 + ArgVars.size(); // _cont + each arg
-  Spec.HasPadding = TaskInfos[RootFn].TaskPadding > 0;
+  Spec.HasPadding = TaskInfos.at(RootFn).TaskPadding > 0;
   if (Spec.HasPadding)
     Spec.NumZeroFields++;
 
@@ -662,7 +662,7 @@ DriverSpec HardCilkTarget::BuildDriverSpec(clang::ASTContext &C) {
   return Spec;
 }
 
-void HardCilkTarget::PrintDriverHeader(llvm::raw_ostream &Out,
+void VitisHLSTarget::PrintDriverHeader(llvm::raw_ostream &Out,
                                        clang::ASTContext &C) {
   DriverSpec Spec = BuildDriverSpec(C);
 

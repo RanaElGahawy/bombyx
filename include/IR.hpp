@@ -415,6 +415,8 @@ public:
 
   static bool classof(const IRExpr *E) { return E->getKind() == EXK_LVAL_CAST; }
 
+  IRType getCastType() const { return CastType; }
+
   virtual void print(llvm::raw_ostream &Out, IRPrintContext &Ctx) override;
   virtual IRExpr *clone() override;
 };

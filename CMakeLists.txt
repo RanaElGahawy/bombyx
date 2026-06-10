@@ -74,7 +74,9 @@ set(SOURCE_FILES
     src/OpenCilk2IR.cpp
     src/MakeExplicit.cpp
     src/Cilk1EmuTarget.cpp
-    src/HardCilkTarget.cpp
+    src/HardCilkAnalysis.cpp
+    src/VitisHLSTarget.cpp
+    src/HardCilkDescGen.cpp
     src/HardCilkDriver.cpp
     src/desugarOpenCilk.cpp
 )

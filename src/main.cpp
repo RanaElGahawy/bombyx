@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <getopt.h>
+#include <optional>
 #include <iostream>
 #include <stdlib.h>
 #include <unistd.h>
@@ -18,8 +19,10 @@
 #include "CountSpawns.hpp"
 #include "DAE.hpp"
 #include "FlattenIR.hpp"
-#include "HardCilkTarget.hpp"
+#include "HardCilkAnalysis.hpp"
+#include "HardCilkDescGen.hpp"
 #include "IR.hpp"
+#include "VitisHLSTarget.hpp"
 #include "MakeExplicit.hpp"
 #include "OpenCilk2IR.hpp"
 #include "util.hpp"
@@ -65,6 +68,7 @@ public:
     }
 
     DriverCallersTy DriverCallers;
+    std::optional<HardCilkAnalysisResult> HCAnalysis;
 
     std::vector<PassFn> Passes{
         [&](IRProgram &P) -> void {
@@ -84,6 +88,12 @@ public:
         [&](IRProgram &P) -> void {
           CountSpawns(P, Context);
           // dumpIRProgramJSON(llvm::outs(), P, Context);
+        },
+        // HardCilk task analysis pass — backend-agnostic, runs before any
+        // HardCilk printer.
+        [&](IRProgram &P) -> void {
+          if (GOpts.Target == ConvertOpts::TG_HARDCILK)
+            HCAnalysis = RunHardCilkAnalysis(P);
         },
         [&](IRProgram &P) -> void {
           switch (GOpts.Target) {
@@ -115,12 +125,14 @@ public:
             std::filesystem::create_directories(OutPath);
             std::string AppName = GOpts.AppName;
             // printFullIRProgram(llvm::errs(), P, Context);
-            HardCilkTarget HT(P, AppName, std::move(DriverCallers));
+            VitisHLSTarget HT(P, AppName, *HCAnalysis,
+                              std::move(DriverCallers));
+
             std::string DescJsonName =
                 OutFilename.str() + "/" + AppName + "_descriptors.json";
             llvm::raw_fd_ostream DescJson(DescJsonName, EC,
                                           llvm::sys::fs::OF_Text);
-            HT.PrintDescJson(DescJson);
+            PrintHardCilkDescJson(AppName, HCAnalysis->TaskInfos, DescJson);
 
             std::string HLSCodeName =
                 OutFilename.str() + "/" + AppName + ".cpp";
