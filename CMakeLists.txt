@@ -74,9 +74,11 @@ set(SOURCE_FILES
     src/core/FlattenIR.cpp
     src/core/MakeExplicit.cpp
     src/core/DAE.cpp
+    src/core/PruneDeadSpawnArgs.cpp
     src/core/CountSpawns.cpp
     src/core/desugarOpenCilk.cpp
     src/core/Cilk1EmuTarget.cpp
+    src/core/TBBTarget.cpp
 
     # HardCilk analysis: task/closure/memory analysis, descriptor generation, driver
     src/hardcilk/HardCilkAnalysis.cpp
@@ -112,4 +114,4 @@ install(
     TARGETS bombyx-cc
     RUNTIME   
 )
-install(FILES support/cilk_explicit.hh DESTINATION include/)
+install(FILES support/cilk_explicit.hh support/tbb_explicit.hh DESTINATION include/)

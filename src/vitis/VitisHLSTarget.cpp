@@ -5,6 +5,9 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <algorithm>
+#include <cctype>
+#include <functional>
 #include <iostream>
 #include <map>
 
@@ -75,6 +78,7 @@ static llvm::raw_ostream &printHardCilkDecl(llvm::raw_ostream &Out,
 
 const char *DESCRIPTOR_TEMPLATE = R"(#pragma once
 #include <cstdint>
+#include <cstring>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -101,6 +105,11 @@ using namespace std;
 
 using addr_t = uint64_t;
 
+// Continuation tag carried in the high 8 bits of a continuation closure address.
+// A task that may send its argument to more than one continuation matches this
+// against each candidate continuation's <NAME>_TAG to pick the right port.
+#define CONT_TAG(cont) ((uint8_t)((cont) >> 56))
+
 )";
 
 #define TAB "  "
@@ -116,6 +125,38 @@ static bool emitMemStore(llvm::raw_ostream &Out, IRPrintContext &C,
                          StoreIRStmt *SS);
 static const clang::FieldDecl *getAccessFieldDecl(AccessIRExpr *AE);
 static std::string getAccessStructName(AccessIRExpr *AE);
+
+// ─── Multi-continuation send-argument helpers ────────────────────────────────
+
+// The defs.h macro that holds a continuation's 8-bit tag, e.g.
+// "APPLYFN_REENTRY0_CONT0_TAG".
+static std::string contTagMacro(IRFunction *Cont) {
+  std::string Name = Cont->getName();
+  for (char &c : Name)
+    c = (char)std::toupper((unsigned char)c);
+  return Name + "_TAG";
+}
+
+// Per-destination port names. With a single destination the plain "argOut" /
+// "argDataOut" ports are kept; with multiple destinations each gets its own
+// "<port>_<contName>" so the task can route by tag.
+static std::string argOutPortName(IRFunction *Dst, bool Multi) {
+  return Multi ? "argOut_" + Dst->getName() : std::string("argOut");
+}
+static std::string argDataPortName(IRFunction *Dst, bool Multi) {
+  return Multi ? "argDataOut_" + Dst->getName() : std::string("argDataOut");
+}
+
+// Send-argument destinations in a stable (name-sorted) order so port lists and
+// routing chains are deterministic regardless of pointer-ordered set iteration.
+static std::vector<IRFunction *> sortedDests(const HCTaskInfo &Info) {
+  std::vector<IRFunction *> Dests(Info.SendArgList.begin(),
+                                  Info.SendArgList.end());
+  std::sort(Dests.begin(), Dests.end(), [](IRFunction *A, IRFunction *B) {
+    return A->getName() < B->getName();
+  });
+  return Dests;
+}
 
 // ─── Helper: callee collection ───────────────────────────────────────────────
 
@@ -325,7 +366,7 @@ PrintInlinableFunction(llvm::raw_ostream &Out, clang::ASTContext &C,
               if (Callee)
                 Out << Callee->getName();
               else
-                Out << std::get<ASTVarRef>(CE->Fn)->getName();
+                Out << std::get<ASTVarRef>(CE->Fn)->getQualifiedNameAsString();
               Out << "(";
               bool firstArg = true;
               if (Callee && FuncsNeedingMem.count(Callee)) {
@@ -443,17 +484,45 @@ private:
       }
     }
 
-    Indent() << SpawnNextFnName << "_spawn_next " << SpawnNextName << ";\n";
-    Indent() << SpawnNextName << ".addr = SN_" << SpawnNextFnName << "c_k;\n";
-    Indent() << SpawnNextName << ".data = SN_" << SpawnNextFnName << "c;\n";
     auto SnInfoIt = TaskInfos.find(S->Fn);
     assert(SnInfoIt != TaskInfos.end());
     auto &SnInfo = SnInfoIt->second;
-    size_t SnTaskSize = llvm::Log2_32_Ceil(SnInfo.TaskSize);
-    Indent() << SpawnNextName << ".size = " << SnTaskSize << ";\n";
-    Indent() << SpawnNextName << ".allow = SN_" << SpawnNextFnName
-             << "c_cnt;\n";
-    Indent() << "spawnNext.write(" << SpawnNextName << ");\n\n";
+    const std::string Closure = SpawnNextName + "c"; // SN_<fn>c (assembled closure)
+    unsigned Beats = closureWriteBeats(SnInfo);
+
+    if (Beats == 1) {
+      Indent() << SpawnNextFnName << "_spawn_next " << SpawnNextName << ";\n";
+      Indent() << SpawnNextName << ".addr = " << Closure << "_k;\n";
+      Indent() << SpawnNextName << ".data = " << Closure << ";\n";
+      Indent() << SpawnNextName << ".size = " << llvm::Log2_32_Ceil(SnInfo.TaskSize)
+               << ";\n";
+      Indent() << SpawnNextName << ".allow = " << Closure << "_cnt;\n";
+      Indent() << "spawnNext_" << SpawnNextFnName << ".write(" << SpawnNextName
+               << ");\n\n";
+    } else {
+      // Closure is wider than one write-buffer beat: write it as `Beats`
+      // ordered beats of `BeatBytes` each. The destination address advances by
+      // one beat per write; allow stays 0 until the final beat, which carries
+      // the spawn counter to release the continuation.
+      unsigned BeatBytes = closureBeatBytes(SnInfo);
+      size_t BeatSizeLog = llvm::Log2_32_Ceil(BeatBytes);
+      Indent() << "uint8_t *" << SpawnNextName << "_bytes = (uint8_t *)&"
+               << Closure << ";\n";
+      for (unsigned i = 0; i < Beats; ++i) {
+        std::string V = SpawnNextName + std::to_string(i);
+        Indent() << SpawnNextFnName << "_spawn_next " << V << ";\n";
+        Indent() << V << ".addr = " << Closure << "_k + " << (i * BeatBytes)
+                 << ";\n";
+        Indent() << "memcpy(" << V << ".data, " << SpawnNextName << "_bytes + "
+                 << (i * BeatBytes) << ", " << BeatBytes << ");\n";
+        Indent() << V << ".size = " << BeatSizeLog << ";\n";
+        Indent() << V << ".allow = "
+                 << (i + 1 == Beats ? Closure + "_cnt" : std::string("0"))
+                 << ";\n";
+        Indent() << "spawnNext_" << SpawnNextFnName << ".write(" << V << ");\n";
+      }
+      Out << "\n";
+    }
   }
 
   void handleSpawn(ESpawnIRStmt *ES, IRFunction *F) {
@@ -498,27 +567,33 @@ private:
     if (ES->Fn == F) {
       Indent() << "taskOut.write(" << SpawnFnArgsName << ");\n\n";
     } else {
-      Indent() << "taskGlobalOut.write(" << SpawnFnArgsName << ");\n\n";
+      std::string PortName = "taskGlobalOut_" + ES->Fn->getName();
+      if (ES->SN)
+        PortName += "_depends_" + ES->SN->Fn->getName();
+      Indent() << PortName << ".write(" << SpawnFnArgsName << ");\n\n";
     }
   }
 
   void handleSendArg(ReturnIRStmt *RS, IRFunction *F) {
-    if (F->isVoid())
+    if (F->isVoid() || !RS->RetVal)
       return;
-    Indent() << "argOut.write(args._cont);\n";
+    // Build the writeback packet once; routing only selects which ports the two
+    // stream writes target.
     HardCilkType *RetType = clangTypeToHardCilk(F->getReturnType());
-    printHardCilkType(Indent(), RetType, true)
-        << "_arg_out a" << ArgDataCtr << ";\n";
-    Indent() << "a" << ArgDataCtr << ".addr = args._cont;\n";
-    Indent() << "a" << ArgDataCtr << ".data = ";
+    int A = ArgDataCtr++;
+    printHardCilkType(Indent(), RetType, true) << "_arg_out a" << A << ";\n";
+    Indent() << "a" << A << ".addr = args._cont;\n";
+    Indent() << "a" << A << ".data = ";
     C.ExprCB(&C, Out, RS->RetVal.get());
     Out << ";\n";
     size_t RetTypeSz = llvm::Log2_32_Ceil(hardCilkTypeSize(RetType));
-    Indent() << "a" << ArgDataCtr << ".size = " << RetTypeSz << ";"
+    Indent() << "a" << A << ".size = " << RetTypeSz << ";"
              << " // TODO calculation could be wrong fix manually for now\n";
-    Indent() << "a" << ArgDataCtr << ".allow = 1;\n";
-    Indent() << "argDataOut.write(a" << ArgDataCtr << ");\n";
-    ArgDataCtr++;
+    Indent() << "a" << A << ".allow = 1;\n";
+    emitArgRouting(F, [&](const std::string &ArgOut, const std::string &ArgData) {
+      Indent() << ArgOut << ".write(args._cont);\n";
+      Indent() << ArgData << ".write(a" << A << ");\n";
+    });
     delete RetType;
   }
 
@@ -553,8 +628,10 @@ private:
     size_t ArgDataTySz = llvm::Log2_32_Ceil(hardCilkTypeSize(ArgDataTy));
     Indent() << "a" << ArgDataCtr << ".size = " << ArgDataTySz << ";\n";
     Indent() << "a" << ArgDataCtr << ".allow = " << AllowIt->second << ";\n";
-    Indent() << "argDataOut.write(a" << ArgDataCtr << ");\n";
-    ArgDataCtr++;
+    int A = ArgDataCtr++;
+    emitArgRouting(F, [&](const std::string &, const std::string &ArgData) {
+      Indent() << ArgData << ".write(a" << A << ");\n";
+    });
     return true;
   }
 
@@ -607,6 +684,27 @@ public:
                   TaskInfosTy const &TaskInfos)
       : Out(Out), C(C), TaskInfos(TaskInfos) {}
 
+  // Emit a single zero-sized writeback packet with allow=1. Used when a buffered
+  // store lives inside a loop: every real store carries allow=0, and this final
+  // flush releases exactly one output packet regardless of iteration count.
+  void emitFinalArgOutFlush(IRFunction *F) {
+    auto TaskInfoIt = TaskInfos.find(F);
+    assert(TaskInfoIt != TaskInfos.end());
+    auto &Info = TaskInfoIt->second;
+    HardCilkType ScratchTy;
+    HardCilkType *ArgDataTy = getTaskArgDataType(Info, ScratchTy);
+    printHardCilkType(Indent(), ArgDataTy, true)
+        << "_arg_out a" << ArgDataCtr << ";\n";
+    Indent() << "a" << ArgDataCtr << ".addr = 0x3FFFFFFFF;\n";
+    Indent() << "a" << ArgDataCtr << ".data = 0;\n";
+    Indent() << "a" << ArgDataCtr << ".size = 0;\n";
+    Indent() << "a" << ArgDataCtr << ".allow = 1;\n";
+    int A = ArgDataCtr++;
+    emitArgRouting(F, [&](const std::string &, const std::string &ArgData) {
+      Indent() << ArgData << ".write(a" << A << ");\n";
+    });
+  }
+
   void prepareForTask(IRFunction *Task) {
     EmittedSpawnNexts.clear();
     ClosureToSpawnNext.clear();
@@ -617,6 +715,44 @@ public:
         if (SNS->Decl)
           ClosureToSpawnNext[SNS->Decl] = SNS;
     }
+  }
+
+  // Emit `Body(argOutPort, argDataPort)` for the task's send-argument
+  // destination(s). With zero/one destination it is a single direct emit on the
+  // plain "argOut"/"argDataOut" ports. With several it reads the continuation
+  // tag once and emits an if/else-if chain routing to each destination's own
+  // "<port>_<contName>" ports.
+  void emitArgRouting(
+      IRFunction *F,
+      const std::function<void(const std::string &, const std::string &)>
+          &Body) {
+    auto It = TaskInfos.find(F);
+    assert(It != TaskInfos.end());
+    const HCTaskInfo &Info = It->second;
+    if (Info.SendArgList.size() <= 1) {
+      Body("argOut", "argDataOut");
+      return;
+    }
+    // `_cont_tag` is declared once per PE (see PrintHardCilkTask) so multiple
+    // routed sites in the same task don't redeclare it.
+    bool First = true;
+    for (IRFunction *Dst : sortedDests(Info)) {
+      Indent() << (First ? "if" : "} else if") << " (_cont_tag == "
+               << contTagMacro(Dst) << ") {\n";
+      First = false;
+      IndentLvl++;
+      Body(argOutPortName(Dst, true), argDataPortName(Dst, true));
+      IndentLvl--;
+    }
+    Indent() << "}\n";
+  }
+
+  // Void/terminal completion: forward args._cont to the continuation's argOut,
+  // routed by tag when there is more than one destination.
+  void emitCompletionArgOut(IRFunction *F) {
+    emitArgRouting(F, [&](const std::string &ArgOut, const std::string &) {
+      Indent() << ArgOut << ".write(args._cont);\n";
+    });
   }
 };
 
@@ -698,29 +834,59 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
   bool HasMem = taskNeedsMem(Task, FuncsNeedingMem);
   if (HasMem)
     Out << "  void *mem,\n";
-  assert(Task->Info.SpawnList.size() <= 2);
+  // Build spawn-target → spawn_next-function map by scanning ESpawnIRStmts.
+  std::map<IRFunction *, IRFunction *> SpawnSNMap;
+  for (auto &B : *Task)
+    for (auto &S : *B)
+      if (auto *ES = dyn_cast<ESpawnIRStmt>(S.get()))
+        if (ES->Fn != Task && !SpawnSNMap.count(ES->Fn))
+          SpawnSNMap[ES->Fn] = ES->SN ? ES->SN->Fn : nullptr;
+
   for (IRFunction *SpawnTask : Task->Info.SpawnList) {
-    if (SpawnTask == Task)
+    if (SpawnTask == Task) {
       intfs.push_back(std::make_pair("taskOut", Task->getName() + "_task"));
-    else
-      intfs.push_back(
-          std::make_pair("taskGlobalOut", SpawnTask->getName() + "_task"));
+    } else {
+      std::string PortName = "taskGlobalOut_" + SpawnTask->getName();
+      auto It = SpawnSNMap.find(SpawnTask);
+      if (It != SpawnSNMap.end() && It->second)
+        PortName += "_depends_" + It->second->getName();
+      intfs.push_back(std::make_pair(PortName, SpawnTask->getName() + "_task"));
+    }
   }
   if (Info.SendArgList.size() > 0) {
-    if (Info.SendArgList.size() > 1){
-      PANIC("UNSUPPORTED: more than one send argument destination");
-    }
-    bool NeedsVoidSend = Task->Info.SpawnNextList.empty();
-    if (!Task->isVoid() || NeedsVoidSend)
-      intfs.push_back(std::make_pair("argOut", "uint64_t"));
-    if (!typeIsVoid(*Info.RetTy) ||
-        (Info.GenerateArgOutWriteBuffer && NeedsVoidSend)) {
-      std::string ArgDataOutTy;
+    // A void task that tail-spawns another task is not the completion point;
+    // the spawned task (and its descendants) will send the argOut signal.
+    bool NeedsVoidSend =
+        Task->Info.SpawnNextList.empty() && Task->Info.SpawnList.empty();
+    bool NeedsArgOut = !Task->isVoid() || NeedsVoidSend;
+    bool NeedsArgData = !typeIsVoid(*Info.RetTy) ||
+                        (Info.GenerateArgOutWriteBuffer && NeedsVoidSend);
+    std::string ArgDataOutTy;
+    if (NeedsArgData) {
       llvm::raw_string_ostream ArgDataOutTyS(ArgDataOutTy);
       HardCilkType ScratchTy;
       printHardCilkType(ArgDataOutTyS, getTaskArgDataType(Info, ScratchTy),
                         true);
-      intfs.push_back(std::make_pair("argDataOut", ArgDataOutTy + "_arg_out"));
+      ArgDataOutTy += "_arg_out";
+    }
+    // One destination keeps the plain argOut/argDataOut ports; multiple
+    // destinations get a dedicated port pair each, selected at runtime by the
+    // continuation tag (see emitArgRouting).
+    bool Multi = Info.SendArgList.size() > 1;
+    if (!Multi) {
+      if (NeedsArgOut)
+        intfs.push_back(std::make_pair("argOut", "uint64_t"));
+      if (NeedsArgData)
+        intfs.push_back(std::make_pair("argDataOut", ArgDataOutTy));
+    } else {
+      for (IRFunction *Dst : sortedDests(Info)) {
+        if (NeedsArgOut)
+          intfs.push_back(
+              std::make_pair(argOutPortName(Dst, true), "uint64_t"));
+        if (NeedsArgData)
+          intfs.push_back(
+              std::make_pair(argDataPortName(Dst, true), ArgDataOutTy));
+      }
     }
   }
   if (IsTerminalCont)
@@ -732,7 +898,7 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
     auto &SNDest = *Task->Info.SpawnNextList.begin();
     intfs.push_back(std::make_pair("closureIn", "uint64_t"));
     intfs.push_back(
-        std::make_pair("spawnNext", SNDest->getName() + "_spawn_next"));
+        std::make_pair("spawnNext_" + SNDest->getName(), SNDest->getName() + "_spawn_next"));
   }
 
   bool first = true;
@@ -748,6 +914,11 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
     Out << "#pragma HLS INTERFACE mode = axis port = " << intfName << "\n";
   if (HasMem)
     Out << "#pragma HLS INTERFACE mode = m_axi port = mem\n";
+  // Every PE runs as a free-running, pipelined kernel: no block-level control
+  // protocol and a flushable pipeline so it keeps draining its input streams.
+  // This applies to m_axi PEs too — they still need ap_ctrl_none.
+  Out << "#pragma HLS INTERFACE ap_ctrl_none port = return\n";
+  Out << "#pragma HLS PIPELINE II = 1 style = flp\n";
   Out << "\n";
 
   for (auto &Local : Task->Vars) {
@@ -761,12 +932,21 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
   }
 
   Out << "  " << intfs[0].second << " args = taskIn.read();\n\n";
+  // Tasks that may send to more than one continuation route every argOut /
+  // argDataOut write by this tag; declare it once for all routed sites.
+  if (Info.SendArgList.size() > 1)
+    Out << "  uint8_t _cont_tag = CONT_TAG(args._cont);\n\n";
   Printer.prepareForTask(Task);
   Printer.traverse(*Task);
   if ((Info.SendArgList.size() > 0 && Task->isVoid() &&
-       Task->Info.SpawnNextList.empty()) ||
+       Task->Info.SpawnNextList.empty() && Task->Info.SpawnList.empty()) ||
       IsTerminalCont) {
-    Out << TAB << "argOut.write(args._cont);\n";
+    if (Info.EmitFinalArgOutFlush)
+      Printer.emitFinalArgOutFlush(Task);
+    // Forward args._cont to the completion port, routed by tag when this task
+    // can complete into more than one continuation. IsTerminalCont has an empty
+    // SendArgList, so it falls through to the single plain argOut.
+    Printer.emitCompletionArgOut(Task);
   }
   Out << "}\n\n";
 }
@@ -915,7 +1095,10 @@ void handleRef(RefIRExpr *RE, IRPrintContext *C, llvm::raw_ostream &Out) {
 void VitisHLSTarget::PrintHardCilk(llvm::raw_ostream &Out,
                                    clang::ASTContext &C) {
   Out << "#include \"hls_stream.h\"\n";
-  Out << "#include \"" << AppName << "_defs.h\"\n\n";
+  Out << "#include \"" << AppName << "_defs.h\"\n";
+  for (auto &Inc : ExtraIncludes)
+    Out << Inc << "\n";
+  Out << "\n";
 
   const std::set<IRFunction *> FuncsNeedingMem = computeFuncsNeedingMem(P);
 
@@ -944,7 +1127,7 @@ void VitisHLSTarget::PrintHardCilk(llvm::raw_ostream &Out,
               if (Callee)
                 Out << Callee->getName();
               else
-                Out << std::get<ASTVarRef>(CE->Fn)->getName();
+                Out << std::get<ASTVarRef>(CE->Fn)->getQualifiedNameAsString();
               Out << "(";
               bool firstArg = true;
               if (Callee && FuncsNeedingMem.count(Callee)) {
@@ -1000,6 +1183,11 @@ void VitisHLSTarget::PrintHardCilk(llvm::raw_ostream &Out,
 
 void VitisHLSTarget::PrintDef(llvm::raw_ostream &Out, IRFunction *Task,
                               HCTaskInfo &Info) {
+  // Publish this continuation's 8-bit routing tag so PEs that send to multiple
+  // continuations can match it against CONT_TAG(args._cont).
+  if (Info.IsCont)
+    Out << "#define " << contTagMacro(Task) << " " << (unsigned)Info.Tag
+        << "\n\n";
   Out << "struct __attribute__((packed))" << Task->getName() << "_task {\n";
   if (Info.IsCont) {
     // Counter is the first field. Choose uint32 vs uint64 to minimize the
@@ -1024,12 +1212,24 @@ void VitisHLSTarget::PrintDef(llvm::raw_ostream &Out, IRFunction *Task,
   Out << "};\n\n";
 
   if (Info.IsCont) {
-    size_t SnSize = Info.TaskSize + Info.TaskPadding +
-                    hardCilkTypeSize(TY_ADDR) + hardCilkTypeSize(TY_UINT32) * 2;
-    size_t SnPadding = PADDING(SnSize, 32);
+    // The write buffer caps a single beat at MAX_CLOSURE_BEAT_BITS. Closures
+    // wider than that are written in several ordered beats, so the spawn_next
+    // payload becomes a raw beat-sized byte buffer instead of the full closure.
+    unsigned Beats = closureWriteBeats(Info);
+    size_t DataBytes =
+        Beats > 1 ? closureBeatBytes(Info) : Info.TaskSize + Info.TaskPadding;
+    size_t SnSize = DataBytes + hardCilkTypeSize(TY_ADDR) +
+                    hardCilkTypeSize(TY_UINT32) * 2;
+    // Write-buffer packets must be a power-of-2 width (32/64/128/256/...), so
+    // pad the spawn_next packet up to the next power of two rather than to a
+    // multiple of 32 (which can yield non-power-of-2 widths like 96).
+    size_t SnPadding = (size_t)llvm::NextPowerOf2(SnSize - 1) - SnSize;
     Out << "struct " << Task->getName() << "_spawn_next {\n";
     Out << "  addr_t addr;\n";
-    Out << "  " << Task->getName() << "_task data;\n";
+    if (Beats > 1)
+      Out << "  uint8_t data[" << DataBytes << "];\n";
+    else
+      Out << "  " << Task->getName() << "_task data;\n";
     Out << "  uint32_t size;\n";
     Out << "  uint32_t allow;\n";
     if (SnPadding > 0)
@@ -1054,7 +1254,9 @@ void VitisHLSTarget::PrintDef(llvm::raw_ostream &Out, IRFunction *Task,
     size_t argOutSize = hardCilkTypeSize(ArgDataTy) +
                         hardCilkTypeSize(TY_UINT64) +
                         hardCilkTypeSize(TY_UINT32) * 2;
-    size_t argOutPadding = PADDING(argOutSize, 32);
+    // Pad the arg_out write-buffer packet to a power-of-2 width as well.
+    size_t argOutPadding =
+        (size_t)llvm::NextPowerOf2(argOutSize - 1) - argOutSize;
     if (argOutPadding > 0)
       Out << "  uint8_t _padding[" << argOutPadding << "];\n";
     Out << "};\n\n";

@@ -456,6 +456,7 @@ static void printStmtWithReturnRewrite(llvm::raw_ostream &Out, clang::Stmt *S,
                                        VarRenamePrinterHelper *Helper,
                                        const clang::PrintingPolicy &PP,
                                        const std::string &ContKey,
+                                       const std::string &RetStmt,
                                        unsigned Depth) {
   const unsigned IW = PP.Indentation ? PP.Indentation : 2;
   std::string Ind(Depth * IW, ' ');
@@ -466,7 +467,7 @@ static void printStmtWithReturnRewrite(llvm::raw_ostream &Out, clang::Stmt *S,
       Val->printPretty(Out, Helper, PP);
     else
       Out << "0";
-    Out << ");\n" << Ind << "return;\n";
+    Out << ");\n" << Ind << RetStmt << "\n";
     return;
   }
 
@@ -477,10 +478,11 @@ static void printStmtWithReturnRewrite(llvm::raw_ostream &Out, clang::Stmt *S,
     auto *Body = clang::dyn_cast<clang::CompoundStmt>(SW->getBody());
     if (Body) {
       for (auto *Child : Body->body())
-        printStmtWithReturnRewrite(Out, Child, Helper, PP, ContKey, Depth + 1);
+        printStmtWithReturnRewrite(Out, Child, Helper, PP, ContKey, RetStmt,
+                                   Depth + 1);
     } else if (SW->getBody()) {
       printStmtWithReturnRewrite(Out, SW->getBody(), Helper, PP, ContKey,
-                                 Depth + 1);
+                                 RetStmt, Depth + 1);
     }
     Out << Ind << "}";
     return;
@@ -489,7 +491,8 @@ static void printStmtWithReturnRewrite(llvm::raw_ostream &Out, clang::Stmt *S,
   if (auto *CS = clang::dyn_cast<clang::CompoundStmt>(S)) {
     Out << "{\n";
     for (auto *Child : CS->body())
-      printStmtWithReturnRewrite(Out, Child, Helper, PP, ContKey, Depth + 1);
+      printStmtWithReturnRewrite(Out, Child, Helper, PP, ContKey, RetStmt,
+                                   Depth + 1);
     Out << Ind << "}\n";
     return;
   }
@@ -500,7 +503,7 @@ static void printStmtWithReturnRewrite(llvm::raw_ostream &Out, clang::Stmt *S,
     Ca->getLHS()->printPretty(Out, Helper, PP);
     Out << ":\n";
     printStmtWithReturnRewrite(Out, Ca->getSubStmt(), Helper, PP, ContKey,
-                               Depth);
+                               RetStmt, Depth);
     return;
   }
 
@@ -508,7 +511,7 @@ static void printStmtWithReturnRewrite(llvm::raw_ostream &Out, clang::Stmt *S,
     std::string DefInd(Depth > 0 ? (Depth - 1) * IW : 0, ' ');
     Out << DefInd << "default:\n";
     printStmtWithReturnRewrite(Out, Df->getSubStmt(), Helper, PP, ContKey,
-                               Depth);
+                               RetStmt, Depth);
     return;
   }
 
@@ -542,7 +545,8 @@ void ASTStmtWrapIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {
   // rewrite returns
   if (!Ctx.TaskContinuationKey.empty()) {
     VarRenamePrinterHelper Helper(Effective, PP);
-    printStmtWithReturnRewrite(Out, S, &Helper, PP, Ctx.TaskContinuationKey, 0);
+    printStmtWithReturnRewrite(Out, S, &Helper, PP, Ctx.TaskContinuationKey,
+                               Ctx.TaskReturnStmt, 0);
     // no rewriting needed
   } else if (Effective.empty()) {
     S->printPretty(Out, nullptr, PP);

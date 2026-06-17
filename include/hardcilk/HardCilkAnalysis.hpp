@@ -79,10 +79,12 @@ template <typename T> inline const T *hctGetIf(const HardCilkType *Ty) {
 
 struct HCTaskInfo {
   std::set<IRFunction *> SendArgList;
+  uint8_t Tag = 0; // 8-bit continuation tag; meaningful only when IsCont.
   bool IsRoot = false;
   bool IsCont = false;
   bool IsSynthetic = false;
   bool GenerateArgOutWriteBuffer = false;
+  bool EmitFinalArgOutFlush = false;
   bool HasAXI = false;
   uint32_t BufferedArgumentBits = 0;
   HardCilkBaseType BufferedArgType = TY_VOID;
@@ -94,6 +96,25 @@ struct HCTaskInfo {
 };
 
 using TaskInfosTy = std::unordered_map<IRFunction *, HCTaskInfo>;
+
+// ─── Continuation closure write-buffer beats ─────────────────────────────────
+
+// Maximum closure payload the continuation write buffer can transfer in a
+// single beat. Closures wider than this are written in several ordered beats.
+static constexpr unsigned MAX_CLOSURE_BEAT_BITS = 512;
+
+// Number of ordered write-buffer beats needed to write this continuation's
+// closure to memory (1 = fits in one beat, no split). The padded closure width
+// is always a power of two, so a split (>1) always yields 64-byte beats.
+inline unsigned closureWriteBeats(const HCTaskInfo &Info) {
+  unsigned Bits = (unsigned)(Info.TaskSize + Info.TaskPadding) * 8;
+  return (Bits + MAX_CLOSURE_BEAT_BITS - 1) / MAX_CLOSURE_BEAT_BITS;
+}
+
+// Bytes of closure data carried per beat (== 64 whenever beats > 1).
+inline unsigned closureBeatBytes(const HCTaskInfo &Info) {
+  return (unsigned)(Info.TaskSize + Info.TaskPadding) / closureWriteBeats(Info);
+}
 
 // ─── Analysis Result ─────────────────────────────────────────────────────────
 

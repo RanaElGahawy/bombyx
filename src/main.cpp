@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include "core/Cilk1EmuTarget.hpp"
+#include "core/TBBTarget.hpp"
 #include "core/CountSpawns.hpp"
 #include "core/DAE.hpp"
 #include "core/FlattenIR.hpp"
@@ -26,6 +27,7 @@
 #include "vitis/VitisHLSTclGen.hpp"
 #include "core/MakeExplicit.hpp"
 #include "core/OpenCilk2IR.hpp"
+#include "core/PruneDeadSpawnArgs.hpp"
 #include "core/util.hpp"
 
 using namespace clang;
@@ -40,7 +42,7 @@ struct ConvertOpts {
 
   // flags to pass when running the program
   // default: TC_CILK1EMU
-  enum { TG_CILK1EMU, TG_HARDCILK } Target = TG_CILK1EMU;
+  enum { TG_CILK1EMU, TG_HARDCILK, TG_TBB } Target = TG_CILK1EMU;
   bool HCGenDriver = false;
   std::string OutputDir; // -d flag: override base output directory
   std::string AppName;   // stem of input file
@@ -90,6 +92,10 @@ public:
           CountSpawns(P, Context);
           // dumpIRProgramJSON(llvm::outs(), P, Context);
         },
+        [&](IRProgram &P) -> void {
+          if (GOpts.Target == ConvertOpts::TG_HARDCILK)
+            PruneDeadSpawnArgs(P);
+        },
         // HardCilk task analysis pass — backend-agnostic, runs before any
         // HardCilk printer.
         [&](IRProgram &P) -> void {
@@ -121,6 +127,35 @@ public:
             }
             break;
           };
+          case ConvertOpts::TG_TBB: {
+            llvm::raw_fd_ostream TBBOut(OutFilename, EC,
+                                        llvm::sys::fs::OF_Text);
+            PrintTBB(P, TBBOut, Context, CI);
+            std::filesystem::path OutDir =
+                std::filesystem::path(OutFilename.str()).parent_path();
+            if (OutDir.empty())
+              OutDir = ".";
+
+            std::filesystem::path Src =
+                std::filesystem::path(BOMBYX_SUPPORT_DIR) / "tbb_explicit.hh";
+            std::filesystem::path Dest = OutDir / "tbb_explicit.hh";
+
+            std::error_code CopyEC;
+            std::filesystem::copy_file(
+                Src, Dest, std::filesystem::copy_options::overwrite_existing,
+                CopyEC);
+            if (CopyEC) {
+              llvm::errs() << "warning: could not copy tbb_explicit.hh to "
+                           << Dest.string() << ": " << CopyEC.message()
+                           << "\n";
+            }
+
+            std::string CMakePath = (OutDir / "CMakeLists.txt").string();
+            llvm::raw_fd_ostream CMakeOut(CMakePath, EC,
+                                          llvm::sys::fs::OF_Text);
+            PrintTBBCMake(GOpts.AppName + "_tbb", CMakeOut);
+            break;
+          };
           case ConvertOpts::TG_HARDCILK: {
             std::filesystem::path OutPath(OutFilename.str());
             std::filesystem::create_directories(OutPath);
@@ -129,11 +164,123 @@ public:
             VitisHLSTarget HT(P, AppName, *HCAnalysis,
                               std::move(DriverCallers));
 
+            // Collect #include directives for the HLS output.
+            // For every externally-declared function called in the IR,
+            // trace its NamedDecl location up the include chain to the
+            // top-level header (e.g. <cstdlib> for std::abs).
+            {
+              auto &SMSrc = CI.getSourceManager();
+              std::vector<std::string> Includes;
+              std::set<std::string> Seen;
+
+              auto addInclude = [&](std::string Inc) {
+                if (Seen.insert(Inc).second)
+                  Includes.push_back(std::move(Inc));
+              };
+
+              // For every externally-called function, find its
+              // immediate non-internal declaring header.  Internal C++
+              // implementation headers (bits/, ext/, detail/) are skipped and
+              // we walk up the include chain to the first public header.
+              auto findHeaderForDecl =
+                  [&](const clang::NamedDecl *D) -> std::string {
+                clang::SourceLocation Loc = D->getLocation();
+                if (!Loc.isValid() || SMSrc.isInMainFile(Loc))
+                  return "";
+                bool IsSys = SMSrc.isInSystemHeader(Loc);
+                clang::FileID FID = SMSrc.getFileID(Loc);
+                while (FID.isValid()) {
+                  auto *FE = SMSrc.getFileEntryForID(FID);
+                  if (FE) {
+                    llvm::StringRef Full = FE->getName();
+                    // Skip internal C++ implementation headers.
+                    bool IsInternal = Full.contains("/bits/") ||
+                                      Full.contains("/ext/") ||
+                                      Full.contains("/detail/") ||
+                                      Full.contains("/details/");
+                    if (!IsInternal) {
+                      size_t Slash = Full.rfind('/');
+                      std::string Base = (Slash != std::string::npos)
+                                             ? Full.substr(Slash + 1).str()
+                                             : Full.str();
+                      return IsSys ? "#include <" + Base + ">"
+                                   : "#include \"" + Base + "\"";
+                    }
+                  }
+                  // Walk up one level in the include chain.
+                  clang::SourceLocation IncLoc = SMSrc.getIncludeLoc(FID);
+                  if (!IncLoc.isValid())
+                    break;
+                  FID = SMSrc.getFileID(IncLoc);
+                }
+                return "";
+              };
+
+              // Walk all IR expressions to find ASTVarRef call targets.
+              auto walkExpr = [&](auto &&self, IRExpr *E) -> void {
+                if (!E)
+                  return;
+                if (auto *CE = dyn_cast<CallIRExpr>(E)) {
+                  if (auto *AV = std::get_if<ASTVarRef>(&CE->Fn)) {
+                    std::string H = findHeaderForDecl(*AV);
+                    if (!H.empty())
+                      addInclude(std::move(H));
+                  }
+                  for (auto &Arg : CE->Args)
+                    self(self, Arg.get());
+                  return;
+                }
+                if (auto *BE = dyn_cast<BinopIRExpr>(E)) {
+                  self(self, BE->Left.get());
+                  self(self, BE->Right.get());
+                } else if (auto *UE = dyn_cast<UnopIRExpr>(E)) {
+                  self(self, UE->Expr.get());
+                } else if (auto *CE2 = dyn_cast<CastIRExpr>(E)) {
+                  self(self, CE2->E.get());
+                } else if (auto *DE = dyn_cast<DRefIRExpr>(E)) {
+                  self(self, DE->Expr.get());
+                } else if (auto *IE = dyn_cast<IndexIRExpr>(E)) {
+                  self(self, IE->Arr.get());
+                  self(self, IE->Ind.get());
+                } else if (auto *RE = dyn_cast<RefIRExpr>(E)) {
+                  self(self, RE->E.get());
+                }
+              };
+              auto walkStmt = [&](IRStmt *S) {
+                if (auto *CS = dyn_cast<CopyIRStmt>(S))
+                  walkExpr(walkExpr, CS->Src.get());
+                else if (auto *EW = dyn_cast<ExprWrapIRStmt>(S))
+                  walkExpr(walkExpr, EW->Expr.get());
+                else if (auto *SS = dyn_cast<StoreIRStmt>(S)) {
+                  walkExpr(walkExpr, SS->Dest.get());
+                  walkExpr(walkExpr, SS->Src.get());
+                } else if (auto *IS = dyn_cast<IfIRStmt>(S))
+                  walkExpr(walkExpr, IS->Cond.get());
+                else if (auto *LS = dyn_cast<LoopIRStmt>(S))
+                  walkExpr(walkExpr, LS->Cond.get());
+                else if (auto *RS = dyn_cast<ReturnIRStmt>(S))
+                  walkExpr(walkExpr, RS->RetVal.get());
+                else if (auto *ES = dyn_cast<ESpawnIRStmt>(S))
+                  for (auto &Arg : ES->Args)
+                    walkExpr(walkExpr, Arg.get());
+              };
+              for (auto &FPtr : P)
+                for (auto &B : *FPtr) {
+                  for (auto &S : *B)
+                    walkStmt(S.get());
+                  if (B->Term)
+                    walkStmt(B->Term);
+                }
+
+              HT.SetExtraIncludes(std::move(Includes));
+            }
+
             std::string DescJsonName =
-                OutFilename.str() + "/" + AppName + "_descriptors.json";
+                OutFilename.str() + "/" + AppName + ".json";
             llvm::raw_fd_ostream DescJson(DescJsonName, EC,
                                           llvm::sys::fs::OF_Text);
-            PrintHardCilkDescJson(AppName, HCAnalysis->TaskInfos, DescJson);
+            PrintHardCilkDescJson(AppName, HCAnalysis->TaskInfos,
+                                  OutFilename.str(), DescJson);
 
             std::string HLSCodeName =
                 OutFilename.str() + "/" + AppName + ".cpp";
@@ -285,10 +432,6 @@ public:
 
     auto H = new BombyxPragmaHandler();
     CI.getPreprocessor().AddPragmaHandler(H);
-    if (!PP.getPreprocessingRecord()) {
-      PP.createPreprocessingRecord();
-    }
-    clang::PreprocessingRecord *PPRec = PP.getPreprocessingRecord();
 
     return std::make_unique<CilkConvert>(CI, OutFilename);
   }
@@ -302,8 +445,10 @@ void set_target(const char *targ) {
     GOpts.Target = ConvertOpts::TG_CILK1EMU;
   } else if (strcmp(targ, "hardcilk") == 0) {
     GOpts.Target = ConvertOpts::TG_HARDCILK;
+  } else if (strcmp(targ, "tbb") == 0) {
+    GOpts.Target = ConvertOpts::TG_TBB;
   } else if (strcmp(targ, "help") == 0) {
-    fprintf(stderr, "Available targets: cilk1emu, hardcilk\n");
+    fprintf(stderr, "Available targets: cilk1emu, tbb, hardcilk\n");
     exit(EXIT_SUCCESS);
   } else {
     PANIC("unrecognized target %s", targ);
@@ -411,7 +556,9 @@ int main(int argc, char *argv[]) {
                               : std::filesystem::path(GOpts.OutputDir);
 
   std::string OutFilename;
-  if (GOpts.Target == ConvertOpts::TG_CILK1EMU) {
+  if (GOpts.Target == ConvertOpts::TG_HARDCILK) {
+    OutFilename = (BaseOutDir / (Stem + "_HardCilk")).string();
+  } else {
     if (!GOpts.OutputDir.empty()) {
       std::error_code MkEC;
       std::filesystem::create_directories(BaseOutDir, MkEC);
@@ -421,9 +568,9 @@ int main(int argc, char *argv[]) {
         return 1;
       }
     }
-    OutFilename = (BaseOutDir / (Stem + "_cilk1.cpp")).string();
-  } else {
-    OutFilename = (BaseOutDir / (Stem + "_HardCilk")).string();
+    const char *Suffix =
+        GOpts.Target == ConvertOpts::TG_TBB ? "_tbb.cpp" : "_cilk1.cpp";
+    OutFilename = (BaseOutDir / (Stem + Suffix)).string();
   }
 
   std::vector<std::string> compilationFlags = {

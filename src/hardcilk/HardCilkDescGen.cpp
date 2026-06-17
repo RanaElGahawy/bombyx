@@ -35,10 +35,11 @@ static llvm::json::Object getAllocatorSide() {
 }
 
 static llvm::json::Object printTaskDescriptor(IRFunction *Task,
-                                              const HCTaskInfo &TaskInfo) {
+                                              const HCTaskInfo &TaskInfo,
+                                              const std::string &OutputDir) {
   llvm::json::Object obj;
   obj["name"] = Task->getName();
-  obj["peHDLPath"] = "?";
+  obj["peHDLPath"] = OutputDir + "/vitis_hls_output/" + Task->getName();
   obj["isRoot"] = TaskInfo.IsRoot;
   obj["isCont"] = TaskInfo.IsCont;
   obj["hasAXI"] = TaskInfo.HasAXI;
@@ -64,6 +65,16 @@ static llvm::json::Object printTaskDescriptor(IRFunction *Task,
       obj["generateArgOutWriteBuffer"] = false;
     }
   }
+  // 8-bit tag identifying this continuation type. The framework encodes it into
+  // the high 8 bits of the continuation's closure address so that a task sending
+  // to multiple continuations can route by it.
+  if (TaskInfo.IsCont) {
+    obj["tag"] = (int64_t)TaskInfo.Tag;
+    // Number of ordered write-buffer beats this continuation's closure is
+    // written in (1 = fits in one beat; >1 = closure wider than the buffer's
+    // per-beat payload, split into that many sequential spawn_next writes).
+    obj["closureWriteBeats"] = (int64_t)closureWriteBeats(TaskInfo);
+  }
   std::vector<llvm::json::Value> sidesConfigs{getSchedulerSide(TaskInfo)};
   if (TaskInfo.IsCont) {
     sidesConfigs.push_back(getArgumentNotifierSide());
@@ -75,6 +86,7 @@ static llvm::json::Object printTaskDescriptor(IRFunction *Task,
 
 void PrintHardCilkDescJson(const std::string &AppName,
                            const TaskInfosTy &TaskInfos,
+                           const std::string &OutputDir,
                            llvm::raw_ostream &Out) {
   llvm::json::Object obj;
   obj["name"] = AppName;
@@ -85,7 +97,7 @@ void PrintHardCilkDescJson(const std::string &AppName,
   llvm::json::Object mallocList;
   bool anyAXI = false;
   for (auto &[F, Info] : TaskInfos) {
-    taskDescriptors.push_back(printTaskDescriptor(F, Info));
+    taskDescriptors.push_back(printTaskDescriptor(F, Info, OutputDir));
     if (Info.HasAXI)
       anyAXI = true;
     // Only include entries with non-empty lists
@@ -101,11 +113,17 @@ void PrintHardCilkDescJson(const std::string &AppName,
     if (!spawnNextListF.empty())
       spawnNextList[F->getName()] = std::move(spawnNextListF);
 
-    std::vector<llvm::json::Value> sendArgumentListF;
-    for (auto G : Info.SendArgList)
-      sendArgumentListF.push_back(llvm::json::Value(G->getName()));
-    if (!sendArgumentListF.empty())
-      sendArgumentList[F->getName()] = std::move(sendArgumentListF);
+    // Only emit sendArgumentList for tasks that actually have an argOut port.
+    // Tasks that tail-spawn (non-empty SpawnList or SpawnNextList) forward _cont
+    // through the spawned task struct rather than via argOut.
+    bool NeedsArgOut = F->Info.SpawnList.empty() && F->Info.SpawnNextList.empty();
+    if (NeedsArgOut) {
+      std::vector<llvm::json::Value> sendArgumentListF;
+      for (auto G : Info.SendArgList)
+        sendArgumentListF.push_back(llvm::json::Value(G->getName()));
+      if (!sendArgumentListF.empty())
+        sendArgumentList[F->getName()] = std::move(sendArgumentListF);
+    }
   }
   obj["taskDescriptors"] = taskDescriptors;
   obj["spawnList"] = llvm::json::Value(std::move(spawnList));

@@ -70,7 +70,9 @@ HardCilkType *clangTypeToHardCilk(IRType &Ty) {
       break;
     case clang::BuiltinType::Long:
     case clang::BuiltinType::ULong:
-      *HCT = TY_UINT32;
+      // LP64 target (64-bit Linux): `long`/`unsigned long` are 64-bit, and
+      // `uint64_t`/`size_t` desugar to them. Mapping to 32 bits truncated them.
+      *HCT = TY_UINT64;
       break;
     case clang::BuiltinType::LongLong:
     case clang::BuiltinType::ULongLong:
@@ -406,15 +408,44 @@ namespace {
 class HardCilkStmtOrderCollector : public ScopedIRTraverser {
 public:
   std::vector<IRStmt *> Stmts;
+  // Statements that lexically sit inside at least one loop body.
+  std::set<const IRStmt *> InLoop;
 
 private:
-  void handleScope(ScopeEvent) override {}
+  // One entry per open scope; true if that scope is a loop body. The traverser
+  // emits exactly one Open and one Close per if/loop (Else carries no nesting
+  // change), so a stack tracks loop nesting correctly even for ifs inside loops.
+  std::vector<bool> ScopeIsLoop;
+  int LoopDepth = 0;
+  IRBasicBlock *CurrentBlock = nullptr;
+
+  void handleScope(ScopeEvent SE) override {
+    if (SE == ScopeEvent::Open) {
+      bool IsLoop = CurrentBlock && CurrentBlock->Term &&
+                    isa<LoopIRStmt>(CurrentBlock->Term);
+      ScopeIsLoop.push_back(IsLoop);
+      if (IsLoop)
+        LoopDepth++;
+    } else if (SE == ScopeEvent::Close) {
+      assert(!ScopeIsLoop.empty());
+      if (ScopeIsLoop.back())
+        LoopDepth--;
+      ScopeIsLoop.pop_back();
+    }
+  }
 
   void visitBlock(IRBasicBlock *B) override {
-    for (auto &S : *B)
+    CurrentBlock = B;
+    for (auto &S : *B) {
       Stmts.push_back(S.get());
-    if (B->Term)
+      if (LoopDepth > 0)
+        InLoop.insert(S.get());
+    }
+    if (B->Term) {
       Stmts.push_back(B->Term);
+      if (LoopDepth > 0)
+        InLoop.insert(B->Term);
+    }
   }
 };
 } // namespace
@@ -483,6 +514,7 @@ static void analyzeSendArguments(IRProgram &P, TaskInfosTy &TaskInfos) {
 static void analyzeArgOutWriteBuffers(TaskInfosTy &TaskInfos) {
   for (auto &[F, Info] : TaskInfos) {
     Info.GenerateArgOutWriteBuffer = false;
+    Info.EmitFinalArgOutFlush = false;
     Info.BufferedArgumentBits = 0;
     Info.BufferedArgType = TY_VOID;
     Info.BufferedStoreAllowMap.clear();
@@ -531,7 +563,15 @@ static void analyzeArgOutWriteBuffers(TaskInfosTy &TaskInfos) {
     for (auto *SS : BufferedStores) {
       Info.BufferedStoreAllowMap[SS] = 0;
     }
-    Info.BufferedStoreAllowMap[BufferedStores.front()] = 1;
+    // The allow=1 store releases exactly one writeback packet. If that store
+    // sits inside a loop, the single statement runs once per iteration and would
+    // wrongly release N packets. In that case keep every store at allow=0 and
+    // emit a single trailing zero-sized flush packet (allow=1) after the body.
+    StoreIRStmt *AllowStore = BufferedStores.front();
+    if (Collector.InLoop.count(AllowStore))
+      Info.EmitFinalArgOutFlush = true;
+    else
+      Info.BufferedStoreAllowMap[AllowStore] = 1;
   }
 }
 
@@ -576,6 +616,22 @@ HardCilkAnalysisResult RunHardCilkAnalysis(IRProgram &P) {
         TaskInfos[G] = HCTaskInfo();
       TaskInfos[G].IsCont = true;
     }
+  }
+
+  // Assign each continuation type a unique 8-bit tag. Walk the program in
+  // IRProgram order (deterministic, unlike the TaskInfos unordered_map) so tag
+  // values are stable across runs. Tag 0 is reserved for "untagged"; the high 8
+  // bits of a continuation's closure address carry this tag so that a task with
+  // multiple send destinations can route by it.
+  unsigned NextTag = 1;
+  for (auto &FPtr : P) {
+    auto It = TaskInfos.find(FPtr.get());
+    if (It == TaskInfos.end() || !It->second.IsCont)
+      continue;
+    if (NextTag > 0xFF) {
+      PANIC("more than 255 continuation types; 8-bit continuation tag exhausted");
+    }
+    It->second.Tag = (uint8_t)NextTag++;
   }
 
   // If no explicit continuation exists at all, seed root tasks with a synthetic

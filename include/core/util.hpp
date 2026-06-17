@@ -23,4 +23,16 @@ extern int VERBOSITY;
   fprintf(stderr, "\n");                                                       \
   exit(EXIT_FAILURE);
 
+// Like PANIC but does not abort: print a red "critical" diagnostic and keep
+// going so the rest of the output can still be inspected for debugging.
+#define CRITICAL(...)                                                          \
+  do {                                                                         \
+    fprintf(stderr,                                                            \
+            "[" BRED "critical" COLOR_RESET "@" BHBLK "%s:%d" COLOR_RESET      \
+            "(%s)] ",                                                          \
+            __FILE__, __LINE__, __func__);                                     \
+    fprintf(stderr, __VA_ARGS__);                                              \
+    fprintf(stderr, "\n");                                                     \
+  } while (0)
+
 using namespace clang;

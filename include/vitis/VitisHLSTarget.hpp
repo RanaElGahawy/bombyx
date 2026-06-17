@@ -39,6 +39,7 @@ private:
   const TaskInfosTy &TaskInfos;
   DriverCallersTy DriverCallers;
   bool ArgOutImplList[TY_LAST] = {false};
+  std::vector<std::string> ExtraIncludes;
 
   void PrintDef(llvm::raw_ostream &Out, IRFunction *Task, HCTaskInfo &Info);
 
@@ -59,6 +60,10 @@ public:
   VitisHLSTarget(IRProgram &P, const std::string &AppName,
                  const HardCilkAnalysisResult &Analysis,
                  DriverCallersTy DriverCallers);
+
+  void SetExtraIncludes(std::vector<std::string> Inc) {
+    ExtraIncludes = std::move(Inc);
+  }
 
   void PrintHardCilk(llvm::raw_ostream &out, clang::ASTContext &C);
   void PrintDriver(llvm::raw_ostream &out);
