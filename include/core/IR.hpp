@@ -73,6 +73,10 @@ struct IRPrintContext {
   // a flag that tells the opaque AST printer that it is inside a task function,
   // when it sees return expr, replace it with send argument
   std::string TaskContinuationKey;
+  // statement emitted to leave the task function after a rewritten return;
+  // backends whose task functions are non-void override this (e.g. the TBB
+  // backend uses "return nullptr;")
+  std::string TaskReturnStmt = "return;";
 };
 
 class IRExpr {
