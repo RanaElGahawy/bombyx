@@ -853,14 +853,17 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
       intfs.push_back(std::make_pair(PortName, SpawnTask->getName() + "_task"));
     }
   }
-  if (Info.SendArgList.size() > 0) {
-    // A void task that tail-spawns another task is not the completion point;
-    // the spawned task (and its descendants) will send the argOut signal.
-    bool NeedsVoidSend =
-        Task->Info.SpawnNextList.empty() && Task->Info.SpawnList.empty();
-    bool NeedsArgOut = !Task->isVoid() || NeedsVoidSend;
-    bool NeedsArgData = !typeIsVoid(*Info.RetTy) ||
-                        (Info.GenerateArgOutWriteBuffer && NeedsVoidSend);
+  // argOut/argDataOut ports are emitted only for leaf senders — tasks that
+  // complete here rather than tail-spawning. A task with a non-empty spawn or
+  // spawn_next list forwards its argument through the spawned closure and never
+  // writes argOut/argDataOut, so emitting those ports would create dead outputs
+  // (which Vitis HLS then synthesizes as stray input ports). This matches the
+  // JSON sendArgumentList, which is gated on the same empty-spawn-lists rule.
+  bool NeedsVoidSend =
+      Task->Info.SpawnNextList.empty() && Task->Info.SpawnList.empty();
+  if (Info.SendArgList.size() > 0 && NeedsVoidSend) {
+    bool NeedsArgData =
+        !typeIsVoid(*Info.RetTy) || Info.GenerateArgOutWriteBuffer;
     std::string ArgDataOutTy;
     if (NeedsArgData) {
       llvm::raw_string_ostream ArgDataOutTyS(ArgDataOutTy);
@@ -874,15 +877,12 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
     // continuation tag (see emitArgRouting).
     bool Multi = Info.SendArgList.size() > 1;
     if (!Multi) {
-      if (NeedsArgOut)
-        intfs.push_back(std::make_pair("argOut", "uint64_t"));
+      intfs.push_back(std::make_pair("argOut", "uint64_t"));
       if (NeedsArgData)
         intfs.push_back(std::make_pair("argDataOut", ArgDataOutTy));
     } else {
       for (IRFunction *Dst : sortedDests(Info)) {
-        if (NeedsArgOut)
-          intfs.push_back(
-              std::make_pair(argOutPortName(Dst, true), "uint64_t"));
+        intfs.push_back(std::make_pair(argOutPortName(Dst, true), "uint64_t"));
         if (NeedsArgData)
           intfs.push_back(
               std::make_pair(argDataPortName(Dst, true), ArgDataOutTy));

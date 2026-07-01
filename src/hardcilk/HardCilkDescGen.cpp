@@ -3,6 +3,9 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/JSON.h"
 
+#include <algorithm>
+#include <vector>
+
 static llvm::json::Object getSchedulerSide(const HCTaskInfo &TaskInfo) {
   llvm::json::Object obj;
   obj["sideType"] = "scheduler";
@@ -54,15 +57,41 @@ static llvm::json::Object printTaskDescriptor(IRFunction *Task,
   if (TaskInfo.IsCont || !TaskInfo.IsRoot)
     obj["spawnServersCount"] = 1;
   // generateArgOutWriteBuffer: emit for all non-root tasks (false is meaningful)
-  if (!TaskInfo.IsRoot) {
-    if (TaskInfo.GenerateArgOutWriteBuffer) {
-      obj["generateArgOutWriteBuffer"] = true;
-      std::vector<llvm::json::Value> ArgumentSizeList;
-      ArgumentSizeList.push_back(
-          llvm::json::Value(static_cast<int64_t>(TaskInfo.BufferedArgumentBits)));
+  if (!TaskInfo.IsRoot)
+    obj["generateArgOutWriteBuffer"] = TaskInfo.GenerateArgOutWriteBuffer;
+
+  // argumentSizeList: payload width (bits) carried on each argDataOut port,
+  // keyed by the exact stream name written in the PE so every entry maps to its
+  // related write. A task's argData payload is its return type (non-void tasks)
+  // or its buffered-store type; the same width is written to every destination
+  // port, but each port gets its own entry. Single-destination tasks use the
+  // plain "argDataOut" port; multi-destination tasks use "argDataOut_<cont>".
+  // Only leaf senders (empty spawn-lists) actually have argDataOut ports; a task
+  // that tail-spawns forwards its argument through the spawned closure and never
+  // writes argOut/argDataOut. This mirrors the PE port emission and the JSON
+  // sendArgumentList gating.
+  bool NeedsVoidSend =
+      Task->Info.SpawnNextList.empty() && Task->Info.SpawnList.empty();
+  if (!TaskInfo.IsRoot && !TaskInfo.SendArgList.empty() && NeedsVoidSend) {
+    bool RetIsValue = TaskInfo.RetTy && !typeIsVoid(*TaskInfo.RetTy);
+    bool NeedsArgData = RetIsValue || TaskInfo.GenerateArgOutWriteBuffer;
+    if (NeedsArgData) {
+      int64_t Bits = RetIsValue
+                         ? (int64_t)hardCilkTypeSize(TaskInfo.RetTy.get()) * 8
+                         : (int64_t)TaskInfo.BufferedArgumentBits;
+      bool Multi = TaskInfo.SendArgList.size() > 1;
+      std::vector<IRFunction *> Dests(TaskInfo.SendArgList.begin(),
+                                      TaskInfo.SendArgList.end());
+      std::sort(Dests.begin(), Dests.end(), [](IRFunction *A, IRFunction *B) {
+        return A->getName() < B->getName();
+      });
+      llvm::json::Object ArgumentSizeList;
+      for (IRFunction *D : Dests) {
+        std::string Port =
+            Multi ? "argDataOut_" + D->getName() : std::string("argDataOut");
+        ArgumentSizeList[Port] = Bits;
+      }
       obj["argumentSizeList"] = std::move(ArgumentSizeList);
-    } else {
-      obj["generateArgOutWriteBuffer"] = false;
     }
   }
   // 8-bit tag identifying this continuation type. The framework encodes it into

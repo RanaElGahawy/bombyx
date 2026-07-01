@@ -134,10 +134,11 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
   Out << "# Clock       : " << FreqMhz << " MHz\n";
   Out << "#\n";
   Out << "# Usage:\n";
-  Out << "#   ./build_hls.sh [--debug]\n";
+  Out << "#   ./build_hls.sh [--debug] [-jN | --jobs N]\n";
   Out << "#\n";
   Out << "# Options:\n";
-  Out << "#   --debug   Keep intermediate Vitis HLS project directories.\n";
+  Out << "#   --debug        Keep intermediate Vitis HLS project directories.\n";
+  Out << "#   -jN, --jobs N  Max PEs to synthesise in parallel (default: nproc).\n";
   Out << "#\n";
   Out << "# Requirements:\n";
   Out << "#   vitis_hls must be on PATH.\n";
@@ -147,12 +148,27 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
   Out << "#   vitis_hls_output/<kernel>/   — synthesised Verilog RTL per PE\n";
   Out << "# =============================================================================\n\n";
 
-  Out << "set -euo pipefail\n\n";
+  // NOTE: '-e' is intentionally omitted: each PE runs as a backgrounded job and
+  // failures are handled explicitly via per-kernel status files (subshell
+  // variable updates do not propagate to the parent).
+  Out << "set -uo pipefail\n\n";
 
   Out << "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n";
   Out << "WORK_ROOT=\"${SCRIPT_DIR}/vitis_hls_work\"\n";
-  Out << "RTL_ROOT=\"${SCRIPT_DIR}/vitis_hls_output\"\n";
-  Out << "DEBUG=\"${1:-}\"\n\n";
+  Out << "RTL_ROOT=\"${SCRIPT_DIR}/vitis_hls_output\"\n\n";
+
+  Out << "DEBUG=\"\"\n";
+  Out << "MAX_JOBS=\"$(nproc 2>/dev/null || echo 4)\"\n";
+  Out << "while [[ $# -gt 0 ]]; do\n";
+  Out << "    case \"$1\" in\n";
+  Out << "        --debug)   DEBUG=\"--debug\"; shift ;;\n";
+  Out << "        --jobs)    MAX_JOBS=\"$2\"; shift 2 ;;\n";
+  Out << "        --jobs=*)  MAX_JOBS=\"${1#--jobs=}\"; shift ;;\n";
+  Out << "        -j*)       MAX_JOBS=\"${1#-j}\"; shift ;;\n";
+  Out << "        *)         shift ;;\n";
+  Out << "    esac\n";
+  Out << "done\n";
+  Out << "[[ \"$MAX_JOBS\" =~ ^[0-9]+$ && \"$MAX_JOBS\" -ge 1 ]] || MAX_JOBS=1\n\n";
 
   Out << "RED='\\033[0;31m'; GREEN='\\033[0;32m'; CYAN='\\033[0;36m'\n";
   Out << "BOLD='\\033[1m'; NC='\\033[0m'\n";
@@ -163,41 +179,57 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
   Out << "command -v vitis_hls &>/dev/null \\\n";
   Out << "    || { error \"'vitis_hls' not found — source the Vitis HLS settings64.sh first.\"; exit 1; }\n\n";
 
-  Out << "mkdir -p \"$WORK_ROOT\" \"$RTL_ROOT\"\n\n";
+  Out << "mkdir -p \"$WORK_ROOT\" \"$RTL_ROOT\"\n";
+  Out << "STATUS_DIR=\"$(mktemp -d)\"\n";
+  Out << "trap 'rm -rf \"$STATUS_DIR\"' EXIT\n\n";
 
   Out << "KERNELS=(";
   for (size_t i = 0; i < KernelNames.size(); ++i) {
     if (i) Out << " ";
     Out << KernelNames[i];
   }
-  Out << ")\n";
-  Out << "PASS=(); FAIL=()\n\n";
+  Out << ")\n\n";
 
-  Out << "for KERNEL in \"${KERNELS[@]}\"; do\n";
-  Out << "    echo -e \"${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\"\n";
-  Out << "    info \"Synthesising PE: ${BOLD}${KERNEL}${NC}\"\n\n";
-
-  Out << "    WORK_DIR=\"${WORK_ROOT}/${KERNEL}\"\n";
+  // Per-PE build, run as a backgrounded job. stdout/stderr of vitis_hls go to a
+  // log file (not the console) so parallel runs do not interleave their output.
+  Out << "build_one() {\n";
+  Out << "    local KERNEL=\"$1\"\n";
+  Out << "    local WORK_DIR=\"${WORK_ROOT}/${KERNEL}\"\n";
+  Out << "    local TCL_FILE=\"${SCRIPT_DIR}/hls_tcl/${KERNEL}.tcl\"\n";
   Out << "    mkdir -p \"$WORK_DIR\"\n";
-  Out << "    TCL_FILE=\"${SCRIPT_DIR}/hls_tcl/${KERNEL}.tcl\"\n\n";
-
-  Out << "    if (cd \"$WORK_DIR\" && vitis_hls -f \"$TCL_FILE\" 2>&1 | tee vitis_hls.log); then\n";
-  Out << "        RTL_SRC=\"${WORK_DIR}/${KERNEL}_proj/solution1/syn/verilog\"\n";
+  Out << "    info \"Synthesising PE: ${BOLD}${KERNEL}${NC}\"\n";
+  Out << "    if (cd \"$WORK_DIR\" && vitis_hls -f \"$TCL_FILE\" > vitis_hls.log 2>&1); then\n";
+  Out << "        local RTL_SRC=\"${WORK_DIR}/${KERNEL}_proj/solution1/syn/verilog\"\n";
   Out << "        if [[ -d \"$RTL_SRC\" ]]; then\n";
   Out << "            mkdir -p \"${RTL_ROOT}/${KERNEL}\"\n";
   Out << "            cp -r \"${RTL_SRC}/.\" \"${RTL_ROOT}/${KERNEL}/\"\n";
   Out << "            success \"${KERNEL} → ${RTL_ROOT}/${KERNEL}/\"\n";
+  Out << "            [[ \"$DEBUG\" == \"--debug\" ]] || rm -rf \"$WORK_DIR\"\n";
+  Out << "            echo PASS > \"${STATUS_DIR}/${KERNEL}\"\n";
   Out << "        else\n";
-  Out << "            error \"Verilog not found: ${RTL_SRC}\"\n";
-  Out << "            FAIL+=(\"$KERNEL\"); continue\n";
+  Out << "            error \"${KERNEL}: Verilog not found: ${RTL_SRC}\"\n";
+  Out << "            echo FAIL > \"${STATUS_DIR}/${KERNEL}\"\n";
   Out << "        fi\n";
-  Out << "        [[ \"$DEBUG\" == \"--debug\" ]] || rm -rf \"$WORK_DIR\"\n";
-  Out << "        PASS+=(\"$KERNEL\")\n";
   Out << "    else\n";
   Out << "        error \"${KERNEL} failed. Log: ${WORK_DIR}/vitis_hls.log\"\n";
+  Out << "        echo FAIL > \"${STATUS_DIR}/${KERNEL}\"\n";
+  Out << "    fi\n";
+  Out << "}\n\n";
+
+  Out << "info \"Building ${#KERNELS[@]} PEs with up to ${MAX_JOBS} parallel job(s).\"\n";
+  Out << "for KERNEL in \"${KERNELS[@]}\"; do\n";
+  Out << "    while (( $(jobs -rp | wc -l) >= MAX_JOBS )); do wait -n; done\n";
+  Out << "    build_one \"$KERNEL\" &\n";
+  Out << "done\n";
+  Out << "wait\n\n";
+
+  Out << "PASS=(); FAIL=()\n";
+  Out << "for KERNEL in \"${KERNELS[@]}\"; do\n";
+  Out << "    if [[ \"$(cat \"${STATUS_DIR}/${KERNEL}\" 2>/dev/null)\" == \"PASS\" ]]; then\n";
+  Out << "        PASS+=(\"$KERNEL\")\n";
+  Out << "    else\n";
   Out << "        FAIL+=(\"$KERNEL\")\n";
   Out << "    fi\n";
-  Out << "    echo\n";
   Out << "done\n\n";
 
   Out << "echo -e \"${BOLD}══════════════════ SUMMARY ══════════════════${NC}\"\n";
