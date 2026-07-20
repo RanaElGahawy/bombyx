@@ -59,7 +59,7 @@ THREAD(rec_matmul_cont2);
 THREAD(rec_matmul_cont3);
 THREAD(main_cont0);
 
-CLOSURE_DEF(rec_matmulAdd,
+struct rec_matmulAdd_data {
     float *A;
     float *B;
     float *C;
@@ -67,19 +67,8 @@ CLOSURE_DEF(rec_matmulAdd,
     int n;
     int p;
     int ld;
-);
-CLOSURE_DEF(rec_matmul,
-    float *A;
-    float *B;
-    float *C;
-    int m;
-    int n;
-    int p;
-    int ld;
-);
-CLOSURE_DEF(rec_matmulAdd_cont0,
-);
-CLOSURE_DEF(rec_matmulAdd_cont1,
+};
+struct rec_matmulAdd_cont1_data {
     float *A;
     float *B;
     float *C;
@@ -88,23 +77,20 @@ CLOSURE_DEF(rec_matmulAdd_cont1,
     int p;
     int ld;
     int n1;
+};
+
+CLOSURE_DEF_SHARED(rec_matmulAdd, rec_matmulAdd_data);
+CLOSURE_DEF_SHARED(rec_matmul, rec_matmulAdd_data);
+CLOSURE_DEF(rec_matmulAdd_cont0,
 );
+CLOSURE_DEF_SHARED(rec_matmulAdd_cont1, rec_matmulAdd_cont1_data);
 CLOSURE_DEF(rec_matmulAdd_cont2,
 );
 CLOSURE_DEF(rec_matmulAdd_cont3,
 );
 CLOSURE_DEF(rec_matmul_cont0,
 );
-CLOSURE_DEF(rec_matmul_cont1,
-    float *A;
-    float *B;
-    float *C;
-    int m;
-    int n;
-    int p;
-    int ld;
-    int n1;
-);
+CLOSURE_DEF_SHARED(rec_matmul_cont1, rec_matmulAdd_cont1_data);
 CLOSURE_DEF(rec_matmul_cont2,
 );
 CLOSURE_DEF(rec_matmul_cont3,

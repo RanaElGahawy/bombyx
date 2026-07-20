@@ -47,7 +47,13 @@ void printFunDecl(IRFunction *F, llvm::raw_ostream &out, clang::ASTContext &C) {
 }
 
 void printClosureDecl(IRFunction *F, llvm::raw_ostream &out,
-                      clang::ASTContext &C) {
+                      clang::ASTContext &C,
+                      const std::string &DataStruct = "") {
+  if (!DataStruct.empty()) {
+    out << "CLOSURE_DEF_SHARED(" << F->getName() << ", " << DataStruct
+        << ");\n";
+    return;
+  }
   out << "CLOSURE_DEF(" << F->getName() << ",\n";
   for (auto &Var : F->Vars) {
     if (Var.DeclLoc == IRVarDecl::ARG) {
@@ -233,6 +239,7 @@ private:
   int SpawnCtr = 0;
   int IndentLvl = 1;
   std::set<ClosureDeclIRStmt *> DeclaredClosures;
+  const std::unordered_map<IRFunction *, std::string> &FnDataStruct;
 
 public:
   bool LastReturnPrinted = false;
@@ -302,27 +309,81 @@ private:
         }
       }
     }
-    for (auto &[SrcVar, DstVar] : S->Decl->Caller2Callee) {
-      if (SrcVar->IsEphemeral && UnconditionalEphemeralVars.count(SrcVar))
-        continue;
-      if (SrcVar->Type->isArrayType()) {
-        UsesMemcpy = true;
-        Indent() << "std::memcpy(((" << SpawnNextFnName << "_closure*)SN_"
-                 << SpawnNextFnName << ".cls.get())->" << GetSym(DstVar->Name)
-                 << ", ";
-        C.IdentCB(Out, SrcVar);
-        Out << ", sizeof(";
-        C.IdentCB(Out, SrcVar);
-        Out << "));\n";
-      } else {
-        Indent() << "((" << SpawnNextFnName << "_closure*)SN_"
-                 << SpawnNextFnName;
-        Out << ".cls.get())->" << GetSym(DstVar->Name) << " = ";
-        C.IdentCB(Out, SrcVar);
-        Out << ";\n";
+    // Check if all non-ephemeral fields are same-named ARG pass-throughs and
+    // both F and the SN function share a data struct — if so, use bulk copy.
+    auto SrcFamIt = FnDataStruct.find(F);
+    auto DstFamIt = FnDataStruct.find(S->Fn);
+    bool canBulk = F->Info.IsTask && SrcFamIt != FnDataStruct.end() &&
+                   DstFamIt != FnDataStruct.end() &&
+                   SrcFamIt->second == DstFamIt->second;
+    if (canBulk) {
+      for (auto &[SrcVar, DstVar] : S->Decl->Caller2Callee) {
+        if (SrcVar->IsEphemeral && UnconditionalEphemeralVars.count(SrcVar))
+          continue;
+        if (SrcVar->DeclLoc != IRVarDecl::ARG ||
+            GetSym(SrcVar->Name) != GetSym(DstVar->Name)) {
+          canBulk = false;
+          break;
+        }
+      }
+    }
+    if (canBulk) {
+      Indent() << "*static_cast<" << SrcFamIt->second << "*>(SN_"
+               << SpawnNextFnName << ".cls.get()) = *largs;\n";
+    } else {
+      for (auto &[SrcVar, DstVar] : S->Decl->Caller2Callee) {
+        if (SrcVar->IsEphemeral && UnconditionalEphemeralVars.count(SrcVar))
+          continue;
+        if (SrcVar->Type->isArrayType()) {
+          UsesMemcpy = true;
+          Indent() << "std::memcpy(((" << SpawnNextFnName << "_closure*)SN_"
+                   << SpawnNextFnName << ".cls.get())->" << GetSym(DstVar->Name)
+                   << ", ";
+          C.IdentCB(Out, SrcVar);
+          Out << ", sizeof(";
+          C.IdentCB(Out, SrcVar);
+          Out << "));\n";
+        } else {
+          Indent() << "((" << SpawnNextFnName << "_closure*)SN_"
+                   << SpawnNextFnName;
+          Out << ".cls.get())->" << GetSym(DstVar->Name) << " = ";
+          C.IdentCB(Out, SrcVar);
+          Out << ";\n";
+        }
       }
     }
     Indent() << "// Original sync was here\n";
+  }
+
+  // Returns the shared data struct name if F and ES->Fn are in the same family
+  // AND every spawn arg is a direct same-named ARG pass-through from largs.
+  std::string bulkCopyDataStruct(ESpawnIRStmt *ES, IRFunction *F) {
+    if (!F->Info.IsTask)
+      return "";
+    auto SrcIt = FnDataStruct.find(F);
+    auto DstIt = FnDataStruct.find(ES->Fn);
+    if (SrcIt == FnDataStruct.end() || DstIt == FnDataStruct.end())
+      return "";
+    if (SrcIt->second != DstIt->second)
+      return "";
+    auto DstArgIt = ES->Fn->Vars.begin();
+    for (auto &Arg : ES->Args) {
+      while (DstArgIt != ES->Fn->Vars.end() &&
+             DstArgIt->DeclLoc != IRVarDecl::ARG)
+        DstArgIt++;
+      if (DstArgIt == ES->Fn->Vars.end())
+        return "";
+      auto *IE = llvm::dyn_cast<IdentIRExpr>(Arg.get());
+      if (!IE)
+        return "";
+      IRVarDecl *SrcVar = IE->Ident;
+      if (!SrcVar || SrcVar->DeclLoc != IRVarDecl::ARG)
+        return "";
+      if (GetSym(SrcVar->Name) != GetSym(DstArgIt->Name))
+        return "";
+      DstArgIt++;
+    }
+    return SrcIt->second;
   }
 
   void emitSpawnArgList(ESpawnIRStmt *ES, const std::string &accessor) {
@@ -396,15 +457,21 @@ private:
       // Fire-and-forget spawn (no spawn_next). Pass the parent's k
       // continuation so the spawned task can eventually SEND_ARGUMENT
       // back to the original caller.
-      Indent() << "auto sp" << SpawnCtr << "c = std::make_shared<"
-               << SpawnFnName << "_closure>(";
-      if (F->Info.IsTask) {
-        Out << "largs->k";
+      std::string DataStruct = bulkCopyDataStruct(ES, F);
+      if (!DataStruct.empty()) {
+        Indent() << "auto sp" << SpawnCtr << "c = std::make_shared<"
+                 << SpawnFnName << "_closure>(largs->k, *largs);\n";
       } else {
-        Out << "CONT_DUMMY";
+        Indent() << "auto sp" << SpawnCtr << "c = std::make_shared<"
+                 << SpawnFnName << "_closure>(";
+        if (F->Info.IsTask) {
+          Out << "largs->k";
+        } else {
+          Out << "CONT_DUMMY";
+        }
+        Out << ");\n";
+        emitSpawnArgList(ES, "->");
       }
-      Out << ");\n";
-      emitSpawnArgList(ES, "->");
     }
 
     // we do not create spawn destination functions.
@@ -479,7 +546,9 @@ private:
   }
 
 public:
-  Cilk1EmuPrinter(llvm::raw_ostream &Out, IRPrintContext &C) : Out(Out), C(C) {}
+  Cilk1EmuPrinter(llvm::raw_ostream &Out, IRPrintContext &C,
+                  const std::unordered_map<IRFunction *, std::string> &FDS)
+      : Out(Out), C(C), FnDataStruct(FDS) {}
 };
 
 void printOriginalSourceSplit(IRProgram &P, llvm::raw_ostream &OutA,
@@ -539,6 +608,36 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
   std::string Buf;
   llvm::raw_string_ostream BufStream(Buf);
 
+  // Compute closure data families: task functions that share the same ordered
+  // ARG list (name + type) can share a data struct, enabling one-liner copies.
+  // Key: ordered vector of (field_name, type_string) pairs.
+  using DataKey = std::vector<std::pair<std::string, std::string>>;
+  std::map<DataKey, std::vector<IRFunction *>> FamilyMap;
+  for (auto &F : P) {
+    if (!F->Info.IsTask)
+      continue;
+    DataKey Key;
+    for (auto &Var : F->Vars)
+      if (Var.DeclLoc == IRVarDecl::ARG)
+        Key.push_back(
+            {GetSym(Var.Name), Var.Type.getAsString(C.getPrintingPolicy())});
+    if (!Key.empty())
+      FamilyMap[Key].push_back(F.get());
+  }
+  // Only keep groups with 2+ members — singletons need no shared struct.
+  std::unordered_map<IRFunction *, std::string> FnDataStruct;
+  for (auto &[Key, Fns] : FamilyMap) {
+    if (Fns.size() < 2)
+      continue;
+    // Name the struct after the first member's RootFun (or the function
+    // itself).
+    IRFunction *First = Fns[0];
+    // Name the struct after the first member's IR name (unique in the program).
+    std::string DataName = First->getName() + "_data";
+    for (auto *Fn : Fns)
+      FnDataStruct[Fn] = DataName;
+  }
+
   // 1. Print forward declarations of each function, include Cilk1 emulation
   // file.
   std::string PartB;
@@ -550,9 +649,35 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
     BufStream << ";\n";
   }
   BufStream << "\n";
+
+  // Emit shared data structs before closure definitions.
+  std::set<std::string> EmittedDataStructs;
+  for (auto &F : P) {
+    if (!F->Info.IsTask)
+      continue;
+    auto It = FnDataStruct.find(F.get());
+    if (It == FnDataStruct.end())
+      continue;
+    const std::string &DataName = It->second;
+    if (!EmittedDataStructs.insert(DataName).second)
+      continue;
+    BufStream << "struct " << DataName << " {\n";
+    for (auto &Var : F->Vars) {
+      if (Var.DeclLoc != IRVarDecl::ARG)
+        continue;
+      BufStream << TAB;
+      Var.Type.print(BufStream, C.getPrintingPolicy(), GetSym(Var.Name));
+      BufStream << ";\n";
+    }
+    BufStream << "};\n";
+  }
+  BufStream << "\n";
+
   for (auto &F : P) {
     if (F->Info.IsTask) {
-      printClosureDecl(F.get(), BufStream, C);
+      auto It = FnDataStruct.find(F.get());
+      printClosureDecl(F.get(), BufStream, C,
+                       It != FnDataStruct.end() ? It->second : "");
     }
   }
 
@@ -610,7 +735,7 @@ void PrintCilk1Emu(IRProgram &P, llvm::raw_ostream &out, clang::ASTContext &C,
               }
             },
         .TaskContinuationKey = F->Info.IsTask ? std::string("largs->k") : ""};
-    Cilk1EmuPrinter Printer(BufStream, IRC);
+    Cilk1EmuPrinter Printer(BufStream, IRC, FnDataStruct);
     Printer.traverse(*F);
     UsesMemcpy |= Printer.UsesMemcpy;
     if (F->Info.IsTask && !Printer.LastReturnPrinted) {

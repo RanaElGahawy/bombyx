@@ -51,25 +51,19 @@ THREAD(sample_qsort_cont0);
 THREAD(sample_qsort_cont1);
 THREAD(qmain_cont0);
 
+struct sample_qsort_afterif0_data {
+    int *begin;
+    int *end;
+    int *middle;
+};
+
 CLOSURE_DEF(sample_qsort,
     int *begin;
     int *end;
 );
-CLOSURE_DEF(sample_qsort_afterif0,
-    int *begin;
-    int *end;
-    int *middle;
-);
-CLOSURE_DEF(sample_qsort_cont0,
-    int *begin;
-    int *end;
-    int *middle;
-);
-CLOSURE_DEF(sample_qsort_cont1,
-    int *begin;
-    int *end;
-    int *middle;
-);
+CLOSURE_DEF_SHARED(sample_qsort_afterif0, sample_qsort_afterif0_data);
+CLOSURE_DEF_SHARED(sample_qsort_cont0, sample_qsort_afterif0_data);
+CLOSURE_DEF_SHARED(sample_qsort_cont1, sample_qsort_afterif0_data);
 CLOSURE_DEF(qmain_cont0,
     int n;
     int *a;
@@ -178,18 +172,13 @@ THREAD(sample_qsort_cont0) {
     sample_qsort_cont0_closure *largs = (sample_qsort_cont0_closure*)(args.get());
     sample_qsort_cont1_closure SN_sample_qsort_cont1c(largs->k);
     spawn_next<sample_qsort_cont1_closure> SN_sample_qsort_cont1(SN_sample_qsort_cont1c);
-    ((sample_qsort_cont1_closure*)SN_sample_qsort_cont1.cls.get())->middle = largs->middle;
-    ((sample_qsort_cont1_closure*)SN_sample_qsort_cont1.cls.get())->end = largs->end;
-    ((sample_qsort_cont1_closure*)SN_sample_qsort_cont1.cls.get())->begin = largs->begin;
+    *static_cast<sample_qsort_afterif0_data*>(SN_sample_qsort_cont1.cls.get()) = *largs;
     // Original sync was here
     return;
 }
 THREAD(sample_qsort_cont1) {
     sample_qsort_cont1_closure *largs = (sample_qsort_cont1_closure*)(args.get());
-    auto sp0c = std::make_shared<sample_qsort_afterif0_closure>(largs->k);
-    sp0c->begin = largs->begin;
-    sp0c->end = largs->end;
-    sp0c->middle = largs->middle;
+    auto sp0c = std::make_shared<sample_qsort_afterif0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }

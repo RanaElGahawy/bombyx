@@ -126,3 +126,10 @@ public:
     task_fn_t getTask() override { return &name; }                             \
   };
 #define CONT_DUMMY (cont{})
+
+#define CLOSURE_DEF_SHARED(name, data_type)                                    \
+  struct name##_closure : public closure, public data_type {                   \
+    name##_closure(cont k, const data_type &d) : closure(k), data_type(d) {}   \
+    using closure::closure;                                                    \
+    task_fn_t getTask() override { return &name; }                             \
+  };

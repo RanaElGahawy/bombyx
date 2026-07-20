@@ -56,6 +56,17 @@ THREAD(heat_cont0);
 THREAD(heat_cont1);
 THREAD(heat_reentry0_cont0);
 
+struct heat_exit0_data {
+    double **old;
+    double **neww;
+    int c;
+    int l;
+};
+struct divide_cont0_data {
+    int l;
+    int r;
+};
+
 CLOSURE_DEF(divide,
     int lb;
     int ub;
@@ -64,26 +75,10 @@ CLOSURE_DEF(divide,
     int mode;
     int timestep;
 );
-CLOSURE_DEF(heat_exit0,
-    double **old;
-    double **neww;
-    int c;
-    int l;
-);
-CLOSURE_DEF(heat_reentry0,
-    double **old;
-    double **neww;
-    int c;
-    int l;
-);
-CLOSURE_DEF(divide_cont0,
-    int l;
-    int r;
-);
-CLOSURE_DEF(divide_cont1,
-    int l;
-    int r;
-);
+CLOSURE_DEF_SHARED(heat_exit0, heat_exit0_data);
+CLOSURE_DEF_SHARED(heat_reentry0, heat_exit0_data);
+CLOSURE_DEF_SHARED(divide_cont0, divide_cont0_data);
+CLOSURE_DEF_SHARED(divide_cont1, divide_cont0_data);
 CLOSURE_DEF(heat_cont0,
     double **old;
     double **neww;
@@ -93,12 +88,7 @@ CLOSURE_DEF(heat_cont1,
     double **neww;
     int l;
 );
-CLOSURE_DEF(heat_reentry0_cont0,
-    double **old;
-    double **neww;
-    int c;
-    int l;
-);
+CLOSURE_DEF_SHARED(heat_reentry0_cont0, heat_exit0_data);
 unsigned long long todval (struct timeval *tp) {
     return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }
@@ -478,16 +468,10 @@ THREAD(heat_reentry0) {
         sp0c.timestep = largs->c;
         spawn<divide_closure> sp0(sp0c);
 
-        ((heat_reentry0_cont0_closure*)SN_heat_reentry0_cont0.cls.get())->c = largs->c;
-        ((heat_reentry0_cont0_closure*)SN_heat_reentry0_cont0.cls.get())->neww = largs->neww;
-        ((heat_reentry0_cont0_closure*)SN_heat_reentry0_cont0.cls.get())->old = largs->old;
+        *static_cast<heat_exit0_data*>(SN_heat_reentry0_cont0.cls.get()) = *largs;
         // Original sync was here
     } else {
-        auto sp1c = std::make_shared<heat_exit0_closure>(largs->k);
-        sp1c->old = largs->old;
-        sp1c->neww = largs->neww;
-        sp1c->c = largs->c;
-        sp1c->l = largs->l;
+        auto sp1c = std::make_shared<heat_exit0_closure>(largs->k, *largs);
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
@@ -496,8 +480,7 @@ THREAD(divide_cont0) {
     divide_cont0_closure *largs = (divide_cont0_closure*)(args.get());
     divide_cont1_closure SN_divide_cont1c(largs->k);
     spawn_next<divide_cont1_closure> SN_divide_cont1(SN_divide_cont1c);
-    ((divide_cont1_closure*)SN_divide_cont1.cls.get())->r = largs->r;
-    ((divide_cont1_closure*)SN_divide_cont1.cls.get())->l = largs->l;
+    *static_cast<divide_cont0_data*>(SN_divide_cont1.cls.get()) = *largs;
     // Original sync was here
     return;
 }
@@ -543,11 +526,7 @@ THREAD(heat_cont1) {
 THREAD(heat_reentry0_cont0) {
     heat_reentry0_cont0_closure *largs = (heat_reentry0_cont0_closure*)(args.get());
     (largs->c++);
-    auto sp0c = std::make_shared<heat_reentry0_closure>(largs->k);
-    sp0c->old = largs->old;
-    sp0c->neww = largs->neww;
-    sp0c->c = largs->c;
-    sp0c->l = largs->l;
+    auto sp0c = std::make_shared<heat_reentry0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }

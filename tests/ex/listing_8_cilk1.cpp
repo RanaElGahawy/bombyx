@@ -10,39 +10,29 @@ THREAD(fun_cont0);
 THREAD(fun_cont1);
 THREAD(main_cont0);
 
+struct fun_afterif0_data {
+    long n;
+    long w;
+    long x;
+    long y;
+    long x0;
+    long y0;
+};
+struct fun_cont0_data {
+    long n;
+    long x;
+    long y;
+    long x0;
+    long y0;
+};
+
 CLOSURE_DEF(fun,
     long n;
 );
-CLOSURE_DEF(fun_afterif0,
-    long n;
-    long w;
-    long x;
-    long y;
-    long x0;
-    long y0;
-);
-CLOSURE_DEF(fun_afterif1,
-    long n;
-    long w;
-    long x;
-    long y;
-    long x0;
-    long y0;
-);
-CLOSURE_DEF(fun_cont0,
-    long n;
-    long x;
-    long y;
-    long x0;
-    long y0;
-);
-CLOSURE_DEF(fun_cont1,
-    long n;
-    long x;
-    long y;
-    long x0;
-    long y0;
-);
+CLOSURE_DEF_SHARED(fun_afterif0, fun_afterif0_data);
+CLOSURE_DEF_SHARED(fun_afterif1, fun_afterif0_data);
+CLOSURE_DEF_SHARED(fun_cont0, fun_cont0_data);
+CLOSURE_DEF_SHARED(fun_cont1, fun_cont0_data);
 CLOSURE_DEF(main_cont0,
     int n;
 );
@@ -132,13 +122,7 @@ THREAD(fun_afterif0) {
 }
 THREAD(fun_afterif1) {
     fun_afterif1_closure *largs = (fun_afterif1_closure*)(args.get());
-    auto sp0c = std::make_shared<fun_afterif0_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->w = largs->w;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->x0 = largs->x0;
-    sp0c->y0 = largs->y0;
+    auto sp0c = std::make_shared<fun_afterif0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }

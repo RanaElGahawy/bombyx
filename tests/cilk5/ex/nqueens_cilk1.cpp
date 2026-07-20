@@ -17,6 +17,7 @@ int main(int argc, char **argv);
 THREAD(nqueens_cont0);
 THREAD(main_cont0);
 
+
 CLOSURE_DEF(nqueens,
     int n;
     int j;

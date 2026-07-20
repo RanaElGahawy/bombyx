@@ -15,6 +15,14 @@ THREAD(reduce_reentry0);
 THREAD(main_cont0);
 THREAD(reduce_reentry0_cont0);
 
+struct reduce_exit0_data {
+    int *arr;
+    int n;
+    Accum acc;
+    int i;
+    int r;
+};
+
 CLOSURE_DEF(worker,
     int x;
 );
@@ -22,30 +30,12 @@ CLOSURE_DEF(reduce,
     int *arr;
     int n;
 );
-CLOSURE_DEF(reduce_exit0,
-    int *arr;
-    int n;
-    Accum acc;
-    int i;
-    int r;
-);
-CLOSURE_DEF(reduce_reentry0,
-    int *arr;
-    int n;
-    Accum acc;
-    int i;
-    int r;
-);
+CLOSURE_DEF_SHARED(reduce_exit0, reduce_exit0_data);
+CLOSURE_DEF_SHARED(reduce_reentry0, reduce_exit0_data);
 CLOSURE_DEF(main_cont0,
     int result;
 );
-CLOSURE_DEF(reduce_reentry0_cont0,
-    int *arr;
-    int n;
-    Accum acc;
-    int i;
-    int r;
-);
+CLOSURE_DEF_SHARED(reduce_reentry0_cont0, reduce_exit0_data);
 
 
 
@@ -106,18 +96,10 @@ THREAD(reduce_reentry0) {
         sp0c.x = largs->arr[largs->i];
         spawn<worker_closure> sp0(sp0c);
 
-        ((reduce_reentry0_cont0_closure*)SN_reduce_reentry0_cont0.cls.get())->i = largs->i;
-        ((reduce_reentry0_cont0_closure*)SN_reduce_reentry0_cont0.cls.get())->acc = largs->acc;
-        ((reduce_reentry0_cont0_closure*)SN_reduce_reentry0_cont0.cls.get())->n = largs->n;
-        ((reduce_reentry0_cont0_closure*)SN_reduce_reentry0_cont0.cls.get())->arr = largs->arr;
+        *static_cast<reduce_exit0_data*>(SN_reduce_reentry0_cont0.cls.get()) = *largs;
         // Original sync was here
     } else {
-        auto sp1c = std::make_shared<reduce_exit0_closure>(largs->k);
-        sp1c->arr = largs->arr;
-        sp1c->n = largs->n;
-        sp1c->acc = largs->acc;
-        sp1c->i = largs->i;
-        sp1c->r = largs->r;
+        auto sp1c = std::make_shared<reduce_exit0_closure>(largs->k, *largs);
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
@@ -132,12 +114,7 @@ THREAD(reduce_reentry0_cont0) {
     largs->acc.value = (largs->acc.value + largs->r);
     largs->acc.count = (largs->acc.count + 1);
     largs->i = (largs->i + 1);
-    auto sp0c = std::make_shared<reduce_reentry0_closure>(largs->k);
-    sp0c->arr = largs->arr;
-    sp0c->n = largs->n;
-    sp0c->acc = largs->acc;
-    sp0c->i = largs->i;
-    sp0c->r = largs->r;
+    auto sp0c = std::make_shared<reduce_reentry0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }

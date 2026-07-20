@@ -93,13 +93,81 @@ THREAD(multiply_matrix_afterif1_cont0);
 THREAD(init_matrix_afterif3_cont0);
 THREAD(add_matrix_afterif4_cont0);
 
-CLOSURE_DEF(check_matrix,
+struct check_matrix_data {
     block *R;
     long x;
     long y;
     long o;
     DTYPE v;
-);
+};
+struct run_afterif0_data {
+    long x;
+    long y;
+    long z;
+    int check;
+    block *A;
+    block *B;
+    block *R;
+    long long flops;
+    struct timeval t1;
+    struct timeval t2;
+    unsigned long long runtime_ms;
+};
+struct multiply_matrix_afterif1_data {
+    block *A;
+    long oa;
+    block *B;
+    long ob;
+    long x;
+    long y;
+    long z;
+    block *R;
+    long orr;
+    int add;
+    long long _tmp;
+    long long flops;
+    long long _tmp1;
+    long long _tmp2;
+};
+struct add_matrix_afterif4_data {
+    block *T;
+    long ot;
+    block *R;
+    long orr;
+    long x;
+    long y;
+    long long flops;
+    long long _tmp1;
+    long long _tmp2;
+};
+struct check_matrix_afterif5_data {
+    block *R;
+    long x;
+    long y;
+    long o;
+    DTYPE v;
+    int a;
+    int b;
+    int tmp;
+    int _tmp3;
+};
+struct run_cont0_data {
+    long x;
+    long y;
+    long z;
+    int check;
+    block *A;
+    block *B;
+    block *R;
+    struct timeval t1;
+    struct timeval t2;
+};
+struct multiply_matrix_afterif1_cont0_data {
+    long long _tmp1;
+    long long _tmp2;
+};
+
+CLOSURE_DEF_SHARED(check_matrix, check_matrix_data);
 CLOSURE_DEF(add_matrix,
     block *T;
     long ot;
@@ -108,13 +176,7 @@ CLOSURE_DEF(add_matrix,
     long x;
     long y;
 );
-CLOSURE_DEF(init_matrix,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-);
+CLOSURE_DEF_SHARED(init_matrix, check_matrix_data);
 CLOSURE_DEF(multiply_matrix,
     block *A;
     long oa;
@@ -127,176 +189,21 @@ CLOSURE_DEF(multiply_matrix,
     long orr;
     int add;
 );
-CLOSURE_DEF(run_afterif0,
-    long x;
-    long y;
-    long z;
-    int check;
-    block *A;
-    block *B;
-    block *R;
-    long long flops;
-    struct timeval t1;
-    struct timeval t2;
-    unsigned long long runtime_ms;
-);
-CLOSURE_DEF(multiply_matrix_afterif1,
-    block *A;
-    long oa;
-    block *B;
-    long ob;
-    long x;
-    long y;
-    long z;
-    block *R;
-    long orr;
-    int add;
-    long long _tmp;
-    long long flops;
-    long long _tmp1;
-    long long _tmp2;
-);
-CLOSURE_DEF(multiply_matrix_afterif2,
-    block *A;
-    long oa;
-    block *B;
-    long ob;
-    long x;
-    long y;
-    long z;
-    block *R;
-    long orr;
-    int add;
-    long long _tmp;
-    long long flops;
-    long long _tmp1;
-    long long _tmp2;
-);
-CLOSURE_DEF(init_matrix_afterif3,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-);
-CLOSURE_DEF(add_matrix_afterif4,
-    block *T;
-    long ot;
-    block *R;
-    long orr;
-    long x;
-    long y;
-    long long flops;
-    long long _tmp1;
-    long long _tmp2;
-);
-CLOSURE_DEF(check_matrix_afterif5,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-    int a;
-    int b;
-    int tmp;
-    int _tmp3;
-);
-CLOSURE_DEF(check_matrix_cont0,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-    int a;
-    int b;
-    int tmp;
-    int _tmp3;
-);
-CLOSURE_DEF(check_matrix_cont1,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-    int a;
-    int b;
-    int tmp;
-    int _tmp3;
-);
-CLOSURE_DEF(check_matrix_cont2,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-    int a;
-    int b;
-    int tmp;
-    int _tmp3;
-);
-CLOSURE_DEF(check_matrix_cont3,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-    int a;
-    int b;
-    int tmp;
-    int _tmp3;
-);
-CLOSURE_DEF(add_matrix_cont0,
-    block *T;
-    long ot;
-    block *R;
-    long orr;
-    long x;
-    long y;
-    long long flops;
-    long long _tmp1;
-    long long _tmp2;
-);
-CLOSURE_DEF(add_matrix_cont1,
-    block *T;
-    long ot;
-    block *R;
-    long orr;
-    long x;
-    long y;
-    long long flops;
-    long long _tmp1;
-    long long _tmp2;
-);
-CLOSURE_DEF(init_matrix_cont0,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-);
-CLOSURE_DEF(init_matrix_cont1,
-    block *R;
-    long x;
-    long y;
-    long o;
-    DTYPE v;
-);
-CLOSURE_DEF(multiply_matrix_cont0,
-    block *A;
-    long oa;
-    block *B;
-    long ob;
-    long x;
-    long y;
-    long z;
-    block *R;
-    long orr;
-    int add;
-    long long _tmp;
-    long long flops;
-    long long _tmp1;
-    long long _tmp2;
-);
+CLOSURE_DEF_SHARED(run_afterif0, run_afterif0_data);
+CLOSURE_DEF_SHARED(multiply_matrix_afterif1, multiply_matrix_afterif1_data);
+CLOSURE_DEF_SHARED(multiply_matrix_afterif2, multiply_matrix_afterif1_data);
+CLOSURE_DEF_SHARED(init_matrix_afterif3, check_matrix_data);
+CLOSURE_DEF_SHARED(add_matrix_afterif4, add_matrix_afterif4_data);
+CLOSURE_DEF_SHARED(check_matrix_afterif5, check_matrix_afterif5_data);
+CLOSURE_DEF_SHARED(check_matrix_cont0, check_matrix_afterif5_data);
+CLOSURE_DEF_SHARED(check_matrix_cont1, check_matrix_afterif5_data);
+CLOSURE_DEF_SHARED(check_matrix_cont2, check_matrix_afterif5_data);
+CLOSURE_DEF_SHARED(check_matrix_cont3, check_matrix_afterif5_data);
+CLOSURE_DEF_SHARED(add_matrix_cont0, add_matrix_afterif4_data);
+CLOSURE_DEF_SHARED(add_matrix_cont1, add_matrix_afterif4_data);
+CLOSURE_DEF_SHARED(init_matrix_cont0, check_matrix_data);
+CLOSURE_DEF_SHARED(init_matrix_cont1, check_matrix_data);
+CLOSURE_DEF_SHARED(multiply_matrix_cont0, multiply_matrix_afterif1_data);
 CLOSURE_DEF(multiply_matrix_cont1,
     block *A;
     long oa;
@@ -312,60 +219,10 @@ CLOSURE_DEF(multiply_matrix_cont1,
     long long flops;
     long long _tmp1;
 );
-CLOSURE_DEF(multiply_matrix_cont2,
-    block *A;
-    long oa;
-    block *B;
-    long ob;
-    long x;
-    long y;
-    long z;
-    block *R;
-    long orr;
-    int add;
-    long long _tmp;
-    long long flops;
-    long long _tmp1;
-    long long _tmp2;
-);
-CLOSURE_DEF(multiply_matrix_cont3,
-    block *A;
-    long oa;
-    block *B;
-    long ob;
-    long x;
-    long y;
-    long z;
-    block *R;
-    long orr;
-    int add;
-    long long _tmp;
-    long long flops;
-    long long _tmp1;
-    long long _tmp2;
-);
-CLOSURE_DEF(run_cont0,
-    long x;
-    long y;
-    long z;
-    int check;
-    block *A;
-    block *B;
-    block *R;
-    struct timeval t1;
-    struct timeval t2;
-);
-CLOSURE_DEF(run_cont1,
-    long x;
-    long y;
-    long z;
-    int check;
-    block *A;
-    block *B;
-    block *R;
-    struct timeval t1;
-    struct timeval t2;
-);
+CLOSURE_DEF_SHARED(multiply_matrix_cont2, multiply_matrix_afterif1_data);
+CLOSURE_DEF_SHARED(multiply_matrix_cont3, multiply_matrix_afterif1_data);
+CLOSURE_DEF_SHARED(run_cont0, run_cont0_data);
+CLOSURE_DEF_SHARED(run_cont1, run_cont0_data);
 CLOSURE_DEF(run_cont2,
     long x;
     long y;
@@ -378,29 +235,11 @@ CLOSURE_DEF(run_cont2,
     struct timeval t1;
     struct timeval t2;
 );
-CLOSURE_DEF(run_cont3,
-    long x;
-    long y;
-    long z;
-    int check;
-    block *A;
-    block *B;
-    block *R;
-    long long flops;
-    struct timeval t1;
-    struct timeval t2;
-    unsigned long long runtime_ms;
-);
-CLOSURE_DEF(multiply_matrix_afterif1_cont0,
-    long long _tmp1;
-    long long _tmp2;
-);
+CLOSURE_DEF_SHARED(run_cont3, run_afterif0_data);
+CLOSURE_DEF_SHARED(multiply_matrix_afterif1_cont0, multiply_matrix_afterif1_cont0_data);
 CLOSURE_DEF(init_matrix_afterif3_cont0,
 );
-CLOSURE_DEF(add_matrix_afterif4_cont0,
-    long long _tmp1;
-    long long _tmp2;
-);
+CLOSURE_DEF_SHARED(add_matrix_afterif4_cont0, multiply_matrix_afterif1_cont0_data);
 
 /* compute R = R+AB, where R,A,B are BLOCK_EDGE x BLOCK_EDGE matricies
  */
@@ -919,11 +758,7 @@ THREAD(init_matrix) {
             sp1c.v = largs->v;
             spawn<init_matrix_closure> sp1(sp1c);
 
-            ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->v = largs->v;
-            ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->o = largs->o;
-            ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->y = largs->y;
-            ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->x = largs->x;
-            ((init_matrix_cont1_closure*)SN_init_matrix_cont1.cls.get())->R = largs->R;
+            *static_cast<check_matrix_data*>(SN_init_matrix_cont1.cls.get()) = *largs;
             // Original sync was here
         } else {
             init_matrix_cont0_closure SN_init_matrix_cont0c(largs->k);
@@ -948,11 +783,7 @@ THREAD(init_matrix) {
             sp3c.v = largs->v;
             spawn<init_matrix_closure> sp3(sp3c);
 
-            ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->v = largs->v;
-            ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->o = largs->o;
-            ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->y = largs->y;
-            ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->x = largs->x;
-            ((init_matrix_cont0_closure*)SN_init_matrix_cont0.cls.get())->R = largs->R;
+            *static_cast<check_matrix_data*>(SN_init_matrix_cont0.cls.get()) = *largs;
             // Original sync was here
         }
     }
@@ -1180,21 +1011,7 @@ THREAD(multiply_matrix_afterif1) {
 }
 THREAD(multiply_matrix_afterif2) {
     multiply_matrix_afterif2_closure *largs = (multiply_matrix_afterif2_closure*)(args.get());
-    auto sp0c = std::make_shared<multiply_matrix_afterif1_closure>(largs->k);
-    sp0c->A = largs->A;
-    sp0c->oa = largs->oa;
-    sp0c->B = largs->B;
-    sp0c->ob = largs->ob;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
-    sp0c->R = largs->R;
-    sp0c->orr = largs->orr;
-    sp0c->add = largs->add;
-    sp0c->_tmp = largs->_tmp;
-    sp0c->flops = largs->flops;
-    sp0c->_tmp1 = largs->_tmp1;
-    sp0c->_tmp2 = largs->_tmp2;
+    auto sp0c = std::make_shared<multiply_matrix_afterif1_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -1223,30 +1040,13 @@ THREAD(check_matrix_cont0) {
     check_matrix_cont0_closure *largs = (check_matrix_cont0_closure*)(args.get());
     check_matrix_cont1_closure SN_check_matrix_cont1c(largs->k);
     spawn_next<check_matrix_cont1_closure> SN_check_matrix_cont1(SN_check_matrix_cont1c);
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->_tmp3 = largs->_tmp3;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->tmp = largs->tmp;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->b = largs->b;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->a = largs->a;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->v = largs->v;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->o = largs->o;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->y = largs->y;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->x = largs->x;
-    ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->R = largs->R;
+    *static_cast<check_matrix_afterif5_data*>(SN_check_matrix_cont1.cls.get()) = *largs;
     // Original sync was here
     return;
 }
 THREAD(check_matrix_cont1) {
     check_matrix_cont1_closure *largs = (check_matrix_cont1_closure*)(args.get());
-    auto sp0c = std::make_shared<check_matrix_afterif5_closure>(largs->k);
-    sp0c->R = largs->R;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->o = largs->o;
-    sp0c->v = largs->v;
-    sp0c->a = largs->a;
-    sp0c->b = largs->b;
-    sp0c->tmp = largs->tmp;
-    sp0c->_tmp3 = largs->_tmp3;
+    auto sp0c = std::make_shared<check_matrix_afterif5_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -1254,102 +1054,43 @@ THREAD(check_matrix_cont2) {
     check_matrix_cont2_closure *largs = (check_matrix_cont2_closure*)(args.get());
     check_matrix_cont3_closure SN_check_matrix_cont3c(largs->k);
     spawn_next<check_matrix_cont3_closure> SN_check_matrix_cont3(SN_check_matrix_cont3c);
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->_tmp3 = largs->_tmp3;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->tmp = largs->tmp;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->b = largs->b;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->a = largs->a;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->v = largs->v;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->o = largs->o;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->y = largs->y;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->x = largs->x;
-    ((check_matrix_cont3_closure*)SN_check_matrix_cont3.cls.get())->R = largs->R;
+    *static_cast<check_matrix_afterif5_data*>(SN_check_matrix_cont3.cls.get()) = *largs;
     // Original sync was here
     return;
 }
 THREAD(check_matrix_cont3) {
     check_matrix_cont3_closure *largs = (check_matrix_cont3_closure*)(args.get());
-    auto sp0c = std::make_shared<check_matrix_afterif5_closure>(largs->k);
-    sp0c->R = largs->R;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->o = largs->o;
-    sp0c->v = largs->v;
-    sp0c->a = largs->a;
-    sp0c->b = largs->b;
-    sp0c->tmp = largs->tmp;
-    sp0c->_tmp3 = largs->_tmp3;
+    auto sp0c = std::make_shared<check_matrix_afterif5_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(add_matrix_cont0) {
     add_matrix_cont0_closure *largs = (add_matrix_cont0_closure*)(args.get());
-    auto sp0c = std::make_shared<add_matrix_afterif4_closure>(largs->k);
-    sp0c->T = largs->T;
-    sp0c->ot = largs->ot;
-    sp0c->R = largs->R;
-    sp0c->orr = largs->orr;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->flops = largs->flops;
-    sp0c->_tmp1 = largs->_tmp1;
-    sp0c->_tmp2 = largs->_tmp2;
+    auto sp0c = std::make_shared<add_matrix_afterif4_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(add_matrix_cont1) {
     add_matrix_cont1_closure *largs = (add_matrix_cont1_closure*)(args.get());
-    auto sp0c = std::make_shared<add_matrix_afterif4_closure>(largs->k);
-    sp0c->T = largs->T;
-    sp0c->ot = largs->ot;
-    sp0c->R = largs->R;
-    sp0c->orr = largs->orr;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->flops = largs->flops;
-    sp0c->_tmp1 = largs->_tmp1;
-    sp0c->_tmp2 = largs->_tmp2;
+    auto sp0c = std::make_shared<add_matrix_afterif4_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(init_matrix_cont0) {
     init_matrix_cont0_closure *largs = (init_matrix_cont0_closure*)(args.get());
-    auto sp0c = std::make_shared<init_matrix_afterif3_closure>(largs->k);
-    sp0c->R = largs->R;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->o = largs->o;
-    sp0c->v = largs->v;
+    auto sp0c = std::make_shared<init_matrix_afterif3_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(init_matrix_cont1) {
     init_matrix_cont1_closure *largs = (init_matrix_cont1_closure*)(args.get());
-    auto sp0c = std::make_shared<init_matrix_afterif3_closure>(largs->k);
-    sp0c->R = largs->R;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->o = largs->o;
-    sp0c->v = largs->v;
+    auto sp0c = std::make_shared<init_matrix_afterif3_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(multiply_matrix_cont0) {
     multiply_matrix_cont0_closure *largs = (multiply_matrix_cont0_closure*)(args.get());
-    auto sp0c = std::make_shared<multiply_matrix_afterif2_closure>(largs->k);
-    sp0c->A = largs->A;
-    sp0c->oa = largs->oa;
-    sp0c->B = largs->B;
-    sp0c->ob = largs->ob;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
-    sp0c->R = largs->R;
-    sp0c->orr = largs->orr;
-    sp0c->add = largs->add;
-    sp0c->_tmp = largs->_tmp;
-    sp0c->flops = largs->flops;
-    sp0c->_tmp1 = largs->_tmp1;
-    sp0c->_tmp2 = largs->_tmp2;
+    auto sp0c = std::make_shared<multiply_matrix_afterif2_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -1391,41 +1132,13 @@ THREAD(multiply_matrix_cont1) {
 }
 THREAD(multiply_matrix_cont2) {
     multiply_matrix_cont2_closure *largs = (multiply_matrix_cont2_closure*)(args.get());
-    auto sp0c = std::make_shared<multiply_matrix_afterif2_closure>(largs->k);
-    sp0c->A = largs->A;
-    sp0c->oa = largs->oa;
-    sp0c->B = largs->B;
-    sp0c->ob = largs->ob;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
-    sp0c->R = largs->R;
-    sp0c->orr = largs->orr;
-    sp0c->add = largs->add;
-    sp0c->_tmp = largs->_tmp;
-    sp0c->flops = largs->flops;
-    sp0c->_tmp1 = largs->_tmp1;
-    sp0c->_tmp2 = largs->_tmp2;
+    auto sp0c = std::make_shared<multiply_matrix_afterif2_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(multiply_matrix_cont3) {
     multiply_matrix_cont3_closure *largs = (multiply_matrix_cont3_closure*)(args.get());
-    auto sp0c = std::make_shared<multiply_matrix_afterif1_closure>(largs->k);
-    sp0c->A = largs->A;
-    sp0c->oa = largs->oa;
-    sp0c->B = largs->B;
-    sp0c->ob = largs->ob;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
-    sp0c->R = largs->R;
-    sp0c->orr = largs->orr;
-    sp0c->add = largs->add;
-    sp0c->_tmp = largs->_tmp;
-    sp0c->flops = largs->flops;
-    sp0c->_tmp1 = largs->_tmp1;
-    sp0c->_tmp2 = largs->_tmp2;
+    auto sp0c = std::make_shared<multiply_matrix_afterif1_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -1433,15 +1146,7 @@ THREAD(run_cont0) {
     run_cont0_closure *largs = (run_cont0_closure*)(args.get());
     run_cont1_closure SN_run_cont1c(largs->k);
     spawn_next<run_cont1_closure> SN_run_cont1(SN_run_cont1c);
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->t2 = largs->t2;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->t1 = largs->t1;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->R = largs->R;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->B = largs->B;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->A = largs->A;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->check = largs->check;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->z = largs->z;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->y = largs->y;
-    ((run_cont1_closure*)SN_run_cont1.cls.get())->x = largs->x;
+    *static_cast<run_cont0_data*>(SN_run_cont1.cls.get()) = *largs;
     // Original sync was here
     return;
 }
@@ -1528,18 +1233,7 @@ THREAD(run_cont2) {
 }
 THREAD(run_cont3) {
     run_cont3_closure *largs = (run_cont3_closure*)(args.get());
-    auto sp0c = std::make_shared<run_afterif0_closure>(largs->k);
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
-    sp0c->check = largs->check;
-    sp0c->A = largs->A;
-    sp0c->B = largs->B;
-    sp0c->R = largs->R;
-    sp0c->flops = largs->flops;
-    sp0c->t1 = largs->t1;
-    sp0c->t2 = largs->t2;
-    sp0c->runtime_ms = largs->runtime_ms;
+    auto sp0c = std::make_shared<run_afterif0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }

@@ -17,71 +17,32 @@ THREAD(original_reentry0_exit1_cont1);
 THREAD(original_reentry0_exit1_cont2);
 THREAD(original_reentry0_reentry1_cont0);
 
-CLOSURE_DEF(f,
+struct f_data {
     int x;
-);
-CLOSURE_DEF(g,
+};
+struct original_exit0_data {
+    int n;
+    int m;
+    int total;
+    int i;
+    int j;
+    int inner_sum;
     int x;
-);
+    int y;
+    int z;
+};
+
+CLOSURE_DEF_SHARED(f, f_data);
+CLOSURE_DEF_SHARED(g, f_data);
 CLOSURE_DEF(original,
     int n;
     int m;
 );
-CLOSURE_DEF(original_exit0,
-    int n;
-    int m;
-    int total;
-    int i;
-    int j;
-    int inner_sum;
-    int x;
-    int y;
-    int z;
-);
-CLOSURE_DEF(original_reentry0,
-    int n;
-    int m;
-    int total;
-    int i;
-    int j;
-    int inner_sum;
-    int x;
-    int y;
-    int z;
-);
-CLOSURE_DEF(original_reentry0_exit1,
-    int n;
-    int m;
-    int total;
-    int i;
-    int j;
-    int inner_sum;
-    int x;
-    int y;
-    int z;
-);
-CLOSURE_DEF(original_reentry0_reentry1,
-    int n;
-    int m;
-    int total;
-    int i;
-    int j;
-    int inner_sum;
-    int x;
-    int y;
-    int z;
-);
-CLOSURE_DEF(original_reentry0_exit1_afterif0,
-    int n;
-    int m;
-    int total;
-    int i;
-    int j;
-    int inner_sum;
-    int x;
-    int y;
-    int z;
-);
+CLOSURE_DEF_SHARED(original_exit0, original_exit0_data);
+CLOSURE_DEF_SHARED(original_reentry0, original_exit0_data);
+CLOSURE_DEF_SHARED(original_reentry0_exit1, original_exit0_data);
+CLOSURE_DEF_SHARED(original_reentry0_reentry1, original_exit0_data);
+CLOSURE_DEF_SHARED(original_reentry0_exit1_afterif0, original_exit0_data);
 CLOSURE_DEF(main_cont0,
     int ans;
 );
@@ -94,39 +55,9 @@ CLOSURE_DEF(original_reentry0_exit1_cont0,
     int inner_sum;
     int x;
 );
-CLOSURE_DEF(original_reentry0_exit1_cont1,
-    int n;
-    int m;
-    int total;
-    int i;
-    int j;
-    int inner_sum;
-    int x;
-    int y;
-    int z;
-);
-CLOSURE_DEF(original_reentry0_exit1_cont2,
-    int n;
-    int m;
-    int total;
-    int i;
-    int j;
-    int inner_sum;
-    int x;
-    int y;
-    int z;
-);
-CLOSURE_DEF(original_reentry0_reentry1_cont0,
-    int n;
-    int m;
-    int total;
-    int i;
-    int j;
-    int inner_sum;
-    int x;
-    int y;
-    int z;
-);
+CLOSURE_DEF_SHARED(original_reentry0_exit1_cont1, original_exit0_data);
+CLOSURE_DEF_SHARED(original_reentry0_exit1_cont2, original_exit0_data);
+CLOSURE_DEF_SHARED(original_reentry0_reentry1_cont0, original_exit0_data);
 
 
 
@@ -192,29 +123,11 @@ THREAD(original_reentry0) {
         largs->j = 0;
         largs->inner_sum = 0;
         largs->total = (largs->total + 10);
-        auto sp0c = std::make_shared<original_reentry0_reentry1_closure>(largs->k);
-        sp0c->n = largs->n;
-        sp0c->m = largs->m;
-        sp0c->total = largs->total;
-        sp0c->i = largs->i;
-        sp0c->j = largs->j;
-        sp0c->inner_sum = largs->inner_sum;
-        sp0c->x = largs->x;
-        sp0c->y = largs->y;
-        sp0c->z = largs->z;
+        auto sp0c = std::make_shared<original_reentry0_reentry1_closure>(largs->k, *largs);
         cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
         return;
     } else {
-        auto sp1c = std::make_shared<original_exit0_closure>(largs->k);
-        sp1c->n = largs->n;
-        sp1c->m = largs->m;
-        sp1c->total = largs->total;
-        sp1c->i = largs->i;
-        sp1c->j = largs->j;
-        sp1c->inner_sum = largs->inner_sum;
-        sp1c->x = largs->x;
-        sp1c->y = largs->y;
-        sp1c->z = largs->z;
+        auto sp1c = std::make_shared<original_exit0_closure>(largs->k, *largs);
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
@@ -247,26 +160,10 @@ THREAD(original_reentry0_reentry1) {
         spawn<f_closure> sp0(sp0c);
 
         largs->inner_sum = (largs->inner_sum + 2);
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->z = largs->z;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->y = largs->y;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->inner_sum = largs->inner_sum;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->j = largs->j;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->i = largs->i;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->total = largs->total;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->m = largs->m;
-        ((original_reentry0_reentry1_cont0_closure*)SN_original_reentry0_reentry1_cont0.cls.get())->n = largs->n;
+        *static_cast<original_exit0_data*>(SN_original_reentry0_reentry1_cont0.cls.get()) = *largs;
         // Original sync was here
     } else {
-        auto sp1c = std::make_shared<original_reentry0_exit1_closure>(largs->k);
-        sp1c->n = largs->n;
-        sp1c->m = largs->m;
-        sp1c->total = largs->total;
-        sp1c->i = largs->i;
-        sp1c->j = largs->j;
-        sp1c->inner_sum = largs->inner_sum;
-        sp1c->x = largs->x;
-        sp1c->y = largs->y;
-        sp1c->z = largs->z;
+        auto sp1c = std::make_shared<original_reentry0_exit1_closure>(largs->k, *largs);
         cilk_spawn taskSpawn(sp1c->getTask(), sp1c);
         return;
     }
@@ -275,16 +172,7 @@ THREAD(original_reentry0_exit1_afterif0) {
     original_reentry0_exit1_afterif0_closure *largs = (original_reentry0_exit1_afterif0_closure*)(args.get());
     largs->total = (largs->total + 50);
     largs->i = (largs->i + 1);
-    auto sp0c = std::make_shared<original_reentry0_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->m = largs->m;
-    sp0c->total = largs->total;
-    sp0c->i = largs->i;
-    sp0c->j = largs->j;
-    sp0c->inner_sum = largs->inner_sum;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
+    auto sp0c = std::make_shared<original_reentry0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -342,32 +230,14 @@ THREAD(original_reentry0_exit1_cont0) {
 THREAD(original_reentry0_exit1_cont1) {
     original_reentry0_exit1_cont1_closure *largs = (original_reentry0_exit1_cont1_closure*)(args.get());
     largs->total = (largs->total + largs->z);
-    auto sp0c = std::make_shared<original_reentry0_exit1_afterif0_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->m = largs->m;
-    sp0c->total = largs->total;
-    sp0c->i = largs->i;
-    sp0c->j = largs->j;
-    sp0c->inner_sum = largs->inner_sum;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
+    auto sp0c = std::make_shared<original_reentry0_exit1_afterif0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(original_reentry0_exit1_cont2) {
     original_reentry0_exit1_cont2_closure *largs = (original_reentry0_exit1_cont2_closure*)(args.get());
     largs->total = (largs->total + largs->y);
-    auto sp0c = std::make_shared<original_reentry0_exit1_afterif0_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->m = largs->m;
-    sp0c->total = largs->total;
-    sp0c->i = largs->i;
-    sp0c->j = largs->j;
-    sp0c->inner_sum = largs->inner_sum;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
+    auto sp0c = std::make_shared<original_reentry0_exit1_afterif0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -375,16 +245,7 @@ THREAD(original_reentry0_reentry1_cont0) {
     original_reentry0_reentry1_cont0_closure *largs = (original_reentry0_reentry1_cont0_closure*)(args.get());
     largs->inner_sum = (largs->inner_sum + largs->x);
     largs->j = (largs->j + 1);
-    auto sp0c = std::make_shared<original_reentry0_reentry1_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->m = largs->m;
-    sp0c->total = largs->total;
-    sp0c->i = largs->i;
-    sp0c->j = largs->j;
-    sp0c->inner_sum = largs->inner_sum;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->z = largs->z;
+    auto sp0c = std::make_shared<original_reentry0_reentry1_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }

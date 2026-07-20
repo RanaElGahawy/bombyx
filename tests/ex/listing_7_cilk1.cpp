@@ -9,6 +9,7 @@ THREAD(fun_cont0);
 THREAD(fun_cont1);
 THREAD(main_cont0);
 
+
 CLOSURE_DEF(fun,
     long n;
 );

@@ -133,6 +133,36 @@ THREAD(fft_aux_afterif0_cont4);
 THREAD(fft_aux_afterif0_cont5);
 THREAD(fft_aux_afterif6_cont0);
 
+struct fft_twiddle_2_data {
+    int a;
+    int b;
+    COMPLEX *in;
+    COMPLEX *out;
+    COMPLEX *W;
+    int nW;
+    int nWdn;
+    int m;
+};
+struct fft_unshuffle_2_data {
+    int a;
+    int b;
+    COMPLEX *in;
+    COMPLEX *out;
+    int m;
+};
+struct fft_aux_afterif0_data {
+    int n;
+    COMPLEX *in;
+    COMPLEX *out;
+    int *factors;
+    COMPLEX *W;
+    int nW;
+    int r;
+    int m;
+    int k0;
+    int k1;
+};
+
 CLOSURE_DEF(compute_w_coefficients,
     int n;
     int a;
@@ -158,91 +188,16 @@ CLOSURE_DEF(fft_twiddle_gen,
     int r;
     int m;
 );
-CLOSURE_DEF(fft_twiddle_2,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    COMPLEX *W;
-    int nW;
-    int nWdn;
-    int m;
-);
-CLOSURE_DEF(fft_unshuffle_2,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    int m;
-);
-CLOSURE_DEF(fft_twiddle_4,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    COMPLEX *W;
-    int nW;
-    int nWdn;
-    int m;
-);
-CLOSURE_DEF(fft_unshuffle_4,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    int m;
-);
-CLOSURE_DEF(fft_twiddle_8,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    COMPLEX *W;
-    int nW;
-    int nWdn;
-    int m;
-);
-CLOSURE_DEF(fft_unshuffle_8,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    int m;
-);
-CLOSURE_DEF(fft_twiddle_16,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    COMPLEX *W;
-    int nW;
-    int nWdn;
-    int m;
-);
-CLOSURE_DEF(fft_unshuffle_16,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    int m;
-);
-CLOSURE_DEF(fft_twiddle_32,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    COMPLEX *W;
-    int nW;
-    int nWdn;
-    int m;
-);
-CLOSURE_DEF(fft_unshuffle_32,
-    int a;
-    int b;
-    COMPLEX *in;
-    COMPLEX *out;
-    int m;
-);
+CLOSURE_DEF_SHARED(fft_twiddle_2, fft_twiddle_2_data);
+CLOSURE_DEF_SHARED(fft_unshuffle_2, fft_unshuffle_2_data);
+CLOSURE_DEF_SHARED(fft_twiddle_4, fft_twiddle_2_data);
+CLOSURE_DEF_SHARED(fft_unshuffle_4, fft_unshuffle_2_data);
+CLOSURE_DEF_SHARED(fft_twiddle_8, fft_twiddle_2_data);
+CLOSURE_DEF_SHARED(fft_unshuffle_8, fft_unshuffle_2_data);
+CLOSURE_DEF_SHARED(fft_twiddle_16, fft_twiddle_2_data);
+CLOSURE_DEF_SHARED(fft_unshuffle_16, fft_unshuffle_2_data);
+CLOSURE_DEF_SHARED(fft_twiddle_32, fft_twiddle_2_data);
+CLOSURE_DEF_SHARED(fft_unshuffle_32, fft_unshuffle_2_data);
 CLOSURE_DEF(fft_aux,
     int n;
     COMPLEX *in;
@@ -257,138 +212,17 @@ CLOSURE_DEF(test_fft_elem,
     COMPLEX *in;
     COMPLEX *out;
 );
-CLOSURE_DEF(fft_aux_afterif0,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_afterif1,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_afterif2,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_afterif3,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_afterif4,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_afterif5,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif6,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif7,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif8,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif9,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif10,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
+CLOSURE_DEF_SHARED(fft_aux_afterif0, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_afterif1, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_afterif2, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_afterif3, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_afterif4, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_afterif5, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif6, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif7, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif8, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif9, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif10, fft_aux_afterif0_data);
 CLOSURE_DEF(compute_w_coefficients_cont0,
 );
 CLOSURE_DEF(compute_w_coefficients_cont1,
@@ -441,78 +275,12 @@ CLOSURE_DEF(fft_unshuffle_32_cont0,
 );
 CLOSURE_DEF(fft_unshuffle_32_cont1,
 );
-CLOSURE_DEF(fft_aux_cont0,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_cont1,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_cont2,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_cont3,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_cont4,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_cont5,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
+CLOSURE_DEF_SHARED(fft_aux_cont0, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_cont1, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_cont2, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_cont3, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_cont4, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_cont5, fft_aux_afterif0_data);
 CLOSURE_DEF(cilk_fft_cont0,
     int n;
     COMPLEX *in;
@@ -525,90 +293,13 @@ CLOSURE_DEF(cilk_fft_cont1,
 );
 CLOSURE_DEF(test_fft_cont0,
 );
-CLOSURE_DEF(fft_aux_afterif0_cont0,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_cont1,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_cont2,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_cont3,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_cont4,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif0_cont5,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
-CLOSURE_DEF(fft_aux_afterif6_cont0,
-    int n;
-    COMPLEX *in;
-    COMPLEX *out;
-    int *factors;
-    COMPLEX *W;
-    int nW;
-    int r;
-    int m;
-    int k0;
-    int k1;
-);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_cont0, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_cont1, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_cont2, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_cont3, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_cont4, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif0_cont5, fft_aux_afterif0_data);
+CLOSURE_DEF_SHARED(fft_aux_afterif6_cont0, fft_aux_afterif0_data);
 unsigned long long todval(struct timeval *tp) {
   return tp->tv_sec * 1000 * 1000 + tp->tv_usec;
 }
@@ -4665,16 +4356,7 @@ THREAD(fft_aux_afterif0) {
         sp0c.m = largs->m;
         spawn<fft_twiddle_2_closure> sp0(sp0c);
 
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->k1 = largs->k1;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->k0 = largs->k0;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->m = largs->m;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->r = largs->r;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->nW = largs->nW;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->W = largs->W;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->factors = largs->factors;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->out = largs->out;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->in = largs->in;
-        ((fft_aux_afterif0_cont5_closure*)SN_fft_aux_afterif0_cont5.cls.get())->n = largs->n;
+        *static_cast<fft_aux_afterif0_data*>(SN_fft_aux_afterif0_cont5.cls.get()) = *largs;
         // Original sync was here
     } else {
         if ((largs->r == 4)) {
@@ -4693,16 +4375,7 @@ THREAD(fft_aux_afterif0) {
             sp1c.m = largs->m;
             spawn<fft_twiddle_4_closure> sp1(sp1c);
 
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->k1 = largs->k1;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->k0 = largs->k0;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->m = largs->m;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->r = largs->r;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->nW = largs->nW;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->W = largs->W;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->factors = largs->factors;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->out = largs->out;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->in = largs->in;
-            ((fft_aux_afterif0_cont4_closure*)SN_fft_aux_afterif0_cont4.cls.get())->n = largs->n;
+            *static_cast<fft_aux_afterif0_data*>(SN_fft_aux_afterif0_cont4.cls.get()) = *largs;
             // Original sync was here
         } else {
             if ((largs->r == 8)) {
@@ -4721,16 +4394,7 @@ THREAD(fft_aux_afterif0) {
                 sp2c.m = largs->m;
                 spawn<fft_twiddle_8_closure> sp2(sp2c);
 
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->k1 = largs->k1;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->k0 = largs->k0;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->m = largs->m;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->r = largs->r;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->nW = largs->nW;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->W = largs->W;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->factors = largs->factors;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->out = largs->out;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->in = largs->in;
-                ((fft_aux_afterif0_cont3_closure*)SN_fft_aux_afterif0_cont3.cls.get())->n = largs->n;
+                *static_cast<fft_aux_afterif0_data*>(SN_fft_aux_afterif0_cont3.cls.get()) = *largs;
                 // Original sync was here
             } else {
                 if ((largs->r == 16)) {
@@ -4749,16 +4413,7 @@ THREAD(fft_aux_afterif0) {
                     sp3c.m = largs->m;
                     spawn<fft_twiddle_16_closure> sp3(sp3c);
 
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->k1 = largs->k1;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->k0 = largs->k0;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->m = largs->m;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->r = largs->r;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->nW = largs->nW;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->W = largs->W;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->factors = largs->factors;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->out = largs->out;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->in = largs->in;
-                    ((fft_aux_afterif0_cont2_closure*)SN_fft_aux_afterif0_cont2.cls.get())->n = largs->n;
+                    *static_cast<fft_aux_afterif0_data*>(SN_fft_aux_afterif0_cont2.cls.get()) = *largs;
                     // Original sync was here
                 } else {
                     if ((largs->r == 32)) {
@@ -4777,16 +4432,7 @@ THREAD(fft_aux_afterif0) {
                         sp4c.m = largs->m;
                         spawn<fft_twiddle_32_closure> sp4(sp4c);
 
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->k1 = largs->k1;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->k0 = largs->k0;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->m = largs->m;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->r = largs->r;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->nW = largs->nW;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->W = largs->W;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->factors = largs->factors;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->out = largs->out;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->in = largs->in;
-                        ((fft_aux_afterif0_cont1_closure*)SN_fft_aux_afterif0_cont1.cls.get())->n = largs->n;
+                        *static_cast<fft_aux_afterif0_data*>(SN_fft_aux_afterif0_cont1.cls.get()) = *largs;
                         // Original sync was here
                     } else {
                         fft_aux_afterif0_cont0_closure SN_fft_aux_afterif0_cont0c(largs->k);
@@ -4805,16 +4451,7 @@ THREAD(fft_aux_afterif0) {
                         sp5c.m = largs->m;
                         spawn<fft_twiddle_gen_closure> sp5(sp5c);
 
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->k1 = largs->k1;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->k0 = largs->k0;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->m = largs->m;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->r = largs->r;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->nW = largs->nW;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->W = largs->W;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->factors = largs->factors;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->out = largs->out;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->in = largs->in;
-                        ((fft_aux_afterif0_cont0_closure*)SN_fft_aux_afterif0_cont0.cls.get())->n = largs->n;
+                        *static_cast<fft_aux_afterif0_data*>(SN_fft_aux_afterif0_cont0.cls.get()) = *largs;
                         // Original sync was here
                     }
                 }
@@ -4829,65 +4466,25 @@ THREAD(fft_aux_afterif0_afterif1) {
 }
 THREAD(fft_aux_afterif0_afterif2) {
     fft_aux_afterif0_afterif2_closure *largs = (fft_aux_afterif0_afterif2_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif1_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif1_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif0_afterif3) {
     fft_aux_afterif0_afterif3_closure *largs = (fft_aux_afterif0_afterif3_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif2_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif2_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif0_afterif4) {
     fft_aux_afterif0_afterif4_closure *largs = (fft_aux_afterif0_afterif4_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif3_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif3_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif0_afterif5) {
     fft_aux_afterif0_afterif5_closure *largs = (fft_aux_afterif0_afterif5_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif4_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif4_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -4908,80 +4505,31 @@ THREAD(fft_aux_afterif6) {
         spawn<fft_aux_closure> sp0(sp0c);
 
     }
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->k1 = largs->k1;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->k0 = largs->k0;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->m = largs->m;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->r = largs->r;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->nW = largs->nW;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->W = largs->W;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->factors = largs->factors;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->out = largs->out;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->in = largs->in;
-    ((fft_aux_afterif6_cont0_closure*)SN_fft_aux_afterif6_cont0.cls.get())->n = largs->n;
+    *static_cast<fft_aux_afterif0_data*>(SN_fft_aux_afterif6_cont0.cls.get()) = *largs;
     // Original sync was here
     return;
 }
 THREAD(fft_aux_afterif7) {
     fft_aux_afterif7_closure *largs = (fft_aux_afterif7_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif6_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif6_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif8) {
     fft_aux_afterif8_closure *largs = (fft_aux_afterif8_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif7_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif7_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif9) {
     fft_aux_afterif9_closure *largs = (fft_aux_afterif9_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif8_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif8_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif10) {
     fft_aux_afterif10_closure *largs = (fft_aux_afterif10_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif9_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif9_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -5130,97 +4678,37 @@ THREAD(fft_unshuffle_32_cont1) {
 }
 THREAD(fft_aux_cont0) {
     fft_aux_cont0_closure *largs = (fft_aux_cont0_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif10_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif10_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_cont1) {
     fft_aux_cont1_closure *largs = (fft_aux_cont1_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif10_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif10_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_cont2) {
     fft_aux_cont2_closure *largs = (fft_aux_cont2_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif9_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif9_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_cont3) {
     fft_aux_cont3_closure *largs = (fft_aux_cont3_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif8_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif8_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_cont4) {
     fft_aux_cont4_closure *largs = (fft_aux_cont4_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif7_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif7_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_cont5) {
     fft_aux_cont5_closure *largs = (fft_aux_cont5_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif6_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif6_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -5254,113 +4742,43 @@ THREAD(test_fft_cont0) {
 }
 THREAD(fft_aux_afterif0_cont0) {
     fft_aux_afterif0_cont0_closure *largs = (fft_aux_afterif0_cont0_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif5_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif5_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif0_cont1) {
     fft_aux_afterif0_cont1_closure *largs = (fft_aux_afterif0_cont1_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif5_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif5_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif0_cont2) {
     fft_aux_afterif0_cont2_closure *largs = (fft_aux_afterif0_cont2_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif4_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif4_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif0_cont3) {
     fft_aux_afterif0_cont3_closure *largs = (fft_aux_afterif0_cont3_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif3_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif3_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif0_cont4) {
     fft_aux_afterif0_cont4_closure *largs = (fft_aux_afterif0_cont4_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif2_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif2_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif0_cont5) {
     fft_aux_afterif0_cont5_closure *largs = (fft_aux_afterif0_cont5_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_afterif1_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_afterif1_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
 THREAD(fft_aux_afterif6_cont0) {
     fft_aux_afterif6_cont0_closure *largs = (fft_aux_afterif6_cont0_closure*)(args.get());
-    auto sp0c = std::make_shared<fft_aux_afterif0_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->in = largs->in;
-    sp0c->out = largs->out;
-    sp0c->factors = largs->factors;
-    sp0c->W = largs->W;
-    sp0c->nW = largs->nW;
-    sp0c->r = largs->r;
-    sp0c->m = largs->m;
-    sp0c->k0 = largs->k0;
-    sp0c->k1 = largs->k1;
+    auto sp0c = std::make_shared<fft_aux_afterif0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }

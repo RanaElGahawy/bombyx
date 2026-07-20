@@ -85,6 +85,18 @@ THREAD(upper_solve_cont1);
 THREAD(lu_cont0);
 THREAD(lu_cont1);
 
+struct schur_cont0_data {
+    Matrix M00;
+    Matrix M01;
+    Matrix M10;
+    Matrix M11;
+    Matrix V01;
+    Matrix V11;
+    Matrix W10;
+    Matrix W11;
+    int hnb;
+};
+
 CLOSURE_DEF(schur,
     Matrix M;
     Matrix V;
@@ -108,28 +120,8 @@ CLOSURE_DEF(aux_upper_solve,
     Matrix U;
     int nb;
 );
-CLOSURE_DEF(schur_cont0,
-    Matrix M00;
-    Matrix M01;
-    Matrix M10;
-    Matrix M11;
-    Matrix V01;
-    Matrix V11;
-    Matrix W10;
-    Matrix W11;
-    int hnb;
-);
-CLOSURE_DEF(schur_cont1,
-    Matrix M00;
-    Matrix M01;
-    Matrix M10;
-    Matrix M11;
-    Matrix V01;
-    Matrix V11;
-    Matrix W10;
-    Matrix W11;
-    int hnb;
-);
+CLOSURE_DEF_SHARED(schur_cont0, schur_cont0_data);
+CLOSURE_DEF_SHARED(schur_cont1, schur_cont0_data);
 CLOSURE_DEF(schur_cont2,
 );
 CLOSURE_DEF(schur_cont3,
@@ -755,15 +747,7 @@ THREAD(schur_cont0) {
     schur_cont0_closure *largs = (schur_cont0_closure*)(args.get());
     schur_cont1_closure SN_schur_cont1c(largs->k);
     spawn_next<schur_cont1_closure> SN_schur_cont1(SN_schur_cont1c);
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->hnb = largs->hnb;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W11 = largs->W11;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->W10 = largs->W10;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->V11 = largs->V11;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->V01 = largs->V01;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M11 = largs->M11;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M10 = largs->M10;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M01 = largs->M01;
-    ((schur_cont1_closure*)SN_schur_cont1.cls.get())->M00 = largs->M00;
+    *static_cast<schur_cont0_data*>(SN_schur_cont1.cls.get()) = *largs;
     // Original sync was here
     return;
 }

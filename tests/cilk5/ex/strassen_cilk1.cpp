@@ -87,6 +87,19 @@ THREAD(OptimizedStrassenMultiply_cont0);
 THREAD(OptimizedStrassenMultiply_cont1);
 THREAD(main_cont0);
 
+struct OptimizedStrassenMultiply_cont0_data {
+    REAL *C;
+    unsigned int QuadrantSize;
+    REAL *C12;
+    REAL *C21;
+    REAL *C22;
+    REAL *M2;
+    REAL *M5;
+    REAL *T1sMULT;
+    PTR RowIncrementC;
+    void *StartHeap;
+};
+
 CLOSURE_DEF(OptimizedStrassenMultiply,
     REAL *C;
     REAL *A;
@@ -96,30 +109,8 @@ CLOSURE_DEF(OptimizedStrassenMultiply,
     unsigned int RowWidthA;
     unsigned int RowWidthB;
 );
-CLOSURE_DEF(OptimizedStrassenMultiply_cont0,
-    REAL *C;
-    unsigned int QuadrantSize;
-    REAL *C12;
-    REAL *C21;
-    REAL *C22;
-    REAL *M2;
-    REAL *M5;
-    REAL *T1sMULT;
-    PTR RowIncrementC;
-    void *StartHeap;
-);
-CLOSURE_DEF(OptimizedStrassenMultiply_cont1,
-    REAL *C;
-    unsigned int QuadrantSize;
-    REAL *C12;
-    REAL *C21;
-    REAL *C22;
-    REAL *M2;
-    REAL *M5;
-    REAL *T1sMULT;
-    PTR RowIncrementC;
-    void *StartHeap;
-);
+CLOSURE_DEF_SHARED(OptimizedStrassenMultiply_cont0, OptimizedStrassenMultiply_cont0_data);
+CLOSURE_DEF_SHARED(OptimizedStrassenMultiply_cont1, OptimizedStrassenMultiply_cont0_data);
 CLOSURE_DEF(main_cont0,
     REAL *A;
     REAL *B;
@@ -878,16 +869,7 @@ THREAD(OptimizedStrassenMultiply_cont0) {
     OptimizedStrassenMultiply_cont0_closure *largs = (OptimizedStrassenMultiply_cont0_closure*)(args.get());
     OptimizedStrassenMultiply_cont1_closure SN_OptimizedStrassenMultiply_cont1c(largs->k);
     spawn_next<OptimizedStrassenMultiply_cont1_closure> SN_OptimizedStrassenMultiply_cont1(SN_OptimizedStrassenMultiply_cont1c);
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->StartHeap = largs->StartHeap;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->RowIncrementC = largs->RowIncrementC;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->T1sMULT = largs->T1sMULT;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M5 = largs->M5;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->M2 = largs->M2;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C22 = largs->C22;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C21 = largs->C21;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C12 = largs->C12;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->QuadrantSize = largs->QuadrantSize;
-    ((OptimizedStrassenMultiply_cont1_closure*)SN_OptimizedStrassenMultiply_cont1.cls.get())->C = largs->C;
+    *static_cast<OptimizedStrassenMultiply_cont0_data*>(SN_OptimizedStrassenMultiply_cont1.cls.get()) = *largs;
     // Original sync was here
     return;
 }

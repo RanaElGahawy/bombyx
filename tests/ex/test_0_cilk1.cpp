@@ -12,13 +12,10 @@ THREAD(fun_cont1);
 THREAD(fun_cont2);
 THREAD(main_cont0);
 
-CLOSURE_DEF(worker,
+struct worker_data {
     long n;
-);
-CLOSURE_DEF(fun,
-    long n;
-);
-CLOSURE_DEF(fun_afterif0,
+};
+struct fun_afterif0_data {
     long n;
     long w;
     long x;
@@ -26,38 +23,28 @@ CLOSURE_DEF(fun_afterif0,
     long f;
     long h;
     long z;
-);
-CLOSURE_DEF(fun_afterif1,
+};
+struct fun_cont1_data {
     long n;
-    long w;
     long x;
     long y;
     long f;
     long h;
     long z;
-);
+};
+
+CLOSURE_DEF_SHARED(worker, worker_data);
+CLOSURE_DEF_SHARED(fun, worker_data);
+CLOSURE_DEF_SHARED(fun_afterif0, fun_afterif0_data);
+CLOSURE_DEF_SHARED(fun_afterif1, fun_afterif0_data);
 CLOSURE_DEF(fun_cont0,
     long n;
     long x;
     long y;
     long z;
 );
-CLOSURE_DEF(fun_cont1,
-    long n;
-    long x;
-    long y;
-    long f;
-    long h;
-    long z;
-);
-CLOSURE_DEF(fun_cont2,
-    long n;
-    long x;
-    long y;
-    long f;
-    long h;
-    long z;
-);
+CLOSURE_DEF_SHARED(fun_cont1, fun_cont1_data);
+CLOSURE_DEF_SHARED(fun_cont2, fun_cont1_data);
 CLOSURE_DEF(main_cont0,
     int n;
 );
@@ -132,14 +119,7 @@ THREAD(fun_afterif0) {
 }
 THREAD(fun_afterif1) {
     fun_afterif1_closure *largs = (fun_afterif1_closure*)(args.get());
-    auto sp0c = std::make_shared<fun_afterif0_closure>(largs->k);
-    sp0c->n = largs->n;
-    sp0c->w = largs->w;
-    sp0c->x = largs->x;
-    sp0c->y = largs->y;
-    sp0c->f = largs->f;
-    sp0c->h = largs->h;
-    sp0c->z = largs->z;
+    auto sp0c = std::make_shared<fun_afterif0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
@@ -189,10 +169,7 @@ THREAD(fun_cont1) {
         sp1c.n = largs->y;
         spawn<worker_closure> sp1(sp1c);
 
-        ((fun_cont2_closure*)SN_fun_cont2.cls.get())->h = largs->h;
-        ((fun_cont2_closure*)SN_fun_cont2.cls.get())->f = largs->f;
-        ((fun_cont2_closure*)SN_fun_cont2.cls.get())->x = largs->x;
-        ((fun_cont2_closure*)SN_fun_cont2.cls.get())->n = largs->n;
+        *static_cast<fun_cont1_data*>(SN_fun_cont2.cls.get()) = *largs;
         // Original sync was here
     } else {
         auto sp2c = std::make_shared<fun_afterif1_closure>(largs->k);

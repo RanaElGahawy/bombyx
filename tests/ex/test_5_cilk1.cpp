@@ -13,6 +13,7 @@ int main();
 THREAD(dot_product_cont0);
 THREAD(main_cont0);
 
+
 CLOSURE_DEF(sum_pair,
     Pair p;
 );

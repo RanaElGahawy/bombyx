@@ -7,16 +7,16 @@ int main();
 THREAD(fib_cont0);
 THREAD(main_cont0);
 
-CLOSURE_DEF(fib,
+struct fib_data {
     int n;
-);
+};
+
+CLOSURE_DEF_SHARED(fib, fib_data);
 CLOSURE_DEF(fib_cont0,
     int f1;
     int f2;
 );
-CLOSURE_DEF(main_cont0,
-    int n;
-);
+CLOSURE_DEF_SHARED(main_cont0, fib_data);
 
 
 

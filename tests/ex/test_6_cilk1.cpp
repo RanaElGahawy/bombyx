@@ -13,6 +13,7 @@ int main();
 THREAD(compute_cont0);
 THREAD(main_cont0);
 
+
 CLOSURE_DEF(magnitude,
     Vec2 *v;
 );
