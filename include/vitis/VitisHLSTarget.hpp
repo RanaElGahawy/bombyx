@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hardcilk/HardCilkAnalysis.hpp"
 #include "core/OpenCilk2IR.hpp"
+#include "hardcilk/HardCilkAnalysis.hpp"
 #include "clang/AST/ASTContext.h"
 #include <string>
 #include <vector>
@@ -11,7 +11,9 @@ struct DriverSpec {
   std::string TaskStructName;
   size_t NumZeroFields = 0;
   bool HasPadding = false;
-
+  bool HasContTask = false;
+  std::string ContTaskStructName;
+  size_t ContNumZeroFields = 0;
   std::vector<std::string> HelperFunctions;
   std::vector<std::string> ExternGlobals;
   std::vector<std::string> PreCallStmts;

@@ -1,5 +1,5 @@
-#include "vitis/VitisHLSTarget.hpp"
 #include "core/IR.hpp"
+#include "vitis/VitisHLSTarget.hpp"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -285,6 +285,31 @@ DriverSpec VitisHLSTarget::BuildDriverSpec(clang::ASTContext &C) {
   if (!RootFn) {
     llvm::errs() << "warning: could not find root task for driver header\n";
     return Spec;
+  }
+
+  IRFunction *ContFn = RootFn->Info.SpawnNextList.empty()
+                           ? nullptr
+                           : *RootFn->Info.SpawnNextList.begin();
+  Spec.HasContTask = ContFn != nullptr;
+  if (Spec.HasContTask) {
+    // We only add the counter explicitly (in PrintDriverHeader) if either
+    // there's no continuation to swap to (which shouldn't happen) or we are
+    // using the task itself as a continuation so it has no counter.
+    auto ContFnInfo = TaskInfos.find(ContFn);
+    if (ContFnInfo == TaskInfos.end() || !ContFnInfo->second.IsCont) {
+      Spec.HasContTask = false;
+    } else {
+      Spec.ContTaskStructName = ContFn->getName() + "_task";
+
+      std::vector<const IRVarDecl *> ContArgVars;
+      for (auto &Var : ContFn->Vars)
+        if (Var.DeclLoc == IRVarDecl::ARG)
+          ContArgVars.push_back(&Var);
+      Spec.ContNumZeroFields =
+          2 + ContArgVars.size(); // _counter + _cont + each arg
+      if (ContFnInfo->second.TaskPadding > 0)
+        Spec.ContNumZeroFields++;
+    }
   }
 
   auto &SM = C.getSourceManager();
@@ -684,20 +709,42 @@ void VitisHLSTarget::PrintDriverHeader(llvm::raw_ostream &Out,
          "{}\n\n";
   Out << "    int run_test_bench() override {\n";
 
-  // TODO: change with exiting continuation if there is one
-  //  Zero-initialised task struct + root-task allocation.
-  Out << "        " << Spec.TaskStructName << " root_task_0 = {";
-  for (size_t i = 0; i < Spec.NumZeroFields; i++) {
-    if (i > 0)
-      Out << ", ";
-    Out << "0";
+  if (Spec.HasContTask) {
+    Out << "        " << Spec.ContTaskStructName << " cont_task_0 = {";
+    for (size_t i = 0; i < Spec.ContNumZeroFields; i++) {
+      if (i > 0)
+        Out << ", ";
+      Out << (i == 0 ? "2" : "0");
+    }
+    Out << "};\n\n";
+    PrintAllocateMemFPGA(Out, "addr", "sizeof(cont_task_0)",
+                         "sizeof(cont_task_0)");
+    PrintCopyToDevice(Out, "addr", "&cont_task_0", "sizeof(cont_task_0)");
+    Out << "\n";
+    Out << "        " << Spec.TaskStructName << " root_task_0 = {";
+
+    for (size_t i = 0; i < Spec.NumZeroFields; i++) {
+      if (i > 0)
+        Out << ", ";
+      Out << "0";
+    }
+    Out << "};\n";
+  } else {
+    // TODO: change with exiting continuation if there is one
+    //  Zero-initialised task struct + root-task allocation.
+    Out << "        " << Spec.TaskStructName << " root_task_0 = {";
+    for (size_t i = 0; i < Spec.NumZeroFields; i++) {
+      if (i > 0)
+        Out << ", ";
+      Out << "0";
+    }
+    Out << "};\n";
+    Out << "        int counter = 2;\n\n";
+    PrintAllocateMemFPGA(Out, "addr", "sizeof(root_task_0)",
+                         "sizeof(root_task_0)");
+    PrintCopyToDevice(Out, "addr", "&root_task_0", "sizeof(root_task_0)");
+    PrintCopyToDevice(Out, "addr", "&counter", "sizeof(counter)");
   }
-  Out << "};\n";
-  Out << "        int counter = 2;\n\n";
-  PrintAllocateMemFPGA(Out, "addr", "sizeof(root_task_0)",
-                       "sizeof(root_task_0)");
-  PrintCopyToDevice(Out, "addr", "&root_task_0", "sizeof(root_task_0)");
-  PrintCopyToDevice(Out, "addr", "&counter", "sizeof(counter)");
   Out << "\n";
 
   // Extern declarations for globals.
