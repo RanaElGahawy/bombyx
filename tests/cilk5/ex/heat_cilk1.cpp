@@ -51,7 +51,6 @@ int heat();
 THREAD(heat_exit0);
 THREAD(heat_reentry0);
 THREAD(divide_cont0);
-THREAD(divide_cont1);
 THREAD(heat_cont0);
 THREAD(heat_cont1);
 THREAD(heat_reentry0_cont0);
@@ -61,10 +60,6 @@ struct heat_exit0_data {
     double **neww;
     int c;
     int l;
-};
-struct divide_cont0_data {
-    int l;
-    int r;
 };
 
 CLOSURE_DEF(divide,
@@ -77,8 +72,10 @@ CLOSURE_DEF(divide,
 );
 CLOSURE_DEF_SHARED(heat_exit0, heat_exit0_data);
 CLOSURE_DEF_SHARED(heat_reentry0, heat_exit0_data);
-CLOSURE_DEF_SHARED(divide_cont0, divide_cont0_data);
-CLOSURE_DEF_SHARED(divide_cont1, divide_cont0_data);
+CLOSURE_DEF(divide_cont0,
+    int l;
+    int r;
+);
 CLOSURE_DEF(heat_cont0,
     double **old;
     double **neww;
@@ -477,16 +474,8 @@ THREAD(heat_reentry0) {
     }
 }
 THREAD(divide_cont0) {
-    divide_cont0_closure *largs = (divide_cont0_closure*)(args.get());
-    divide_cont1_closure SN_divide_cont1c(largs->k);
-    spawn_next<divide_cont1_closure> SN_divide_cont1(SN_divide_cont1c);
-    *static_cast<divide_cont0_data*>(SN_divide_cont1.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(divide_cont1) {
     int _tmp;
-    divide_cont1_closure *largs = (divide_cont1_closure*)(args.get());
+    divide_cont0_closure *largs = (divide_cont0_closure*)(args.get());
     _tmp = (largs->l + largs->r);
     SEND_ARGUMENT(largs->k, _tmp);
 }

@@ -29,19 +29,16 @@ unsigned long long todval(struct timeval *tp);
 THREAD(fib);
 int main(int argc, char **argv);
 THREAD(fib_cont0);
-THREAD(fib_cont1);
 THREAD(main_cont0);
 
-struct fib_cont0_data {
-    int x;
-    int y;
-};
 
 CLOSURE_DEF(fib,
     int n;
 );
-CLOSURE_DEF_SHARED(fib_cont0, fib_cont0_data);
-CLOSURE_DEF_SHARED(fib_cont1, fib_cont0_data);
+CLOSURE_DEF(fib_cont0,
+    int x;
+    int y;
+);
 CLOSURE_DEF(main_cont0,
     int result;
     struct timeval t1;
@@ -107,14 +104,6 @@ int main(int argc, char **argv) {
 }
 THREAD(fib_cont0) {
     fib_cont0_closure *largs = (fib_cont0_closure*)(args.get());
-    fib_cont1_closure SN_fib_cont1c(largs->k);
-    spawn_next<fib_cont1_closure> SN_fib_cont1(SN_fib_cont1c);
-    *static_cast<fib_cont0_data*>(SN_fib_cont1.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(fib_cont1) {
-    fib_cont1_closure *largs = (fib_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, (largs->x + largs->y));
 }
 THREAD(main_cont0) {

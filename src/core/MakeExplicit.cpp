@@ -45,6 +45,24 @@ private:
     return CloneBB;
   }
 
+  void mergeRedundantSyncs(IRFunction &F) {
+    for (auto &B : F) {
+      IRBasicBlock *Block = B.get();
+      if (!Block->Term || !isa<SyncIRStmt>(Block->Term))
+        continue;
+
+      std::set<IRBasicBlock *> Seen;
+      IRBasicBlock *Succ = *(Block->Succs.begin());
+      while (Succ->lenInsns() == 0 && Succ->Term &&
+             isa<SyncIRStmt>(Succ->Term) && Seen.insert(Succ).second) {
+        IRBasicBlock *Next = *(Succ->Succs.begin());
+        Block->Succs.remove(Succ);
+        Block->Succs.insert(Next);
+        Succ = Next;
+      }
+    }
+  }
+
   void createSyncPaths(IRFunction &F) {
     Paths.resize(1);
 
@@ -160,6 +178,7 @@ private:
 
 public:
   CreateContinuationFuns(IRFunction &F) {
+    mergeRedundantSyncs(F);
     INFO {
       F.cleanVars();
       outs() << F.getName() << " (init):\n";

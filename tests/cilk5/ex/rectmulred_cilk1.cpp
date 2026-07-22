@@ -68,8 +68,6 @@ THREAD(add_matrix_afterif4);
 THREAD(check_matrix_afterif5);
 THREAD(check_matrix_cont0);
 THREAD(check_matrix_cont1);
-THREAD(check_matrix_cont2);
-THREAD(check_matrix_cont3);
 THREAD(add_matrix_cont0);
 THREAD(add_matrix_cont1);
 THREAD(init_matrix_cont0);
@@ -81,7 +79,6 @@ THREAD(multiply_matrix_cont3);
 THREAD(run_cont0);
 THREAD(run_cont1);
 THREAD(run_cont2);
-THREAD(run_cont3);
 THREAD(multiply_matrix_afterif1_cont0);
 THREAD(init_matrix_afterif3_cont0);
 THREAD(add_matrix_afterif4_cont0);
@@ -166,8 +163,6 @@ CLOSURE_DEF_SHARED(add_matrix_afterif4, add_matrix_data);
 CLOSURE_DEF_SHARED(check_matrix_afterif5, check_matrix_afterif5_data);
 CLOSURE_DEF_SHARED(check_matrix_cont0, check_matrix_afterif5_data);
 CLOSURE_DEF_SHARED(check_matrix_cont1, check_matrix_afterif5_data);
-CLOSURE_DEF_SHARED(check_matrix_cont2, check_matrix_afterif5_data);
-CLOSURE_DEF_SHARED(check_matrix_cont3, check_matrix_afterif5_data);
 CLOSURE_DEF_SHARED(add_matrix_cont0, add_matrix_data);
 CLOSURE_DEF_SHARED(add_matrix_cont1, add_matrix_data);
 CLOSURE_DEF_SHARED(init_matrix_cont0, init_matrix_data);
@@ -178,8 +173,7 @@ CLOSURE_DEF_SHARED(multiply_matrix_cont2, multiply_matrix_data);
 CLOSURE_DEF_SHARED(multiply_matrix_cont3, multiply_matrix_data);
 CLOSURE_DEF_SHARED(run_cont0, run_cont0_data);
 CLOSURE_DEF_SHARED(run_cont1, run_cont0_data);
-CLOSURE_DEF_SHARED(run_cont2, run_cont0_data);
-CLOSURE_DEF_SHARED(run_cont3, run_afterif0_data);
+CLOSURE_DEF_SHARED(run_cont2, run_afterif0_data);
 CLOSURE_DEF(multiply_matrix_afterif1_cont0,
 );
 CLOSURE_DEF(init_matrix_afterif3_cont0,
@@ -523,10 +517,10 @@ THREAD(check_matrix) {
         SEND_ARGUMENT(largs->k, 0);
     } else {
         if ((largs->x > largs->y)) {
-            check_matrix_cont2_closure SN_check_matrix_cont2c(largs->k);
-            spawn_next<check_matrix_cont2_closure> SN_check_matrix_cont2(SN_check_matrix_cont2c);
+            check_matrix_cont1_closure SN_check_matrix_cont1c(largs->k);
+            spawn_next<check_matrix_cont1_closure> SN_check_matrix_cont1(SN_check_matrix_cont1c);
             cont sp0k;
-            SN_BIND_VOID(SN_check_matrix_cont2, &sp0k);
+            SN_BIND_VOID(SN_check_matrix_cont1, &sp0k);
             check_matrix_closure sp0c(sp0k);
             sp0c.R = largs->R;
             sp0c.x = (largs->x / 2);
@@ -537,7 +531,7 @@ THREAD(check_matrix) {
             spawn<check_matrix_closure> sp0(sp0c);
 
             cont sp1k;
-            SN_BIND_VOID(SN_check_matrix_cont2, &sp1k);
+            SN_BIND_VOID(SN_check_matrix_cont1, &sp1k);
             check_matrix_closure sp1c(sp1k);
             sp1c.R = (largs->R + ((largs->x / 2) * largs->o));
             sp1c.x = ((largs->x + 1) / 2);
@@ -547,14 +541,14 @@ THREAD(check_matrix) {
             sp1c.errorf = largs->errorf;
             spawn<check_matrix_closure> sp1(sp1c);
 
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->errorf = largs->errorf;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->v = largs->v;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->o = largs->o;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->b = b;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->y = largs->y;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->a = a;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->x = largs->x;
-            ((check_matrix_cont2_closure*)SN_check_matrix_cont2.cls.get())->R = largs->R;
+            ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->errorf = largs->errorf;
+            ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->v = largs->v;
+            ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->o = largs->o;
+            ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->b = b;
+            ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->y = largs->y;
+            ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->a = a;
+            ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->x = largs->x;
+            ((check_matrix_cont1_closure*)SN_check_matrix_cont1.cls.get())->R = largs->R;
             // Original sync was here
         } else {
             check_matrix_cont0_closure SN_check_matrix_cont0c(largs->k);
@@ -934,28 +928,12 @@ THREAD(check_matrix_afterif5) {
 }
 THREAD(check_matrix_cont0) {
     check_matrix_cont0_closure *largs = (check_matrix_cont0_closure*)(args.get());
-    check_matrix_cont1_closure SN_check_matrix_cont1c(largs->k);
-    spawn_next<check_matrix_cont1_closure> SN_check_matrix_cont1(SN_check_matrix_cont1c);
-    *static_cast<check_matrix_afterif5_data*>(SN_check_matrix_cont1.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(check_matrix_cont1) {
-    check_matrix_cont1_closure *largs = (check_matrix_cont1_closure*)(args.get());
     auto sp0c = std::make_shared<check_matrix_afterif5_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
 }
-THREAD(check_matrix_cont2) {
-    check_matrix_cont2_closure *largs = (check_matrix_cont2_closure*)(args.get());
-    check_matrix_cont3_closure SN_check_matrix_cont3c(largs->k);
-    spawn_next<check_matrix_cont3_closure> SN_check_matrix_cont3(SN_check_matrix_cont3c);
-    *static_cast<check_matrix_afterif5_data*>(SN_check_matrix_cont3.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(check_matrix_cont3) {
-    check_matrix_cont3_closure *largs = (check_matrix_cont3_closure*)(args.get());
+THREAD(check_matrix_cont1) {
+    check_matrix_cont1_closure *largs = (check_matrix_cont1_closure*)(args.get());
     auto sp0c = std::make_shared<check_matrix_afterif5_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;
@@ -1027,19 +1005,11 @@ THREAD(multiply_matrix_cont3) {
 }
 THREAD(run_cont0) {
     run_cont0_closure *largs = (run_cont0_closure*)(args.get());
+    gettimeofday(&(largs->t1),0);
     run_cont1_closure SN_run_cont1c(largs->k);
     spawn_next<run_cont1_closure> SN_run_cont1(SN_run_cont1c);
-    *static_cast<run_cont0_data*>(SN_run_cont1.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(run_cont1) {
-    run_cont1_closure *largs = (run_cont1_closure*)(args.get());
-    gettimeofday(&(largs->t1),0);
-    run_cont2_closure SN_run_cont2c(largs->k);
-    spawn_next<run_cont2_closure> SN_run_cont2(SN_run_cont2c);
     cont sp0k;
-    SN_BIND_VOID(SN_run_cont2, &sp0k);
+    SN_BIND_VOID(SN_run_cont1, &sp0k);
     multiply_matrix_closure sp0c(sp0k);
     sp0c.A = largs->A;
     sp0c.oa = largs->y;
@@ -1053,23 +1023,23 @@ THREAD(run_cont1) {
     sp0c.add = 0;
     spawn<multiply_matrix_closure> sp0(sp0c);
 
-    *static_cast<run_cont0_data*>(SN_run_cont2.cls.get()) = *largs;
+    *static_cast<run_cont0_data*>(SN_run_cont1.cls.get()) = *largs;
     // Original sync was here
     return;
 }
-THREAD(run_cont2) {
+THREAD(run_cont1) {
     unsigned long long runtime_ms;
-    run_cont2_closure *largs = (run_cont2_closure*)(args.get());
+    run_cont1_closure *largs = (run_cont1_closure*)(args.get());
     gettimeofday(&(largs->t2),0);
     runtime_ms = ((todval(&(largs->t2)) - todval(&(largs->t1))) / 1000);
     printf("%f\n",(runtime_ms / 1000.));
     if (largs->check) {
         printf("Now check result ... \n");
         largs->check = 0;
-        run_cont3_closure SN_run_cont3c(largs->k);
-        spawn_next<run_cont3_closure> SN_run_cont3(SN_run_cont3c);
+        run_cont2_closure SN_run_cont2c(largs->k);
+        spawn_next<run_cont2_closure> SN_run_cont2(SN_run_cont2c);
         cont sp0k;
-        SN_BIND_VOID(SN_run_cont3, &sp0k);
+        SN_BIND_VOID(SN_run_cont2, &sp0k);
         check_matrix_closure sp0c(sp0k);
         sp0c.R = largs->R;
         sp0c.x = largs->x;
@@ -1079,16 +1049,16 @@ THREAD(run_cont2) {
         sp0c.errorf = &(largs->check);
         spawn<check_matrix_closure> sp0(sp0c);
 
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->runtime_ms = runtime_ms;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->t2 = largs->t2;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->t1 = largs->t1;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->R = largs->R;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->B = largs->B;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->A = largs->A;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->check = largs->check;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->z = largs->z;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->y = largs->y;
-        ((run_cont3_closure*)SN_run_cont3.cls.get())->x = largs->x;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->runtime_ms = runtime_ms;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->t2 = largs->t2;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->t1 = largs->t1;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->R = largs->R;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->B = largs->B;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->A = largs->A;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->check = largs->check;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->z = largs->z;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->y = largs->y;
+        ((run_cont2_closure*)SN_run_cont2.cls.get())->x = largs->x;
         // Original sync was here
     } else {
         auto sp1c = std::make_shared<run_afterif0_closure>(largs->k);
@@ -1106,8 +1076,8 @@ THREAD(run_cont2) {
         return;
     }
 }
-THREAD(run_cont3) {
-    run_cont3_closure *largs = (run_cont3_closure*)(args.get());
+THREAD(run_cont2) {
+    run_cont2_closure *largs = (run_cont2_closure*)(args.get());
     auto sp0c = std::make_shared<run_afterif0_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;

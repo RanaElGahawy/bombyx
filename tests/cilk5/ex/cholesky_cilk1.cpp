@@ -118,7 +118,6 @@ int main(int argc, char **argv);
 THREAD(main_afterif0);
 THREAD(cholesky_afterif1);
 THREAD(copy_matrix_cont0);
-THREAD(copy_matrix_cont1);
 THREAD(mul_and_subT_cont0);
 THREAD(mul_and_subT_cont1);
 THREAD(backsub_cont0);
@@ -129,7 +128,6 @@ THREAD(cholesky_cont1);
 THREAD(cholesky_cont2);
 THREAD(cholesky_cont3);
 THREAD(cholesky_cont4);
-THREAD(cholesky_cont5);
 THREAD(main_cont0);
 THREAD(main_cont1);
 THREAD(main_cont2);
@@ -145,12 +143,6 @@ struct cholesky_afterif1_data {
     Matrix a00;
     Matrix a10;
     Matrix a11;
-};
-struct copy_matrix_cont0_data {
-    Matrix r00;
-    Matrix r01;
-    Matrix r10;
-    Matrix r11;
 };
 
 CLOSURE_DEF_SHARED(copy_matrix, copy_matrix_data);
@@ -204,8 +196,12 @@ CLOSURE_DEF(main_afterif0,
     unsigned long long runtime_ms;
 );
 CLOSURE_DEF_SHARED(cholesky_afterif1, cholesky_afterif1_data);
-CLOSURE_DEF_SHARED(copy_matrix_cont0, copy_matrix_cont0_data);
-CLOSURE_DEF_SHARED(copy_matrix_cont1, copy_matrix_cont0_data);
+CLOSURE_DEF(copy_matrix_cont0,
+    Matrix r00;
+    Matrix r01;
+    Matrix r10;
+    Matrix r11;
+);
 CLOSURE_DEF(mul_and_subT_cont0,
     int depth;
     int lower;
@@ -255,7 +251,6 @@ CLOSURE_DEF_SHARED(cholesky_cont1, cholesky_afterif1_data);
 CLOSURE_DEF_SHARED(cholesky_cont2, cholesky_afterif1_data);
 CLOSURE_DEF_SHARED(cholesky_cont3, cholesky_afterif1_data);
 CLOSURE_DEF_SHARED(cholesky_cont4, cholesky_afterif1_data);
-CLOSURE_DEF_SHARED(cholesky_cont5, cholesky_afterif1_data);
 CLOSURE_DEF(main_cont0,
     int argc;
     char **argv;
@@ -1272,16 +1267,8 @@ THREAD(cholesky_afterif1) {
     SEND_ARGUMENT(largs->k, largs->a);
 }
 THREAD(copy_matrix_cont0) {
-    copy_matrix_cont0_closure *largs = (copy_matrix_cont0_closure*)(args.get());
-    copy_matrix_cont1_closure SN_copy_matrix_cont1c(largs->k);
-    spawn_next<copy_matrix_cont1_closure> SN_copy_matrix_cont1(SN_copy_matrix_cont1c);
-    *static_cast<copy_matrix_cont0_data*>(SN_copy_matrix_cont1.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(copy_matrix_cont1) {
     Matrix r;
-    copy_matrix_cont1_closure *largs = (copy_matrix_cont1_closure*)(args.get());
+    copy_matrix_cont0_closure *largs = (copy_matrix_cont0_closure*)(args.get());
     r = new_internal(largs->r00,largs->r01,largs->r10,largs->r11);
     SEND_ARGUMENT(largs->k, r);
 }
@@ -1502,14 +1489,6 @@ THREAD(cholesky_cont3) {
 }
 THREAD(cholesky_cont4) {
     cholesky_cont4_closure *largs = (cholesky_cont4_closure*)(args.get());
-    cholesky_cont5_closure SN_cholesky_cont5c(largs->k);
-    spawn_next<cholesky_cont5_closure> SN_cholesky_cont5(SN_cholesky_cont5c);
-    *static_cast<cholesky_afterif1_data*>(SN_cholesky_cont5.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(cholesky_cont5) {
-    cholesky_cont5_closure *largs = (cholesky_cont5_closure*)(args.get());
     auto sp0c = std::make_shared<cholesky_afterif1_closure>(largs->k, *largs);
     cilk_spawn taskSpawn(sp0c->getTask(), sp0c);
     return;

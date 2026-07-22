@@ -91,31 +91,18 @@ THREAD(fft_aux_afterif8);
 THREAD(fft_aux_afterif9);
 THREAD(fft_aux_afterif10);
 THREAD(compute_w_coefficients_cont0);
-THREAD(compute_w_coefficients_cont1);
 THREAD(unshuffle_cont0);
-THREAD(unshuffle_cont1);
 THREAD(fft_twiddle_gen_cont0);
-THREAD(fft_twiddle_gen_cont1);
 THREAD(fft_twiddle_2_cont0);
-THREAD(fft_twiddle_2_cont1);
 THREAD(fft_unshuffle_2_cont0);
-THREAD(fft_unshuffle_2_cont1);
 THREAD(fft_twiddle_4_cont0);
-THREAD(fft_twiddle_4_cont1);
 THREAD(fft_unshuffle_4_cont0);
-THREAD(fft_unshuffle_4_cont1);
 THREAD(fft_twiddle_8_cont0);
-THREAD(fft_twiddle_8_cont1);
 THREAD(fft_unshuffle_8_cont0);
-THREAD(fft_unshuffle_8_cont1);
 THREAD(fft_twiddle_16_cont0);
-THREAD(fft_twiddle_16_cont1);
 THREAD(fft_unshuffle_16_cont0);
-THREAD(fft_unshuffle_16_cont1);
 THREAD(fft_twiddle_32_cont0);
-THREAD(fft_twiddle_32_cont1);
 THREAD(fft_unshuffle_32_cont0);
-THREAD(fft_unshuffle_32_cont1);
 THREAD(fft_aux_cont0);
 THREAD(fft_aux_cont1);
 THREAD(fft_aux_cont2);
@@ -225,55 +212,29 @@ CLOSURE_DEF_SHARED(fft_aux_afterif9, fft_aux_afterif0_data);
 CLOSURE_DEF_SHARED(fft_aux_afterif10, fft_aux_afterif0_data);
 CLOSURE_DEF(compute_w_coefficients_cont0,
 );
-CLOSURE_DEF(compute_w_coefficients_cont1,
-);
 CLOSURE_DEF(unshuffle_cont0,
-);
-CLOSURE_DEF(unshuffle_cont1,
 );
 CLOSURE_DEF(fft_twiddle_gen_cont0,
 );
-CLOSURE_DEF(fft_twiddle_gen_cont1,
-);
 CLOSURE_DEF(fft_twiddle_2_cont0,
-);
-CLOSURE_DEF(fft_twiddle_2_cont1,
 );
 CLOSURE_DEF(fft_unshuffle_2_cont0,
 );
-CLOSURE_DEF(fft_unshuffle_2_cont1,
-);
 CLOSURE_DEF(fft_twiddle_4_cont0,
-);
-CLOSURE_DEF(fft_twiddle_4_cont1,
 );
 CLOSURE_DEF(fft_unshuffle_4_cont0,
 );
-CLOSURE_DEF(fft_unshuffle_4_cont1,
-);
 CLOSURE_DEF(fft_twiddle_8_cont0,
-);
-CLOSURE_DEF(fft_twiddle_8_cont1,
 );
 CLOSURE_DEF(fft_unshuffle_8_cont0,
 );
-CLOSURE_DEF(fft_unshuffle_8_cont1,
-);
 CLOSURE_DEF(fft_twiddle_16_cont0,
-);
-CLOSURE_DEF(fft_twiddle_16_cont1,
 );
 CLOSURE_DEF(fft_unshuffle_16_cont0,
 );
-CLOSURE_DEF(fft_unshuffle_16_cont1,
-);
 CLOSURE_DEF(fft_twiddle_32_cont0,
 );
-CLOSURE_DEF(fft_twiddle_32_cont1,
-);
 CLOSURE_DEF(fft_unshuffle_32_cont0,
-);
-CLOSURE_DEF(fft_unshuffle_32_cont1,
 );
 CLOSURE_DEF_SHARED(fft_aux_cont0, fft_aux_afterif0_data);
 CLOSURE_DEF_SHARED(fft_aux_cont1, fft_aux_afterif0_data);
@@ -4535,145 +4496,54 @@ THREAD(fft_aux_afterif10) {
 }
 THREAD(compute_w_coefficients_cont0) {
     compute_w_coefficients_cont0_closure *largs = (compute_w_coefficients_cont0_closure*)(args.get());
-    compute_w_coefficients_cont1_closure SN_compute_w_coefficients_cont1c(largs->k);
-    spawn_next<compute_w_coefficients_cont1_closure> SN_compute_w_coefficients_cont1(SN_compute_w_coefficients_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(compute_w_coefficients_cont1) {
-    compute_w_coefficients_cont1_closure *largs = (compute_w_coefficients_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(unshuffle_cont0) {
     unshuffle_cont0_closure *largs = (unshuffle_cont0_closure*)(args.get());
-    unshuffle_cont1_closure SN_unshuffle_cont1c(largs->k);
-    spawn_next<unshuffle_cont1_closure> SN_unshuffle_cont1(SN_unshuffle_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(unshuffle_cont1) {
-    unshuffle_cont1_closure *largs = (unshuffle_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_twiddle_gen_cont0) {
     fft_twiddle_gen_cont0_closure *largs = (fft_twiddle_gen_cont0_closure*)(args.get());
-    fft_twiddle_gen_cont1_closure SN_fft_twiddle_gen_cont1c(largs->k);
-    spawn_next<fft_twiddle_gen_cont1_closure> SN_fft_twiddle_gen_cont1(SN_fft_twiddle_gen_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_twiddle_gen_cont1) {
-    fft_twiddle_gen_cont1_closure *largs = (fft_twiddle_gen_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_twiddle_2_cont0) {
     fft_twiddle_2_cont0_closure *largs = (fft_twiddle_2_cont0_closure*)(args.get());
-    fft_twiddle_2_cont1_closure SN_fft_twiddle_2_cont1c(largs->k);
-    spawn_next<fft_twiddle_2_cont1_closure> SN_fft_twiddle_2_cont1(SN_fft_twiddle_2_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_twiddle_2_cont1) {
-    fft_twiddle_2_cont1_closure *largs = (fft_twiddle_2_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_unshuffle_2_cont0) {
     fft_unshuffle_2_cont0_closure *largs = (fft_unshuffle_2_cont0_closure*)(args.get());
-    fft_unshuffle_2_cont1_closure SN_fft_unshuffle_2_cont1c(largs->k);
-    spawn_next<fft_unshuffle_2_cont1_closure> SN_fft_unshuffle_2_cont1(SN_fft_unshuffle_2_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_unshuffle_2_cont1) {
-    fft_unshuffle_2_cont1_closure *largs = (fft_unshuffle_2_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_twiddle_4_cont0) {
     fft_twiddle_4_cont0_closure *largs = (fft_twiddle_4_cont0_closure*)(args.get());
-    fft_twiddle_4_cont1_closure SN_fft_twiddle_4_cont1c(largs->k);
-    spawn_next<fft_twiddle_4_cont1_closure> SN_fft_twiddle_4_cont1(SN_fft_twiddle_4_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_twiddle_4_cont1) {
-    fft_twiddle_4_cont1_closure *largs = (fft_twiddle_4_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_unshuffle_4_cont0) {
     fft_unshuffle_4_cont0_closure *largs = (fft_unshuffle_4_cont0_closure*)(args.get());
-    fft_unshuffle_4_cont1_closure SN_fft_unshuffle_4_cont1c(largs->k);
-    spawn_next<fft_unshuffle_4_cont1_closure> SN_fft_unshuffle_4_cont1(SN_fft_unshuffle_4_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_unshuffle_4_cont1) {
-    fft_unshuffle_4_cont1_closure *largs = (fft_unshuffle_4_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_twiddle_8_cont0) {
     fft_twiddle_8_cont0_closure *largs = (fft_twiddle_8_cont0_closure*)(args.get());
-    fft_twiddle_8_cont1_closure SN_fft_twiddle_8_cont1c(largs->k);
-    spawn_next<fft_twiddle_8_cont1_closure> SN_fft_twiddle_8_cont1(SN_fft_twiddle_8_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_twiddle_8_cont1) {
-    fft_twiddle_8_cont1_closure *largs = (fft_twiddle_8_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_unshuffle_8_cont0) {
     fft_unshuffle_8_cont0_closure *largs = (fft_unshuffle_8_cont0_closure*)(args.get());
-    fft_unshuffle_8_cont1_closure SN_fft_unshuffle_8_cont1c(largs->k);
-    spawn_next<fft_unshuffle_8_cont1_closure> SN_fft_unshuffle_8_cont1(SN_fft_unshuffle_8_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_unshuffle_8_cont1) {
-    fft_unshuffle_8_cont1_closure *largs = (fft_unshuffle_8_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_twiddle_16_cont0) {
     fft_twiddle_16_cont0_closure *largs = (fft_twiddle_16_cont0_closure*)(args.get());
-    fft_twiddle_16_cont1_closure SN_fft_twiddle_16_cont1c(largs->k);
-    spawn_next<fft_twiddle_16_cont1_closure> SN_fft_twiddle_16_cont1(SN_fft_twiddle_16_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_twiddle_16_cont1) {
-    fft_twiddle_16_cont1_closure *largs = (fft_twiddle_16_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_unshuffle_16_cont0) {
     fft_unshuffle_16_cont0_closure *largs = (fft_unshuffle_16_cont0_closure*)(args.get());
-    fft_unshuffle_16_cont1_closure SN_fft_unshuffle_16_cont1c(largs->k);
-    spawn_next<fft_unshuffle_16_cont1_closure> SN_fft_unshuffle_16_cont1(SN_fft_unshuffle_16_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_unshuffle_16_cont1) {
-    fft_unshuffle_16_cont1_closure *largs = (fft_unshuffle_16_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_twiddle_32_cont0) {
     fft_twiddle_32_cont0_closure *largs = (fft_twiddle_32_cont0_closure*)(args.get());
-    fft_twiddle_32_cont1_closure SN_fft_twiddle_32_cont1c(largs->k);
-    spawn_next<fft_twiddle_32_cont1_closure> SN_fft_twiddle_32_cont1(SN_fft_twiddle_32_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_twiddle_32_cont1) {
-    fft_twiddle_32_cont1_closure *largs = (fft_twiddle_32_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_unshuffle_32_cont0) {
     fft_unshuffle_32_cont0_closure *largs = (fft_unshuffle_32_cont0_closure*)(args.get());
-    fft_unshuffle_32_cont1_closure SN_fft_unshuffle_32_cont1c(largs->k);
-    spawn_next<fft_unshuffle_32_cont1_closure> SN_fft_unshuffle_32_cont1(SN_fft_unshuffle_32_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(fft_unshuffle_32_cont1) {
-    fft_unshuffle_32_cont1_closure *largs = (fft_unshuffle_32_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(fft_aux_cont0) {

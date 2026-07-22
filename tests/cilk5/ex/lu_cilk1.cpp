@@ -72,30 +72,15 @@ void upper_solve(Matrix M, Matrix U, int nb);
 void lu(Matrix M, int nb);
 THREAD(schur_cont0);
 THREAD(schur_cont1);
-THREAD(schur_cont2);
-THREAD(schur_cont3);
 THREAD(aux_lower_solve_cont0);
 THREAD(aux_lower_solve_cont1);
 THREAD(aux_lower_solve_cont2);
 THREAD(lower_solve_cont0);
-THREAD(lower_solve_cont1);
 THREAD(aux_upper_solve_cont0);
 THREAD(upper_solve_cont0);
-THREAD(upper_solve_cont1);
 THREAD(lu_cont0);
 THREAD(lu_cont1);
 
-struct schur_cont0_data {
-    Matrix M00;
-    Matrix M01;
-    Matrix M10;
-    Matrix M11;
-    Matrix V01;
-    Matrix V11;
-    Matrix W10;
-    Matrix W11;
-    int hnb;
-};
 
 CLOSURE_DEF(schur,
     Matrix M;
@@ -120,11 +105,18 @@ CLOSURE_DEF(aux_upper_solve,
     Matrix U;
     int nb;
 );
-CLOSURE_DEF_SHARED(schur_cont0, schur_cont0_data);
-CLOSURE_DEF_SHARED(schur_cont1, schur_cont0_data);
-CLOSURE_DEF(schur_cont2,
+CLOSURE_DEF(schur_cont0,
+    Matrix M00;
+    Matrix M01;
+    Matrix M10;
+    Matrix M11;
+    Matrix V01;
+    Matrix V11;
+    Matrix W10;
+    Matrix W11;
+    int hnb;
 );
-CLOSURE_DEF(schur_cont3,
+CLOSURE_DEF(schur_cont1,
 );
 CLOSURE_DEF(aux_lower_solve_cont0,
     Matrix Ma;
@@ -142,16 +134,12 @@ CLOSURE_DEF(aux_lower_solve_cont2,
 );
 CLOSURE_DEF(lower_solve_cont0,
 );
-CLOSURE_DEF(lower_solve_cont1,
-);
 CLOSURE_DEF(aux_upper_solve_cont0,
     Matrix Mb;
     int nb;
     Matrix U11;
 );
 CLOSURE_DEF(upper_solve_cont0,
-);
-CLOSURE_DEF(upper_solve_cont1,
 );
 CLOSURE_DEF(lu_cont0,
     Matrix M01;
@@ -747,16 +735,8 @@ THREAD(schur_cont0) {
     schur_cont0_closure *largs = (schur_cont0_closure*)(args.get());
     schur_cont1_closure SN_schur_cont1c(largs->k);
     spawn_next<schur_cont1_closure> SN_schur_cont1(SN_schur_cont1c);
-    *static_cast<schur_cont0_data*>(SN_schur_cont1.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(schur_cont1) {
-    schur_cont1_closure *largs = (schur_cont1_closure*)(args.get());
-    schur_cont2_closure SN_schur_cont2c(largs->k);
-    spawn_next<schur_cont2_closure> SN_schur_cont2(SN_schur_cont2c);
     cont sp0k;
-    SN_BIND_VOID(SN_schur_cont2, &sp0k);
+    SN_BIND_VOID(SN_schur_cont1, &sp0k);
     schur_closure sp0c(sp0k);
     sp0c.M = largs->M00;
     sp0c.V = largs->V01;
@@ -765,7 +745,7 @@ THREAD(schur_cont1) {
     spawn<schur_closure> sp0(sp0c);
 
     cont sp1k;
-    SN_BIND_VOID(SN_schur_cont2, &sp1k);
+    SN_BIND_VOID(SN_schur_cont1, &sp1k);
     schur_closure sp1c(sp1k);
     sp1c.M = largs->M01;
     sp1c.V = largs->V01;
@@ -774,7 +754,7 @@ THREAD(schur_cont1) {
     spawn<schur_closure> sp1(sp1c);
 
     cont sp2k;
-    SN_BIND_VOID(SN_schur_cont2, &sp2k);
+    SN_BIND_VOID(SN_schur_cont1, &sp2k);
     schur_closure sp2c(sp2k);
     sp2c.M = largs->M10;
     sp2c.V = largs->V11;
@@ -783,7 +763,7 @@ THREAD(schur_cont1) {
     spawn<schur_closure> sp2(sp2c);
 
     cont sp3k;
-    SN_BIND_VOID(SN_schur_cont2, &sp3k);
+    SN_BIND_VOID(SN_schur_cont1, &sp3k);
     schur_closure sp3c(sp3k);
     sp3c.M = largs->M11;
     sp3c.V = largs->V11;
@@ -794,15 +774,8 @@ THREAD(schur_cont1) {
     // Original sync was here
     return;
 }
-THREAD(schur_cont2) {
-    schur_cont2_closure *largs = (schur_cont2_closure*)(args.get());
-    schur_cont3_closure SN_schur_cont3c(largs->k);
-    spawn_next<schur_cont3_closure> SN_schur_cont3(SN_schur_cont3c);
-    // Original sync was here
-    return;
-}
-THREAD(schur_cont3) {
-    schur_cont3_closure *largs = (schur_cont3_closure*)(args.get());
+THREAD(schur_cont1) {
+    schur_cont1_closure *largs = (schur_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(aux_lower_solve_cont0) {
@@ -845,13 +818,6 @@ THREAD(aux_lower_solve_cont2) {
 }
 THREAD(lower_solve_cont0) {
     lower_solve_cont0_closure *largs = (lower_solve_cont0_closure*)(args.get());
-    lower_solve_cont1_closure SN_lower_solve_cont1c(largs->k);
-    spawn_next<lower_solve_cont1_closure> SN_lower_solve_cont1(SN_lower_solve_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(lower_solve_cont1) {
-    lower_solve_cont1_closure *largs = (lower_solve_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(aux_upper_solve_cont0) {
@@ -861,13 +827,6 @@ THREAD(aux_upper_solve_cont0) {
 }
 THREAD(upper_solve_cont0) {
     upper_solve_cont0_closure *largs = (upper_solve_cont0_closure*)(args.get());
-    upper_solve_cont1_closure SN_upper_solve_cont1c(largs->k);
-    spawn_next<upper_solve_cont1_closure> SN_upper_solve_cont1(SN_upper_solve_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(upper_solve_cont1) {
-    upper_solve_cont1_closure *largs = (upper_solve_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(lu_cont0) {

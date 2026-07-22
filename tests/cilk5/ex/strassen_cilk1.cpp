@@ -84,21 +84,8 @@ void free_matrix(REAL *A);
 int usage();
 int main(int argc, char **argv);
 THREAD(OptimizedStrassenMultiply_cont0);
-THREAD(OptimizedStrassenMultiply_cont1);
 THREAD(main_cont0);
 
-struct OptimizedStrassenMultiply_cont0_data {
-    REAL *C;
-    unsigned int QuadrantSize;
-    REAL *C12;
-    REAL *C21;
-    REAL *C22;
-    REAL *M2;
-    REAL *M5;
-    REAL *T1sMULT;
-    PTR RowIncrementC;
-    void *StartHeap;
-};
 
 CLOSURE_DEF(OptimizedStrassenMultiply,
     REAL *C;
@@ -109,8 +96,18 @@ CLOSURE_DEF(OptimizedStrassenMultiply,
     unsigned int RowWidthA;
     unsigned int RowWidthB;
 );
-CLOSURE_DEF_SHARED(OptimizedStrassenMultiply_cont0, OptimizedStrassenMultiply_cont0_data);
-CLOSURE_DEF_SHARED(OptimizedStrassenMultiply_cont1, OptimizedStrassenMultiply_cont0_data);
+CLOSURE_DEF(OptimizedStrassenMultiply_cont0,
+    REAL *C;
+    unsigned int QuadrantSize;
+    REAL *C12;
+    REAL *C21;
+    REAL *C22;
+    REAL *M2;
+    REAL *M5;
+    REAL *T1sMULT;
+    PTR RowIncrementC;
+    void *StartHeap;
+);
 CLOSURE_DEF(main_cont0,
     REAL *A;
     REAL *B;
@@ -866,14 +863,6 @@ int main(int argc, char **argv) {
     }
 }
 THREAD(OptimizedStrassenMultiply_cont0) {
-    OptimizedStrassenMultiply_cont0_closure *largs = (OptimizedStrassenMultiply_cont0_closure*)(args.get());
-    OptimizedStrassenMultiply_cont1_closure SN_OptimizedStrassenMultiply_cont1c(largs->k);
-    spawn_next<OptimizedStrassenMultiply_cont1_closure> SN_OptimizedStrassenMultiply_cont1(SN_OptimizedStrassenMultiply_cont1c);
-    *static_cast<OptimizedStrassenMultiply_cont0_data*>(SN_OptimizedStrassenMultiply_cont1.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(OptimizedStrassenMultiply_cont1) {
     unsigned int Column;
     unsigned int Row;
     REAL LocalM5_0;
@@ -892,7 +881,7 @@ THREAD(OptimizedStrassenMultiply_cont1) {
     REAL T2_1;
     REAL T2_2;
     REAL T2_3;
-    OptimizedStrassenMultiply_cont1_closure *largs = (OptimizedStrassenMultiply_cont1_closure*)(args.get());
+    OptimizedStrassenMultiply_cont0_closure *largs = (OptimizedStrassenMultiply_cont0_closure*)(args.get());
     for (Row = 0;(Row < largs->QuadrantSize);(Row++)) {
         for (Column = 0;(Column < largs->QuadrantSize);Column = (Column + 4)) {
             LocalM5_0 = *(largs->M5);

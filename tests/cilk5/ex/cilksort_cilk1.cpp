@@ -99,31 +99,11 @@ void fill_array(ELM *arr, unsigned long size);
 int usage();
 int main(int argc, char **argv);
 THREAD(cilkmerge_cont0);
-THREAD(cilkmerge_cont1);
 THREAD(cilksort_cont0);
 THREAD(cilksort_cont1);
 THREAD(cilksort_cont2);
-THREAD(cilksort_cont3);
-THREAD(cilksort_cont4);
 THREAD(main_cont0);
 
-struct cilksort_cont0_data {
-    ELM *low;
-    long size;
-    long quarter;
-    ELM *A;
-    ELM *B;
-    ELM *C;
-    ELM *D;
-    ELM *tmpA;
-    ELM *tmpC;
-};
-struct cilksort_cont2_data {
-    long size;
-    ELM *A;
-    ELM *tmpA;
-    ELM *tmpC;
-};
 
 CLOSURE_DEF(cilkmerge,
     ELM *low1;
@@ -139,13 +119,24 @@ CLOSURE_DEF(cilksort,
 );
 CLOSURE_DEF(cilkmerge_cont0,
 );
-CLOSURE_DEF(cilkmerge_cont1,
+CLOSURE_DEF(cilksort_cont0,
+    ELM *low;
+    long size;
+    long quarter;
+    ELM *A;
+    ELM *B;
+    ELM *C;
+    ELM *D;
+    ELM *tmpA;
+    ELM *tmpC;
 );
-CLOSURE_DEF_SHARED(cilksort_cont0, cilksort_cont0_data);
-CLOSURE_DEF_SHARED(cilksort_cont1, cilksort_cont0_data);
-CLOSURE_DEF_SHARED(cilksort_cont2, cilksort_cont2_data);
-CLOSURE_DEF_SHARED(cilksort_cont3, cilksort_cont2_data);
-CLOSURE_DEF(cilksort_cont4,
+CLOSURE_DEF(cilksort_cont1,
+    long size;
+    ELM *A;
+    ELM *tmpA;
+    ELM *tmpC;
+);
+CLOSURE_DEF(cilksort_cont2,
 );
 CLOSURE_DEF(main_cont0,
     long size;
@@ -583,29 +574,14 @@ int main(int argc, char **argv) {
 }
 THREAD(cilkmerge_cont0) {
     cilkmerge_cont0_closure *largs = (cilkmerge_cont0_closure*)(args.get());
-    cilkmerge_cont1_closure SN_cilkmerge_cont1c(largs->k);
-    spawn_next<cilkmerge_cont1_closure> SN_cilkmerge_cont1(SN_cilkmerge_cont1c);
-    // Original sync was here
-    return;
-}
-THREAD(cilkmerge_cont1) {
-    cilkmerge_cont1_closure *largs = (cilkmerge_cont1_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(cilksort_cont0) {
     cilksort_cont0_closure *largs = (cilksort_cont0_closure*)(args.get());
     cilksort_cont1_closure SN_cilksort_cont1c(largs->k);
     spawn_next<cilksort_cont1_closure> SN_cilksort_cont1(SN_cilksort_cont1c);
-    *static_cast<cilksort_cont0_data*>(SN_cilksort_cont1.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(cilksort_cont1) {
-    cilksort_cont1_closure *largs = (cilksort_cont1_closure*)(args.get());
-    cilksort_cont2_closure SN_cilksort_cont2c(largs->k);
-    spawn_next<cilksort_cont2_closure> SN_cilksort_cont2(SN_cilksort_cont2c);
     cont sp0k;
-    SN_BIND_VOID(SN_cilksort_cont2, &sp0k);
+    SN_BIND_VOID(SN_cilksort_cont1, &sp0k);
     cilkmerge_closure sp0c(sp0k);
     sp0c.low1 = largs->A;
     sp0c.high1 = ((largs->A + largs->quarter) - 1);
@@ -615,7 +591,7 @@ THREAD(cilksort_cont1) {
     spawn<cilkmerge_closure> sp0(sp0c);
 
     cont sp1k;
-    SN_BIND_VOID(SN_cilksort_cont2, &sp1k);
+    SN_BIND_VOID(SN_cilksort_cont1, &sp1k);
     cilkmerge_closure sp1c(sp1k);
     sp1c.low1 = largs->C;
     sp1c.high1 = ((largs->C + largs->quarter) - 1);
@@ -624,27 +600,19 @@ THREAD(cilksort_cont1) {
     sp1c.lowdest = largs->tmpC;
     spawn<cilkmerge_closure> sp1(sp1c);
 
-    ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->tmpC = largs->tmpC;
-    ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->tmpA = largs->tmpA;
-    ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->A = largs->A;
-    ((cilksort_cont2_closure*)SN_cilksort_cont2.cls.get())->size = largs->size;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpC = largs->tmpC;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->tmpA = largs->tmpA;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->A = largs->A;
+    ((cilksort_cont1_closure*)SN_cilksort_cont1.cls.get())->size = largs->size;
     // Original sync was here
     return;
 }
-THREAD(cilksort_cont2) {
-    cilksort_cont2_closure *largs = (cilksort_cont2_closure*)(args.get());
-    cilksort_cont3_closure SN_cilksort_cont3c(largs->k);
-    spawn_next<cilksort_cont3_closure> SN_cilksort_cont3(SN_cilksort_cont3c);
-    *static_cast<cilksort_cont2_data*>(SN_cilksort_cont3.cls.get()) = *largs;
-    // Original sync was here
-    return;
-}
-THREAD(cilksort_cont3) {
-    cilksort_cont3_closure *largs = (cilksort_cont3_closure*)(args.get());
-    cilksort_cont4_closure SN_cilksort_cont4c(largs->k);
-    spawn_next<cilksort_cont4_closure> SN_cilksort_cont4(SN_cilksort_cont4c);
+THREAD(cilksort_cont1) {
+    cilksort_cont1_closure *largs = (cilksort_cont1_closure*)(args.get());
+    cilksort_cont2_closure SN_cilksort_cont2c(largs->k);
+    spawn_next<cilksort_cont2_closure> SN_cilksort_cont2(SN_cilksort_cont2c);
     cont sp0k;
-    SN_BIND_VOID(SN_cilksort_cont4, &sp0k);
+    SN_BIND_VOID(SN_cilksort_cont2, &sp0k);
     cilkmerge_closure sp0c(sp0k);
     sp0c.low1 = largs->tmpA;
     sp0c.high1 = (largs->tmpC - 1);
@@ -656,8 +624,8 @@ THREAD(cilksort_cont3) {
     // Original sync was here
     return;
 }
-THREAD(cilksort_cont4) {
-    cilksort_cont4_closure *largs = (cilksort_cont4_closure*)(args.get());
+THREAD(cilksort_cont2) {
+    cilksort_cont2_closure *largs = (cilksort_cont2_closure*)(args.get());
     SEND_ARGUMENT(largs->k, 0);
 }
 THREAD(main_cont0) {
