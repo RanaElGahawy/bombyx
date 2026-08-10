@@ -289,7 +289,9 @@ IRStmt *LoopIRStmt::clone() {
   IRExpr *NewCond = Cond->clone();
   IRStmt *NewInc = Inc ? Inc->clone() : nullptr;
   IRStmt *NewInit = Init ? Init->clone() : nullptr;
-  return new LoopIRStmt(NewCond, NewInc, NewInit);
+  auto *NewLoop = new LoopIRStmt(NewCond, NewInc, NewInit);
+  NewLoop->Overlap = Overlap;
+  return NewLoop;
 }
 
 void IfIRStmt::print(llvm::raw_ostream &Out, IRPrintContext &Ctx) {

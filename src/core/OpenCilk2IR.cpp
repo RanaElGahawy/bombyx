@@ -91,6 +91,518 @@ public:
   }
 };
 
+// ─── OVERLAP run-ahead legality ──────────────────────────────────────────────
+//
+// An OVERLAP loop is "run-ahead" when iteration i+1 may be issued without
+// waiting for iteration i's body — including any loop nested inside it — to
+// finish. That is what lets several neighbours' comparison streams be in flight
+// at once and is the only way one task saturates the compare stage.
+//
+// It is legal exactly when reordering and overlapping the iterations cannot
+// change the result. This analysis proves that conservatively: everything it
+// does not understand is a rejection, never an assumption.
+namespace {
+
+// A loop-carried variable is one of these three, or the loop is rejected.
+enum class CarriedKind { Induction, Reduction, Private, Rejected };
+
+// Detects the shapes that disqualify run-ahead outright: a real cilk_spawn, a
+// jump out of the body, or a call that can carry state between iterations
+// behind the analysis' back. Stores are NOT rejected here — they are handled by
+// checkMemoryIndependence below, which tries to prove them iteration-private.
+class RunAheadBlockerVisitor
+    : public clang::RecursiveASTVisitor<RunAheadBlockerVisitor> {
+public:
+  std::string Reason;
+
+  // A callee can mutate an outer variable through a mutable reference
+  // parameter, or store through a pointer parameter, and neither shows up in
+  // this function's AST. The loop-carried-variable pass would then see nothing
+  // and wrongly conclude the iterations are independent, so anything that hands
+  // a callee a writable handle is rejected. Calls taking only values are fine.
+  bool VisitCallExpr(clang::CallExpr *CE) {
+    if (!Reason.empty())
+      return true;
+    const clang::FunctionDecl *FD = CE->getDirectCallee();
+    if (!FD) {
+      Reason = "the body makes an indirect call";
+      return true;
+    }
+    const unsigned N = std::min<unsigned>(CE->getNumArgs(), FD->getNumParams());
+    for (unsigned I = 0; I < N; ++I) {
+      clang::QualType PT = FD->getParamDecl(I)->getType();
+      if (PT->isLValueReferenceType() &&
+          !PT->getPointeeType().isConstQualified()) {
+        Reason = "the body passes an argument to '" + FD->getNameAsString() +
+                 "' by mutable reference, so that call can carry state between "
+                 "iterations";
+        return true;
+      }
+      if (PT->isPointerType() && !PT->getPointeeType().isConstQualified()) {
+        Reason = "the body passes a writable pointer to '" +
+                 FD->getNameAsString() + "', whose stores are not visible here";
+        return true;
+      }
+    }
+    return true;
+  }
+  bool VisitUnaryOperator(clang::UnaryOperator *UO) {
+    // Taking the address of a variable lets it be written through a handle
+    // this analysis does not follow.
+    if (UO->getOpcode() == clang::UO_AddrOf &&
+        llvm::isa<clang::DeclRefExpr>(UO->getSubExpr()->IgnoreParenImpCasts()) &&
+        Reason.empty())
+      Reason = "the body takes the address of a variable";
+    return true;
+  }
+  bool VisitCilkSpawnExpr(clang::CilkSpawnExpr *) {
+    if (Reason.empty())
+      Reason = "the body contains a cilk_spawn";
+    return true;
+  }
+  bool VisitCilkSpawnStmt(clang::CilkSpawnStmt *) {
+    if (Reason.empty())
+      Reason = "the body contains a cilk_spawn";
+    return true;
+  }
+  bool VisitBreakStmt(clang::BreakStmt *) {
+    // A break belonging to a nested loop or switch is fine; one belonging to
+    // this loop makes the trip count inexact. We cannot tell them apart here,
+    // so the caller only runs this over statements that are not nested loops.
+    if (Reason.empty())
+      Reason = "the body can exit the loop early";
+    return true;
+  }
+  bool VisitReturnStmt(clang::ReturnStmt *) {
+    if (Reason.empty())
+      Reason = "the body returns out of the loop";
+    return true;
+  }
+  bool VisitGotoStmt(clang::GotoStmt *) {
+    if (Reason.empty())
+      Reason = "the body contains a goto";
+    return true;
+  }
+  // Do not descend into nested loops/switches when looking for OUR break.
+  bool TraverseForStmt(clang::ForStmt *S) { return descendSkippingBreaks(S); }
+  bool TraverseWhileStmt(clang::WhileStmt *S) {
+    return descendSkippingBreaks(S);
+  }
+  bool TraverseDoStmt(clang::DoStmt *S) { return descendSkippingBreaks(S); }
+  bool TraverseSwitchStmt(clang::SwitchStmt *S) {
+    return descendSkippingBreaks(S);
+  }
+
+private:
+  // Walk a nested construct for memory/spawn blockers but ignore its `break`s,
+  // which bind to it rather than to the OVERLAP loop.
+  bool descendSkippingBreaks(clang::Stmt *S) {
+    RunAheadBlockerVisitor Inner;
+    for (clang::Stmt *C : S->children())
+      if (C)
+        Inner.TraverseStmt(C);
+    // Inner's own break/return findings about ITS loop are not ours; only keep
+    // the ones that are position-independent.
+    if (Reason.empty() && !Inner.Reason.empty() &&
+        Inner.Reason != "the body can exit the loop early")
+      Reason = Inner.Reason;
+    return true;
+  }
+};
+
+// Classify how a loop-carried variable is updated in the body.
+class CarriedUseVisitor : public clang::RecursiveASTVisitor<CarriedUseVisitor> {
+public:
+  clang::ValueDecl *Var = nullptr;
+  unsigned Writes = 0;      // total writes to Var
+  unsigned Reads = 0;       // reads of Var NOT part of its own update
+  std::string Op;           // the single operator seen across all writes
+  bool Inconsistent = false;// two different operators, or an unrecognised shape
+  bool ConstStep = true;    // every update's RHS is loop-invariant of Var
+
+  bool VisitDeclRefExpr(clang::DeclRefExpr *DRE) {
+    if (DRE->getDecl() == Var)
+      Reads++;
+    return true;
+  }
+
+  bool VisitUnaryOperator(clang::UnaryOperator *UO) {
+    if (!UO->isIncrementDecrementOp())
+      return true;
+    auto *DRE =
+        llvm::dyn_cast<clang::DeclRefExpr>(UO->getSubExpr()->IgnoreParenImpCasts());
+    if (!DRE || DRE->getDecl() != Var)
+      return true;
+    Writes++;
+    Reads--; // the DeclRefExpr we just counted is part of the update
+    note(UO->isIncrementOp() ? "+" : "-");
+    return true;
+  }
+
+  bool VisitBinaryOperator(clang::BinaryOperator *BO) {
+    if (!BO->isAssignmentOp())
+      return true;
+    auto *DRE =
+        llvm::dyn_cast<clang::DeclRefExpr>(BO->getLHS()->IgnoreParenImpCasts());
+    if (!DRE || DRE->getDecl() != Var)
+      return true;
+    Writes++;
+    Reads--; // the LHS reference
+    switch (BO->getOpcode()) {
+    case clang::BO_AddAssign: note("+"); break;
+    case clang::BO_SubAssign: note("-"); break;
+    case clang::BO_MulAssign: note("*"); break;
+    case clang::BO_AndAssign: note("&"); break;
+    case clang::BO_OrAssign:  note("|"); break;
+    case clang::BO_XorAssign: note("^"); break;
+    case clang::BO_Assign: {
+      // `x = x <op> e` is the same reduction written out longhand.
+      auto *RHS =
+          llvm::dyn_cast<clang::BinaryOperator>(BO->getRHS()->IgnoreParenImpCasts());
+      if (!RHS) {
+        Inconsistent = true;
+        break;
+      }
+      auto *L =
+          llvm::dyn_cast<clang::DeclRefExpr>(RHS->getLHS()->IgnoreParenImpCasts());
+      auto *R =
+          llvm::dyn_cast<clang::DeclRefExpr>(RHS->getRHS()->IgnoreParenImpCasts());
+      const bool LIsVar = L && L->getDecl() == Var;
+      const bool RIsVar = R && R->getDecl() == Var;
+      if (!LIsVar && !RIsVar) {
+        Inconsistent = true;
+        break;
+      }
+      Reads--; // the self-reference inside the RHS
+      switch (RHS->getOpcode()) {
+      case clang::BO_Add: note("+"); break;
+      case clang::BO_Mul: note("*"); break;
+      case clang::BO_And: note("&"); break;
+      case clang::BO_Or:  note("|"); break;
+      case clang::BO_Xor: note("^"); break;
+      // Subtraction is associative only with the variable on the left.
+      case clang::BO_Sub:
+        if (LIsVar)
+          note("-");
+        else
+          Inconsistent = true;
+        break;
+      default: Inconsistent = true; break;
+      }
+      break;
+    }
+    default: Inconsistent = true; break;
+    }
+    return true;
+  }
+
+private:
+  void note(llvm::StringRef O) {
+    if (Op.empty())
+      Op = O.str();
+    else if (Op != O)
+      Inconsistent = true;
+  }
+};
+
+// ─── Cross-iteration memory dependence ───────────────────────────────────────
+//
+// A store in the body does not by itself prevent run-ahead. What prevents it is
+// two iterations touching the same address. This pass proves they cannot, for
+// the shape that actually appears in these kernels:
+//
+//     for (i = ...)  { ...  base[f(i)] = e;  ... }
+//
+// It has to establish three things:
+//
+//   1. `base` is fixed for the whole loop, so `base[x]` names the same object
+//      every iteration.
+//   2. `f` is injective in the induction variable — affine with a non-zero
+//      coefficient — so distinct iterations pick distinct slots of that object.
+//   3. Nothing else in the body can reach a slot a different iteration writes.
+//
+// (3) is where aliasing enters, and it is answered by provenance rather than by
+// type: every access is traced back to the named object its address derives
+// from, and two accesses conflict only if they share that root or either root
+// is unknown. A pointer *loaded out of* another object inherits that object's
+// root — `nbrs = (uint32_t *)pGraph[2 * v]` roots at `pGraph` — which is the
+// assumption HardCilk already makes by giving each pointer argument its own
+// memory space, and which the surrounding kernels already depend on (sibling
+// applyFn tasks would otherwise race today). A pointer that cannot be traced to
+// a named object at all is unknown and conflicts with everything.
+//
+// Everything not understood is a rejection, never an assumption.
+
+// Parentheses and casts are transparent to an address computation.
+const clang::Expr *stripAddr(const clang::Expr *E) {
+  return E ? E->IgnoreParenCasts() : nullptr;
+}
+
+// Syntactic equality, over the expression shapes that appear in a subscript.
+// Anything unrecognised compares unequal, so a caller can only ever conclude
+// "provably the same address", never "provably different".
+bool sameAddrExpr(const clang::Expr *A, const clang::Expr *B) {
+  A = stripAddr(A);
+  B = stripAddr(B);
+  if (!A || !B)
+    return false;
+  if (A == B)
+    return true;
+  if (A->getStmtClass() != B->getStmtClass())
+    return false;
+  if (auto *DA = llvm::dyn_cast<clang::DeclRefExpr>(A))
+    return DA->getDecl() ==
+           llvm::cast<clang::DeclRefExpr>(B)->getDecl();
+  if (auto *IA = llvm::dyn_cast<clang::IntegerLiteral>(A))
+    return llvm::APInt::isSameValue(
+        IA->getValue(), llvm::cast<clang::IntegerLiteral>(B)->getValue());
+  if (auto *BA = llvm::dyn_cast<clang::BinaryOperator>(A)) {
+    auto *BB = llvm::cast<clang::BinaryOperator>(B);
+    return BA->getOpcode() == BB->getOpcode() &&
+           sameAddrExpr(BA->getLHS(), BB->getLHS()) &&
+           sameAddrExpr(BA->getRHS(), BB->getRHS());
+  }
+  if (auto *UA = llvm::dyn_cast<clang::UnaryOperator>(A)) {
+    auto *UB = llvm::cast<clang::UnaryOperator>(B);
+    return UA->getOpcode() == UB->getOpcode() &&
+           sameAddrExpr(UA->getSubExpr(), UB->getSubExpr());
+  }
+  if (auto *SA = llvm::dyn_cast<clang::ArraySubscriptExpr>(A)) {
+    auto *SB = llvm::cast<clang::ArraySubscriptExpr>(B);
+    return sameAddrExpr(SA->getBase(), SB->getBase()) &&
+           sameAddrExpr(SA->getIdx(), SB->getIdx());
+  }
+  return false;
+}
+
+// Membership test tolerating the const-qualified pointers the AST hands back
+// for a const expression; the sets themselves are keyed on mutable decls.
+bool containsDecl(const std::set<clang::ValueDecl *> &S, const clang::Decl *D) {
+  auto *VD = llvm::dyn_cast_or_null<clang::ValueDecl>(D);
+  return VD && S.count(const_cast<clang::ValueDecl *>(VD));
+}
+
+// The named object an address derives from, or null when that cannot be
+// determined. `Written` is the set of variables the body assigns: a pointer
+// reassigned inside the loop has no single provenance, so it is unknown.
+const clang::ValueDecl *addrRoot(const clang::Expr *E,
+                                 const std::set<clang::ValueDecl *> &Written,
+                                 unsigned Depth = 0) {
+  E = stripAddr(E);
+  if (!E || Depth > 8)
+    return nullptr;
+  if (auto *DRE = llvm::dyn_cast<clang::DeclRefExpr>(E)) {
+    const clang::ValueDecl *D = DRE->getDecl();
+    if (containsDecl(Written, D))
+      return nullptr;
+    // A pointer initialised from another object inherits its provenance
+    // (`int *my_walk = &global_buffer[u * walkLength];` roots at
+    // `global_buffer`); a parameter or global is a root of its own.
+    if (auto *VD = llvm::dyn_cast<clang::VarDecl>(D))
+      if (VD->hasInit())
+        if (auto *R = addrRoot(VD->getInit(), Written, Depth + 1))
+          return R;
+    return D;
+  }
+  // A pointer read out of an object belongs to that object's world.
+  if (auto *ASE = llvm::dyn_cast<clang::ArraySubscriptExpr>(E))
+    return addrRoot(ASE->getBase(), Written, Depth + 1);
+  if (auto *UO = llvm::dyn_cast<clang::UnaryOperator>(E)) {
+    if (UO->getOpcode() == clang::UO_AddrOf ||
+        UO->getOpcode() == clang::UO_Deref)
+      return addrRoot(UO->getSubExpr(), Written, Depth + 1);
+    return nullptr;
+  }
+  // Pointer arithmetic: the pointer operand carries the provenance.
+  if (auto *BO = llvm::dyn_cast<clang::BinaryOperator>(E)) {
+    if (BO->getOpcode() == clang::BO_Add || BO->getOpcode() == clang::BO_Sub) {
+      if (BO->getLHS()->getType()->isPointerType())
+        return addrRoot(BO->getLHS(), Written, Depth + 1);
+      if (BO->getRHS()->getType()->isPointerType())
+        return addrRoot(BO->getRHS(), Written, Depth + 1);
+    }
+  }
+  return nullptr;
+}
+
+// How a subscript expression depends on the induction variable.
+//   Invariant — same value in every iteration
+//   Linear    — a*i + b with a != 0, so distinct iterations give distinct slots
+//   Unknown   — anything else, including a dependence on another carried
+//               variable or on an inner loop's counter
+enum class IdxKind { Invariant, Linear, Unknown };
+
+bool isNonZeroIntLiteral(const clang::Expr *E) {
+  auto *IL = llvm::dyn_cast_or_null<clang::IntegerLiteral>(stripAddr(E));
+  return IL && !IL->getValue().isZero();
+}
+
+IdxKind classifyIndex(const clang::Expr *E, const clang::ValueDecl *IndVar,
+                      const LoopBodyVarCollector &LC) {
+  E = stripAddr(E);
+  if (!E)
+    return IdxKind::Unknown;
+  if (llvm::isa<clang::IntegerLiteral>(E) ||
+      llvm::isa<clang::CharacterLiteral>(E))
+    return IdxKind::Invariant;
+  if (auto *DRE = llvm::dyn_cast<clang::DeclRefExpr>(E)) {
+    auto *D = DRE->getDecl();
+    if (D == IndVar)
+      return IdxKind::Linear;
+    // Declared inside the body (an inner loop's counter, a temporary) or
+    // assigned by the body: not fixed across iterations.
+    if (containsDecl(LC.DeclaredVars, D) || containsDecl(LC.AssignedVars, D))
+      return IdxKind::Unknown;
+    return IdxKind::Invariant;
+  }
+  if (auto *UO = llvm::dyn_cast<clang::UnaryOperator>(E)) {
+    if (UO->getOpcode() == clang::UO_Plus || UO->getOpcode() == clang::UO_Minus)
+      return classifyIndex(UO->getSubExpr(), IndVar, LC);
+    return IdxKind::Unknown;
+  }
+  auto *BO = llvm::dyn_cast<clang::BinaryOperator>(E);
+  if (!BO)
+    return IdxKind::Unknown;
+  const IdxKind L = classifyIndex(BO->getLHS(), IndVar, LC);
+  const IdxKind R = classifyIndex(BO->getRHS(), IndVar, LC);
+  if (L == IdxKind::Unknown || R == IdxKind::Unknown)
+    return IdxKind::Unknown;
+  const bool BothInvariant =
+      L == IdxKind::Invariant && R == IdxKind::Invariant;
+  switch (BO->getOpcode()) {
+  case clang::BO_Add:
+  case clang::BO_Sub:
+    if (BothInvariant)
+      return IdxKind::Invariant;
+    // `i - i` cancels the induction variable out; only one linear term is a
+    // shifted copy of it.
+    if (L == IdxKind::Linear && R == IdxKind::Linear)
+      return IdxKind::Unknown;
+    return IdxKind::Linear;
+  case clang::BO_Mul: {
+    if (BothInvariant)
+      return IdxKind::Invariant;
+    if (L == IdxKind::Linear && R == IdxKind::Linear)
+      return IdxKind::Unknown;
+    // Scaling stays injective only by a non-zero constant; a runtime-invariant
+    // scale could be zero, collapsing every iteration onto one slot.
+    const clang::Expr *Scale =
+        L == IdxKind::Linear ? BO->getRHS() : BO->getLHS();
+    return isNonZeroIntLiteral(Scale) ? IdxKind::Linear : IdxKind::Unknown;
+  }
+  case clang::BO_Shl:
+    if (BothInvariant)
+      return IdxKind::Invariant;
+    // `i << k` for a loop-invariant k is a non-zero scale.
+    return L == IdxKind::Linear && R == IdxKind::Invariant ? IdxKind::Linear
+                                                           : IdxKind::Unknown;
+  default:
+    return IdxKind::Unknown;
+  }
+}
+
+// Every store and every subscript read in the body. A store's own subscript is
+// also collected as an access, which is harmless: it compares equal to itself.
+struct MemAccessCollector
+    : public clang::RecursiveASTVisitor<MemAccessCollector> {
+  std::vector<const clang::Expr *> Stores; // destination lvalue of each store
+  std::vector<const clang::ArraySubscriptExpr *> Accesses;
+  bool OpaqueAccess = false; // a dereference this pass cannot describe
+
+  bool VisitBinaryOperator(clang::BinaryOperator *BO) {
+    if (!BO->isAssignmentOp())
+      return true;
+    const clang::Expr *L = BO->getLHS()->IgnoreParenImpCasts();
+    // A scalar assignment is loop-carried state, classified by CarriedUseVisitor.
+    if (!llvm::isa<clang::DeclRefExpr>(L))
+      Stores.push_back(L);
+    return true;
+  }
+  bool VisitUnaryOperator(clang::UnaryOperator *UO) {
+    if (UO->isIncrementDecrementOp()) {
+      const clang::Expr *S = UO->getSubExpr()->IgnoreParenImpCasts();
+      if (!llvm::isa<clang::DeclRefExpr>(S))
+        Stores.push_back(S);
+    } else if (UO->getOpcode() == clang::UO_Deref) {
+      OpaqueAccess = true;
+    }
+    return true;
+  }
+  bool VisitArraySubscriptExpr(clang::ArraySubscriptExpr *ASE) {
+    Accesses.push_back(ASE);
+    return true;
+  }
+};
+
+// Empty when no two iterations can touch the same address; otherwise the reason
+// run-ahead is rejected.
+std::string checkMemoryIndependence(clang::Stmt *Body,
+                                    const clang::ValueDecl *IndVar,
+                                    const LoopBodyVarCollector &LC) {
+  MemAccessCollector MC;
+  MC.TraverseStmt(Body);
+  if (MC.Stores.empty())
+    return ""; // read-only body: nothing to disambiguate
+  if (MC.OpaqueAccess)
+    return "the body dereferences a pointer directly, so its accesses cannot "
+           "be compared";
+  if (!IndVar)
+    return "the body stores to memory and the induction variable could not be "
+           "identified";
+
+  struct StoreInfo {
+    const clang::ArraySubscriptExpr *Access;
+    const clang::ValueDecl *Root;
+  };
+  std::vector<StoreInfo> Stores;
+
+  for (const clang::Expr *S : MC.Stores) {
+    auto *ASE = llvm::dyn_cast_or_null<clang::ArraySubscriptExpr>(stripAddr(S));
+    if (!ASE)
+      return "the body stores to a destination that is not a subscript";
+    const clang::ValueDecl *Root = addrRoot(ASE->getBase(), LC.AssignedVars);
+    if (!Root)
+      return "the body stores through a pointer whose provenance is unknown";
+    if (classifyIndex(ASE->getIdx(), IndVar, LC) != IdxKind::Linear)
+      return "the body stores to '" + Root->getName().str() +
+             "' at an index that is not injective in the induction variable, "
+             "so two iterations may write the same address";
+    Stores.push_back({ASE, Root});
+  }
+
+  // Two stores into the same object must target the identical address, else
+  // their affine ranges can overlap across iterations (`out[i]` and `out[i+1]`
+  // collide; `out[i]` twice does not).
+  for (size_t I = 0; I < Stores.size(); ++I)
+    for (size_t J = I + 1; J < Stores.size(); ++J)
+      if (Stores[I].Root == Stores[J].Root &&
+          !sameAddrExpr(Stores[I].Access, Stores[J].Access))
+        return "the body stores to '" + Stores[I].Root->getName().str() +
+               "' at two different addresses, which may collide across "
+               "iterations";
+
+  // No other access may reach a slot a different iteration writes. Sharing the
+  // store's root is allowed only at the identical address, which is this
+  // iteration's own slot.
+  for (const clang::ArraySubscriptExpr *A : MC.Accesses) {
+    const clang::ValueDecl *Root = addrRoot(A->getBase(), LC.AssignedVars);
+    for (const StoreInfo &S : Stores) {
+      if (Root && Root != S.Root)
+        continue; // provably different objects
+      if (sameAddrExpr(A, S.Access))
+        continue; // this iteration's own slot
+      return Root ? ("the body accesses '" + Root->getName().str() +
+                     "' at an address another iteration writes")
+                  : ("the body accesses memory through a pointer whose "
+                     "provenance is unknown, which may alias the store to '" +
+                     S.Root->getName().str() + "'");
+    }
+  }
+  return "";
+}
+
+} // namespace
+
 // Return the definition FunctionDecl if available, otherwise the decl itself.
 static clang::FunctionDecl *toDefinition(clang::FunctionDecl *FD) {
   if (auto *Def = FD->getDefinition())
@@ -248,6 +760,14 @@ private:
   bool SyncNext = false;
   bool WhileCtx = false;
   bool SyncInWhile = false;
+  // Set by the `__bombyx_overlap_here` marker label; consumed by the next
+  // VisitWhileStmt/VisitForStmt to flag that loop's LoopIRStmt as OVERLAP.
+  bool NextLoopOverlap = false;
+  // Set alongside NextLoopOverlap by the `__bombyx_overlap_reassoc_here` marker
+  // (`#pragma BOMBYX OVERLAP REASSOC`): the programmer permits the loop's
+  // reduction to be reassociated, which is what lets a floating-point
+  // accumulator run ahead.
+  bool NextLoopReassoc = false;
   // Stack of switch join blocks for break-in-switch handling.
   // A nullptr entry acts as a loop barrier (breaks inside loops don't exit the
   // switch).
@@ -290,6 +810,148 @@ private:
       // assert(isa<CallIRExpr>(EW->Expr.get()));
       pushIRStmt((IRStmt *)EW);
     }
+  }
+
+  // If the `__bombyx_overlap_here` marker preceded this loop, flag its
+  // LoopIRStmt for OVERLAP lowering. We additionally confirm the loop actually
+  // carries a loop-carried dependency (a variable written in the body but
+  // declared outside it); without one, streaming continuations buy nothing, so
+  // we warn and leave the loop on the normal path.
+  void consumeOverlapFlag(LoopIRStmt *LS, clang::Stmt *Body,
+                          clang::Stmt *LoopStmt = nullptr) {
+    if (!NextLoopOverlap)
+      return;
+    NextLoopOverlap = false;
+    const bool Reassoc = NextLoopReassoc;
+    NextLoopReassoc = false;
+    LoopBodyVarCollector LC;
+    if (Body)
+      LC.TraverseStmt(Body);
+    auto Carried = LC.getLoopCarriedVars();
+    if (Carried.empty()) {
+      llvm::errs() << "warning: #pragma BOMBYX OVERLAP loop has no loop-carried "
+                      "dependency; ignoring OVERLAP\n";
+      return;
+    }
+    LS->Overlap = true;
+    analyzeRunAhead(LS, Body, LoopStmt, Carried, LC, Reassoc);
+  }
+
+  // Decide whether this OVERLAP loop's iterations may be issued ahead of one
+  // another. Rejection is not an error — the loop simply keeps strictly serial
+  // outer iteration — but it costs roughly the memory latency per iteration, so
+  // the reason is always reported.
+  //
+  // `Reassoc` is `#pragma BOMBYX OVERLAP REASSOC`: the programmer's assertion
+  // that this loop's reduction may be reassociated, which is the only thing
+  // that unblocks a floating-point accumulator (see below).
+  void analyzeRunAhead(LoopIRStmt *LS, clang::Stmt *Body,
+                       clang::Stmt *LoopStmt,
+                       const std::set<clang::ValueDecl *> &Carried,
+                       const LoopBodyVarCollector &LC, bool Reassoc) {
+    auto reject = [&](const llvm::Twine &Why) {
+      llvm::errs() << "note: #pragma BOMBYX OVERLAP loop cannot run ahead: "
+                   << Why
+                   << "; falling back to serial outer iteration\n";
+    };
+
+    if (!Body)
+      return reject("the loop has no body");
+
+    // (1) An exact, entry-known trip count. Only a `for` gives one; a `while`
+    //     whose bound is recomputed per iteration does not, and the join unit
+    //     needs to know how many retires to wait for.
+    auto *FS = llvm::dyn_cast_or_null<clang::ForStmt>(LoopStmt);
+    if (!FS || !FS->getInit() || !FS->getCond() || !FS->getInc())
+      return reject("its trip count is not known on entry (not a counted for "
+                    "loop)");
+
+    // (2) No real spawn, no early exit, and no call that could mutate state
+    //     behind this analysis' back.
+    RunAheadBlockerVisitor BV;
+    BV.TraverseStmt(Body);
+    if (!BV.Reason.empty())
+      return reject(BV.Reason);
+
+    // (3) The induction variable, taken from the increment. Needed both by the
+    //     memory pass below and by the carried-variable classification.
+    clang::ValueDecl *IndVar = nullptr;
+    if (auto *Inc = llvm::dyn_cast<clang::UnaryOperator>(
+            FS->getInc()->IgnoreParenImpCasts())) {
+      if (auto *D = llvm::dyn_cast<clang::DeclRefExpr>(
+              Inc->getSubExpr()->IgnoreParenImpCasts()))
+        IndVar = D->getDecl();
+    } else if (auto *Inc = llvm::dyn_cast<clang::BinaryOperator>(
+                   FS->getInc()->IgnoreParenImpCasts())) {
+      if (auto *D = llvm::dyn_cast<clang::DeclRefExpr>(
+              Inc->getLHS()->IgnoreParenImpCasts()))
+        IndVar = D->getDecl();
+    }
+
+    // (4) No two iterations may touch the same address. A store is allowed when
+    //     it is provably iteration-private; see checkMemoryIndependence.
+    if (std::string Why = checkMemoryIndependence(Body, IndVar, LC);
+        !Why.empty())
+      return reject(Why);
+
+    // (5) Classify every loop-carried variable. Exactly one may be a reduction;
+    //     one must be the induction variable; nothing else is allowed.
+    clang::ValueDecl *RedVar = nullptr;
+    std::string RedOp;
+    for (clang::ValueDecl *VD : Carried) {
+      if (VD == IndVar)
+        continue; // the induction variable is advanced by the wrapper itself
+
+      CarriedUseVisitor CV;
+      CV.Var = VD;
+      CV.TraverseStmt(Body);
+      if (CV.Writes == 0)
+        continue; // read-only: loop-invariant, safe
+      if (CV.Inconsistent || CV.Op.empty())
+        return reject("'" + VD->getName() +
+                      "' is carried but is not a recognised reduction");
+      if (CV.Reads > 0)
+        return reject("'" + VD->getName() +
+                      "' is read outside its own reduction update, so "
+                      "iterations are not independent");
+      // Subtraction reorders only if it is really `x = x - e` accumulating a
+      // negated sum; treat it as the associative `+` of negated terms.
+      std::string Op = CV.Op == "-" ? "+" : CV.Op;
+      if (Op != "+" && Op != "*" && Op != "&" && Op != "|" && Op != "^")
+        return reject("'" + VD->getName() + "' uses non-associative operator '" +
+                      CV.Op + "'");
+      // Floating point + and * are NOT associative: run-ahead reorders the
+      // accumulation and would change the result bit-for-bit. REASSOC is the
+      // programmer taking responsibility for that difference; it is not a
+      // proof, so the reorder is still announced.
+      if (VD->getType()->isFloatingType()) {
+        if (!Reassoc)
+          return reject("'" + VD->getName() +
+                        "' is a floating-point reduction, which is not "
+                        "associative (add REASSOC to the pragma to allow "
+                        "reordering it)");
+        llvm::errs() << "note: #pragma BOMBYX OVERLAP REASSOC: reordering the "
+                        "floating-point reduction '"
+                     << VD->getName()
+                     << "'; results may differ from the serial order and are "
+                        "not bit-reproducible run to run\n";
+      }
+      if (RedVar)
+        return reject("more than one reduction ('" + RedVar->getName() +
+                      "' and '" + VD->getName() + "')");
+      RedVar = VD;
+      RedOp = Op;
+    }
+
+    if (!RedVar) {
+      // Nothing to accumulate: the iterations are already independent, so
+      // run-ahead needs no join unit at all.
+      LS->RunAhead = true;
+      return;
+    }
+    LS->RunAhead = true;
+    LS->ReductionVar = RedVar->getName().str();
+    LS->ReductionOp = RedOp;
   }
 
   void handleAssign(IRExpr *Dest, IRExpr *Src) {
@@ -482,6 +1144,19 @@ public:
       handleStmt(Node->getSubStmt());
       return;
     }
+    if (Node->getDecl()->getName() == "__bombyx_overlap_here" ||
+        Node->getDecl()->getName() == "__bombyx_overlap_reassoc_here") {
+      // Marker injected by `#pragma BOMBYX OVERLAP`; it labels the loop that
+      // follows. Flag the next loop statement so it is lowered to in-order
+      // streaming continuations. The `_reassoc_` spelling additionally carries
+      // the REASSOC clause, which permits reordering a floating-point
+      // reduction so the loop can still run ahead.
+      NextLoopOverlap = true;
+      NextLoopReassoc =
+          Node->getDecl()->getName() == "__bombyx_overlap_reassoc_here";
+      handleStmt(Node->getSubStmt());
+      return;
+    }
     if (!containsSpawn(Node)) {
       pushIRStmt(new ASTStmtWrapIRStmt(Node, buildRenames(Node, VarLookup)));
       return;
@@ -589,6 +1264,7 @@ public:
     }
 
     auto *ForS = new LoopIRStmt(Cond, IncS, InitS);
+    consumeOverlapFlag(ForS, FS->getBody(), FS);
     ForB->Term = (IRTerminatorStmt *)ForS;
 
     CurrB = BodyB;
@@ -638,6 +1314,7 @@ public:
     }
 
     auto *WhileS = new LoopIRStmt(LoopCond, nullptr, nullptr);
+    consumeOverlapFlag(WhileS, WS->getBody(), WS);
     WhileB->Term = (IRTerminatorStmt *)WhileS;
 
     CurrB = BodyB;

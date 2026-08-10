@@ -62,7 +62,7 @@ using IRFuncSetTy = std::set<IRFunction *, IRFunctionNameLess>;
 template <typename T>
 using IRFuncMapTy = std::map<IRFunction *, T, IRFunctionNameLess>;
 
-enum ScopeAnnot { SA_OPEN, SA_CLOSE, SA_DO, SA_ELSE, SA_DAE_HERE };
+enum ScopeAnnot { SA_OPEN, SA_CLOSE, SA_DO, SA_ELSE, SA_DAE_HERE, SA_OVERLAP_HERE };
 
 typedef const clang::QualType IRType;
 typedef int Sym;
@@ -620,6 +620,22 @@ struct LoopIRStmt : IRTerminatorStmt {
 
 public:
   std::unique_ptr<IRExpr> Cond;
+  // Set when the loop carries a `#pragma BOMBYX OVERLAP`: its sync-carried
+  // continuation should be lowered to in-order streaming (FIFO of continuation
+  // state + external SystemVerilog merge wrapper) rather than the general
+  // memory-backed closure / allocator / argumentNotifier machinery.
+  bool Overlap = false;
+  // Set on an OVERLAP loop whose iterations may be issued *ahead* of one
+  // another — iteration i+1 starts without waiting for iteration i's body (and
+  // any loop nested in it) to finish. Legal only when the sole non-induction
+  // loop-carried dependence is an associative reduction, which the wrapper then
+  // performs in an accumulate/join unit instead of in the loop-back closure.
+  // Proved by OverlapRunAheadLegality (OpenCilk2IR.cpp); false means the loop
+  // falls back to strictly serial outer iteration.
+  bool RunAhead = false;
+  // The reduction variable's source name and operator, when RunAhead holds.
+  std::string ReductionVar;
+  std::string ReductionOp; // "+", "*", "&", "|", "^", "min", "max"
   LoopIRStmt(IRExpr *Cond) : Cond(Cond), IRTerminatorStmt(STK_LOOP) {}
   LoopIRStmt(IRExpr *Cond, IRStmt *Inc, IRStmt *Init)
       : Cond(Cond), Inc(Inc), Init(Init), IRTerminatorStmt(STK_LOOP) {}
@@ -1021,6 +1037,38 @@ class IRFunction {
 public:
   struct IRFunctionInfo {
     bool IsTask = false;
+    // Set on the task functions produced when splitting a `#pragma BOMBYX
+    // OVERLAP` loop (reentry / continuation / exit). Drives in-order streaming
+    // continuation lowering in the HardCilk analysis and printers.
+    bool IsOverlap = false;
+    // Set on the single reentry task FlattenIR splits an OVERLAP loop into —
+    // the one that holds the per-iteration body. OverlapMemAnalysis decouples
+    // memory reads here and nowhere else: the loop's entry and exit code runs
+    // once per task, so decoupling it would only widen the closure.
+    bool IsOverlapReentry = false;
+    // Set on a synthesised reader whose call sites in one round read addresses
+    // that fall inside a single AXI beat (`pGraph[2*v]` and `pGraph[2*v+1]`).
+    // Consecutive invocations then hit the same line, so an `#pragma HLS cache`
+    // on the reader's m_axi port turns the second read into a hit instead of a
+    // second memory round trip. Only a hint: the pragma is emitted only if the
+    // pointer is also provably never written on the FPGA (HardCilkAnalysis'
+    // computeCacheableReaders).
+    bool SpatialReuseHint = false;
+    // Set on the reader tasks OverlapMemAnalysis synthesises. Only these may
+    // be absorbed into an OVERLAP wrapper; a dependent spawn of anything else
+    // is real task parallelism and must stay an external task.
+    bool IsMemReader = false;
+    // Identifies which `#pragma BOMBYX OVERLAP` loop this task belongs to.
+    // Assigned per loop in FlattenIR and propagated to continuations in
+    // MakeExplicit. Without it every overlap task collapses into one global
+    // group, so two OVERLAP loops in a program merge into a single wrapper.
+    int OverlapId = -1;
+    // Carried from LoopIRStmt::RunAhead onto the tasks FlattenIR splits out of
+    // an OVERLAP loop, so the wrapper generator knows whether this loop's
+    // iterations may be issued ahead of one another.
+    bool RunAhead = false;
+    std::string ReductionVar;
+    std::string ReductionOp;
     const FunctionDecl *RootFun = nullptr;
     // Name-ordered, not pointer-ordered: these two sets are emitted verbatim
     // as the descriptor's spawnList / spawnNextList arrays and are walked by

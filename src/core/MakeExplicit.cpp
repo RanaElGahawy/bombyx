@@ -267,6 +267,10 @@ public:
                   .Args = std::set<IRVarRef>(),
                   .Locals = std::set<IRVarRef>()};
       CF.F->Info.IsTask = true;
+      // A continuation split out of an OVERLAP loop's reentry function is also
+      // lowered with in-order streaming (no closure/allocator/notifier).
+      CF.F->Info.IsOverlap = F.Info.IsOverlap;
+      CF.F->Info.OverlapId = F.Info.OverlapId;
       ContFuns.push_back(CF);
     }
     std::vector<bool> visited(Paths.size() - 1, 0);

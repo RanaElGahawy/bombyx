@@ -374,6 +374,51 @@ private:
                         /*IsReinject=*/false);
   }
 
+  // `#pragma BOMBYX OVERLAP [REASSOC]` — labels the loop that follows so
+  // OpenCilk2IR::VisitLabelStmt can flag it (see `__bombyx_overlap_here`).
+  // Same token-injection trick as daePragma; the REASSOC clause selects the
+  // `_reassoc_` spelling, which additionally permits reordering a
+  // floating-point reduction so the loop can still run ahead.
+  void overlapPragma(clang::Preprocessor &PP,
+                     clang::PragmaIntroducer Introducer,
+                     clang::Token &FirstToken) {
+    bool Reassoc = false;
+    clang::Token Tok;
+    PP.Lex(Tok);
+    while (!Tok.is(clang::tok::eod)) {
+      if (Tok.is(clang::tok::identifier) && PP.getSpelling(Tok) == "REASSOC")
+        Reassoc = true;
+      PP.Lex(Tok);
+    }
+
+    Token LabelTok;
+    LabelTok.startToken();
+    LabelTok.setKind(tok::identifier);
+    LabelTok.setIdentifierInfo(PP.getIdentifierInfo(
+        Reassoc ? "__bombyx_overlap_reassoc_here" : "__bombyx_overlap_here"));
+
+    Token ColTok;
+    ColTok.startToken();
+    ColTok.setKind(tok::colon);
+
+    Token SemiTok;
+    SemiTok.startToken();
+    SemiTok.setKind(tok::semi);
+
+    SmallVector<Token, 3> TokenList;
+    TokenList.push_back(LabelTok);
+    TokenList.push_back(ColTok);
+    TokenList.push_back(SemiTok);
+
+    for (Token &T : TokenList)
+      T.setLocation(FirstToken.getLocation());
+
+    ArrayRef TokenArray = TokenList;
+    PP.EnterTokenStream(TokenArray,
+                        /*DisableMacroExpansion=*/false,
+                        /*IsReinject=*/false);
+  }
+
   void fnIgnorePragma(clang::Preprocessor &PP,
                       clang::PragmaIntroducer Introducer,
                       clang::Token &FirstToken) {
@@ -413,6 +458,8 @@ public:
 
     if (Arg == "DAE") {
       daePragma(PP, Introducer, FirstToken);
+    } else if (Arg == "OVERLAP") {
+      overlapPragma(PP, Introducer, FirstToken);
     } else if (Arg == "IGNORE") {
       fnIgnorePragma(PP, Introducer, FirstToken);
     } else {

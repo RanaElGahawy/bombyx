@@ -319,6 +319,58 @@ static std::vector<IRFunction *> restructureLoopsWithSync(IRFunction &F) {
 
   auto *LoopTerm = dyn_cast<LoopIRStmt>(LoopHeader->Term);
   assert(LoopTerm);
+
+  // Carry the OVERLAP flag onto the split-out task functions. The reentry
+  // function holds the loop body (and the cilk_sync), so MakeExplicit will
+  // later derive the continuation function(s) from it and inherit the flag.
+  //
+  // Two ways a split-out loop belongs to an OVERLAP subsystem:
+  //
+  //   Originates — the loop itself carries `#pragma BOMBYX OVERLAP`.
+  //   Inherits   — the loop is nested inside a function that is already part of
+  //                one, i.e. an unannotated inner loop of an OVERLAP loop nest
+  //                (`applyFn`'s intersection `while` inside its OVERLAP `for`).
+  //
+  // An inherited loop must reuse the enclosing OverlapId, NOT allocate a fresh
+  // one: computeOverlapGroups buckets tasks by OverlapId, so a fresh id would
+  // split the nest across two wrappers and leave the inner loop's tasks
+  // scheduler-visible.
+  const bool Originates = LoopTerm->Overlap;
+  const bool Inherits = F.Info.IsOverlap;
+  if (Originates || Inherits) {
+    static int NextOverlapId = 0;
+    // One id per OVERLAP loop *nest*, so sibling nests each get their own
+    // wrapper instead of being merged into one global group.
+    const int Id = Inherits ? F.Info.OverlapId : NextOverlapId++;
+    ReentryF->Info.IsOverlap = true;
+    ExitF->Info.IsOverlap = true;
+    F.Info.IsOverlap = true;
+    ReentryF->Info.OverlapId = Id;
+    ExitF->Info.OverlapId = Id;
+    F.Info.OverlapId = Id;
+    // IsOverlapReentry marks the OverlapMemAnalysis scope, and only an
+    // ORIGINATING loop's reentry is one. OverlapMemAnalysis runs between the two
+    // FlattenIR passes (main.cpp), so by the time an inherited inner loop is
+    // split its loads are already decoupled; flagging it would be a no-op today
+    // but would make a third FlattenIR pass decouple them a second time and emit
+    // a duplicate memReader.
+    if (Originates)
+      ReentryF->Info.IsOverlapReentry = true;
+    // Run-ahead is a property of the ORIGINATING loop; an inner loop inherits
+    // the group but not the permission to reorder its own iterations.
+    if (Originates) {
+      ReentryF->Info.RunAhead = LoopTerm->RunAhead;
+      ExitF->Info.RunAhead = LoopTerm->RunAhead;
+      F.Info.RunAhead = LoopTerm->RunAhead;
+      ReentryF->Info.ReductionVar = LoopTerm->ReductionVar;
+      ExitF->Info.ReductionVar = LoopTerm->ReductionVar;
+      F.Info.ReductionVar = LoopTerm->ReductionVar;
+      ReentryF->Info.ReductionOp = LoopTerm->ReductionOp;
+      ExitF->Info.ReductionOp = LoopTerm->ReductionOp;
+      F.Info.ReductionOp = LoopTerm->ReductionOp;
+    }
+  }
+
   auto *ReentryCondExpr = LoopTerm->Cond.release();
   ExprIdentifierVisitor _rc(ReentryCondExpr, [&](auto &VR, bool lhs) {
     if (ReentryRemap.find(VR) != ReentryRemap.end())
@@ -632,6 +684,11 @@ static std::vector<IRFunction *> restructureIfsWithSync(IRFunction &F) {
   auto *AfterIfF =
       createTaskFunction(F.getParent(), AfterIfName, F.getReturnType(), AllVars,
                          AfterIfRemap, F.Info.RootFun);
+  // An if split out of an OVERLAP-subsystem function stays part of that
+  // subsystem, exactly as MakeExplicit does for continuations. Without this the
+  // after-if task falls out of the group and becomes scheduler-visible.
+  AfterIfF->Info.IsOverlap = F.Info.IsOverlap;
+  AfterIfF->Info.OverlapId = F.Info.OverlapId;
   NewFunctions.push_back(AfterIfF);
 
   // Move after-if blocks to AfterIfF and remap vars.
