@@ -74,6 +74,7 @@ set(SOURCE_FILES
     src/core/FlattenIR.cpp
     src/core/MakeExplicit.cpp
     src/core/DAE.cpp
+    src/core/OverlapMemAnalysis.cpp
     src/core/PruneDeadSpawnArgs.cpp
     src/core/CountSpawns.cpp
     src/core/desugarOpenCilk.cpp

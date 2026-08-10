@@ -449,6 +449,11 @@ private:
 public:
   ASTLiteralIRExpr(clang::Expr *Lit) : Lit(Lit), IRExpr(EXK_LITERAL) {}
 
+  // The wrapped clang expression. Needed by analyses that must compare or
+  // constant-fold subscripts, since source literals reach the IR wrapped here
+  // rather than as IntLiteralIRExpr.
+  clang::Expr *getExpr() const { return Lit; }
+
   static bool classof(const IRExpr *E) { return E->getKind() == EXK_LITERAL; }
 
   virtual void print(llvm::raw_ostream &Out, IRPrintContext &Ctx) override;

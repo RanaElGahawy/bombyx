@@ -27,6 +27,7 @@
 #include "vitis/VitisHLSTclGen.hpp"
 #include "core/MakeExplicit.hpp"
 #include "core/OpenCilk2IR.hpp"
+#include "core/OverlapMemAnalysis.hpp"
 #include "core/PruneDeadSpawnArgs.hpp"
 #include "core/util.hpp"
 
@@ -78,6 +79,23 @@ public:
           OpenCilk2IR(P, &Context, SM, DriverCallers);
           // printFullIRProgram(llvm::outs(), P, Context);
         },
+        // FlattenIR -> OverlapMemAnalysis -> FlattenIR.
+        //
+        // The order matters and the double run is deliberate. The first
+        // FlattenIR splits every loop containing a *real* spawn/sync into
+        // root/reentry/exit tasks and sets IsOverlap/IsOverlapReentry, which is
+        // the scope OverlapMemAnalysis needs before it can apply.
+        // OverlapMemAnalysis then injects memory syncs, both there and in loops
+        // that FlattenIR left intact because they held no spawn at all
+        // (countIntersections). The second FlattenIR splits those newly
+        // sync-carrying loops; without it restructureLoopsWithSync
+        // (FlattenIR.cpp:267) never fires for them.
+        //
+        // Running FlattenIR twice is safe: its `static int LoopCounter` /
+        // NextOverlapId keep numbering monotone, and an already-split loop
+        // presents nothing left to split.
+        [&](IRProgram &P) -> void { FlattenIR(P); },
+        [&](IRProgram &P) -> void { OverlapMemAnalysis(P, Context); },
         [&](IRProgram &P) -> void {
           FlattenIR(P);
           // printFullIRProgram(llvm::outs(), P, Context);
