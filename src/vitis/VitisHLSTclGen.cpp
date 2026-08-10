@@ -27,6 +27,7 @@ void PrintVitisHLSTaskTcl(const std::string &AppName,
                            bool HasAXI,
                            const std::string &FpgaModel,
                            int FreqMhz,
+                           unsigned DFStartFifoDepth,
                            llvm::raw_ostream &Out) {
   std::string Part = fpgaModelToPart(FpgaModel);
   // Format clock period to 4 decimal places (ns).
@@ -71,6 +72,27 @@ void PrintVitisHLSTaskTcl(const std::string &AppName,
     Out << "config_interface -m_axi_num_write_outstanding 32\n\n";
   }
 
+  // Deep-state DATAFLOW PE. `-start_fifo_depth` has no source-pragma
+  // equivalent, and its default of 2 is not a tuning detail: the start FIFOs
+  // gate how many region invocations can be in flight, so at 2 the PE accepts
+  // one task per (region latency / 2) — measured ~10x below the flushable
+  // pipeline this rewrite replaces, with every internal FIFO never full and the
+  // issue process idle 76% of the time. The FIFOs are 1-bit SRLs, so raising
+  // the depth is free (resource counts were bit-identical at 2 and at 64).
+  //
+  // Note this is a SOLUTION-level directive: it applies to every DATAFLOW
+  // region in this PE's synthesis run. Fine while a PE has at most one, which
+  // is all the rewrite ever produces today.
+  if (DFStartFifoDepth > 0) {
+    Out << "# ── Deep-state DATAFLOW region ───────────────────────────────────"
+           "─────────────\n";
+    Out << "# Allow " << DFStartFifoDepth
+        << " region invocations in flight (default 2 throttles the PE to\n";
+    Out << "# one task per region latency / 2). Matches " << TaskName
+        << "_DF_DEPTH.\n";
+    Out << "config_dataflow -start_fifo_depth " << DFStartFifoDepth << "\n\n";
+  }
+
   Out << "# ── Synthesis ─────────────────────────────────────────────────────────────────\n";
   Out << "csynth_design\n\n";
 
@@ -85,7 +107,9 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
                              const TaskInfosTy &TaskInfos,
                              const std::string &FpgaModel,
                              int FreqMhz,
-                             const std::string &OutputDir) {
+                             const std::string &OutputDir,
+                             const std::map<std::string, unsigned>
+                                 &DFStartFifoDepths) {
   namespace fs = std::filesystem;
 
   // Create hls_tcl/ subdirectory.
@@ -124,8 +148,11 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
                    << ": " << EC.message() << "\n";
       continue;
     }
+    auto DFIt = DFStartFifoDepths.find(Task->getName());
     PrintVitisHLSTaskTcl(AppName, Task->getName(), Info.HasAXI,
-                          FpgaModel, FreqMhz, TclOut);
+                          FpgaModel, FreqMhz,
+                          DFIt == DFStartFifoDepths.end() ? 0u : DFIt->second,
+                          TclOut);
   }
 
   // Sort for deterministic script order.

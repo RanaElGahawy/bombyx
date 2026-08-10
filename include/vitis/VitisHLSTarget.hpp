@@ -3,6 +3,7 @@
 #include "core/OpenCilk2IR.hpp"
 #include "hardcilk/HardCilkAnalysis.hpp"
 #include "clang/AST/ASTContext.h"
+#include <map>
 #include <string>
 #include <vector>
 
@@ -42,8 +43,17 @@ private:
   DriverCallersTy DriverCallers;
   bool ArgOutImplList[TY_LAST] = {false};
   std::vector<std::string> ExtraIncludes;
+  std::map<std::string, unsigned> DataflowStartFifoDepth;
 
   void PrintDef(llvm::raw_ostream &Out, IRFunction *Task, HCTaskInfo &Info);
+
+public:
+  /// Select what to do about deep-state PEs (--deep-state=...). The argument is
+  /// a deepstate::Mode; it is passed as an int so this header does not have to
+  /// pull in the pass's own header.
+  static void setDeepStateMode(int M);
+
+private:
 
   DriverSpec BuildDriverSpec(clang::ASTContext &C);
 
@@ -68,6 +78,20 @@ public:
   }
 
   void PrintHardCilk(llvm::raw_ostream &out, clang::ASTContext &C);
+
+  /// PE name -> the `config_dataflow -start_fifo_depth` its synthesis script
+  /// must carry, for every PE PrintHardCilk emitted as a DATAFLOW region.
+  ///
+  /// Populated by PrintHardCilk and empty otherwise (in particular under
+  /// --deep-state=none and --deep-state=latency), so it must be read after that
+  /// call and handed to PrintVitisHLSArtifacts. There is no source-level pragma
+  /// for the start-FIFO depth: leaving it at the Vitis default of 2 caps the
+  /// region at two invocations in flight and costs ~10x throughput, so this is
+  /// not an optional decoration -- a DATAFLOW PE whose TCL misses the directive
+  /// is correct but not worth generating.
+  const std::map<std::string, unsigned> &getDataflowStartFifoDepths() const {
+    return DataflowStartFifoDepth;
+  }
   void PrintDriver(llvm::raw_ostream &out);
   void PrintDefs(llvm::raw_ostream &out);
   void PrintDriverHeader(llvm::raw_ostream &out, clang::ASTContext &C);

@@ -1,5 +1,6 @@
 #include "vitis/VitisHLSTarget.hpp"
 #include "core/IR.hpp"
+#include "vitis/DeepStateDataflow.hpp"
 #include "clang/AST/Type.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/MathExtras.h"
@@ -808,6 +809,21 @@ public:
     });
   }
 
+  IRPrintContext &getPrintContext() { return C; }
+
+  // Emit a chosen subset of a task's statements, in the given order. The
+  // deep-state dataflow rewrite reprints the original body split across the
+  // generated stage functions, so it needs to drive statement emission itself
+  // instead of traversing the whole CFG. visitStmt uses its block argument only
+  // to reach the parent function, so any block of the task will do.
+  void emitStmtSubset(IRFunction *Task, const std::vector<IRStmt *> &Stmts) {
+    if (Task->begin() == Task->end())
+      return;
+    IRBasicBlock *Any = Task->begin()->get();
+    for (IRStmt *S : Stmts)
+      visitStmt(S, Any);
+  }
+
   void prepareForTask(IRFunction *Task) {
     EmittedSpawnNexts.clear();
     ClosureToSpawnNext.clear();
@@ -864,7 +880,7 @@ public:
 // inlinable function that does. Having addr_t-typed arguments is not sufficient
 // — those are passed through as values in the task struct without dereferencing.
 static bool taskNeedsMem(IRFunction *Task,
-                          const std::set<IRFunction *> &FuncsNeedingMem) {
+                          const IRFuncSetTy &FuncsNeedingMem) {
   auto checkExpr = [&FuncsNeedingMem](auto &&self, IRExpr *E) -> bool {
     if (!E)
       return false;
@@ -923,23 +939,669 @@ static bool taskNeedsMem(IRFunction *Task,
   return false;
 }
 
+// ─── Memory channel planning ─────────────────────────────────────────────────
+//
+// All reads of a PE sharing one m_axi port serialize on that port: the
+// flushable pipeline cannot overlap iteration i's read request with iteration
+// i-1's outstanding response, and a dependent-load chain (read v, then read
+// pGraph[v]) pushes the II up to the full AXI round-trip latency (observed
+// II=144 on triangleDAE's applyFn_reentry0). Emitting one `void *mem_<i>`
+// port per static read site on the SAME `gmem` bundle with a distinct
+// `channel = <i>` gives each site its own AXI ID, so the HLS scheduler treats
+// them as independent ports while the RTL still exposes the single
+// m_axi_gmem interface (no port explosion; the per-PE s_axi_control offset
+// registers stay tied idle at 0 exactly as with the single `mem` port). The
+// dependent-load latency then moves into pipeline depth and the II returns
+// to 1 (verified on applyFn_reentry0: II 144 → 1, Vitis HLS 2022.1).
+//
+// Hazard rule: AXI orders transactions only within one ID, so splitting is
+// legal only when reordering cannot be observed. We split only tasks whose
+// m_axi traffic is read-only — reads commute freely regardless of aliasing —
+// and keep the single ordered `mem` port whenever the task writes memory
+// through m_axi (a MEM_*_OUT store or a ++/-- lowered to read-modify-write),
+// calls an inlinable helper that touches memory (helpers keep the plain
+// `mem` parameter), or contains any construct this planner does not
+// understand. Buffered stores (BufferedStoreAllowMap) leave through the
+// argDataOut write-buffer stream, not this PE's m_axi port, so they do not
+// block splitting.
+namespace {
+struct MemChannelPlan {
+  bool Active = false;      // true while printing a split task's body
+  unsigned NumChannels = 0; // number of mem_<i> ports when Active
+  std::map<const IRExpr *, unsigned> Site; // read-site node → channel
+  // Every read site in emission order, and whether the task was provably
+  // read-only. Recorded even when the split is declined (a single read site
+  // gains nothing from a channel of its own) because the deep-state dataflow
+  // rewrite needs the site list regardless of how many there are.
+  std::vector<const IRExpr *> Sites;
+  bool Blocked = false;
+};
+// Plan for the task currently being printed. Inlinable functions and
+// non-split tasks print with Active=false and keep the plain `mem` name.
+MemChannelPlan GMemPlan;
+
+// ─── Deep-state dataflow rewrite: printer redirections ───────────────────────
+//
+// When a task is emitted as a DATAFLOW region (see DeepStateDataflow.hpp) its
+// original statements are reprinted inside the generated stage functions, where
+// two things no longer mean what they meant in the flat body:
+//
+//   * a read site is not a MEM_* macro any more -- the value arrived on a FIFO,
+//     so the site prints as the local that holds it;
+//   * a variable may live in a different stage than the one being printed, so it
+//     prints as the local that carries it across (_c_<v>, _r_<v>).
+//
+// Both are empty while printing anything else, so every other task and every
+// inlinable function is byte-for-byte unaffected.
+std::map<const IRExpr *, std::string> DFSiteValue;
+IRVarMapTy<std::string> DFIdentRedirect;
+
+// Print the local holding `Site`'s loaded value, if the site has been lifted
+// into a load stage. Returns false when the site should print as a MEM_* macro.
+bool printDFSiteValue(llvm::raw_ostream &Out, const IRExpr *Site) {
+  auto It = DFSiteValue.find(Site);
+  if (It == DFSiteValue.end())
+    return false;
+  Out << It->second;
+  return true;
+}
+} // namespace
+
+// Channels are AXI IDs on one physical interface, so this cap does not
+// multiply RTL ports; it only bounds the per-ID bookkeeping in the HLS m_axi
+// adapter. Extra read sites wrap around — reads may share an ID safely, it
+// only costs II.
+static constexpr unsigned MaxMemChannels = 16;
+
+// Print the m_axi port name a MEM_* read at `Site` must use.
+static void printMemReadPort(llvm::raw_ostream &Out, const IRExpr *Site) {
+  if (!GMemPlan.Active) {
+    Out << "mem";
+    return;
+  }
+  auto It = GMemPlan.Site.find(Site);
+  // A miss means the planner did not see a node the printer emits; channel 0
+  // always exists and reads are order-free, so falling back is safe, just
+  // suboptimal.
+  Out << "mem_" << (It == GMemPlan.Site.end() ? 0u : It->second);
+}
+
+static MemChannelPlan
+planMemChannels(IRFunction *Task, const HCTaskInfo &Info,
+                const IRFuncSetTy &FuncsNeedingMem) {
+  MemChannelPlan Plan;
+  bool Blocked = false;
+  std::vector<const IRExpr *> ReadSites;
+
+  // Mirrors the print-time ExprCB (and handleArrow/handleArray/handleDeref/
+  // handleRef): records every node emitted as a MEM read macro and blocks the
+  // split on anything not provably read-only.
+  std::function<void(IRExpr *)> walkExpr = [&](IRExpr *E) {
+    if (!E || Blocked)
+      return;
+    if (auto *CE = dyn_cast<CallIRExpr>(E)) {
+      if (auto *FP = std::get_if<IRFunction *>(&CE->Fn))
+        if (FuncsNeedingMem.count(*FP)) {
+          Blocked = true;
+          return;
+        }
+      for (auto &Arg : CE->Args)
+        walkExpr(Arg.get());
+    } else if (auto *AE = dyn_cast<AccessIRExpr>(E)) {
+      if (AE->Arrow)
+        ReadSites.push_back(AE); // MEM_STRUCT
+    } else if (auto *DE = dyn_cast<DRefIRExpr>(E)) {
+      ReadSites.push_back(DE); // MEM_IN
+      walkExpr(DE->Expr.get());
+    } else if (auto *IE = dyn_cast<IndexIRExpr>(E)) {
+      // MEM_ARR_IN, or MEM_STRUCT_ARR_IN when the base is an arrow access to
+      // an array field — in that case handleArray prints the base as a plain
+      // ident, so its arrow node is not a separate read site.
+      bool StructArr = false;
+      if (auto *BAE = dyn_cast<AccessIRExpr>(IE->Arr.get()); BAE && BAE->Arrow)
+        if (auto *Field = getAccessFieldDecl(BAE);
+            Field && Field->getType()->isArrayType())
+          StructArr = true;
+      ReadSites.push_back(IE);
+      if (!StructArr)
+        walkExpr(IE->Arr.get());
+      walkExpr(IE->Ind.get());
+    } else if (auto *RE = dyn_cast<RefIRExpr>(E)) {
+      // handleRef prints an address computation: an Index base is decomposed
+      // into Arr/Ind with no MEM access of its own.
+      if (auto *IE2 = dyn_cast<IndexIRExpr>(RE->E.get())) {
+        walkExpr(IE2->Arr.get());
+        walkExpr(IE2->Ind.get());
+      } else {
+        walkExpr(RE->E.get());
+      }
+    } else if (auto *CastE = dyn_cast<CastIRExpr>(E)) {
+      walkExpr(CastE->E.get());
+    } else if (auto *BE = dyn_cast<BinopIRExpr>(E)) {
+      walkExpr(BE->Left.get());
+      walkExpr(BE->Right.get());
+    } else if (auto *UE = dyn_cast<UnopIRExpr>(E)) {
+      bool IncDec = UE->Op == UnopIRExpr::UNOP_PREINC ||
+                    UE->Op == UnopIRExpr::UNOP_POSTINC ||
+                    UE->Op == UnopIRExpr::UNOP_PREDEC ||
+                    UE->Op == UnopIRExpr::UNOP_POSTDEC;
+      bool MemLval = isa<DRefIRExpr>(UE->Expr.get()) ||
+                     isa<IndexIRExpr>(UE->Expr.get());
+      if (auto *OAE = dyn_cast<AccessIRExpr>(UE->Expr.get()))
+        MemLval |= OAE->Arrow;
+      if (IncDec && MemLval) {
+        Blocked = true; // read-modify-write on memory
+        return;
+      }
+      walkExpr(UE->Expr.get());
+    } else if (isa<IdentIRExpr>(E) || isa<ASTLiteralIRExpr>(E) ||
+               isa<IntLiteralIRExpr>(E) || isa<FIdentIRExpr>(E)) {
+      // no memory access
+    } else {
+      Blocked = true; // unknown expression: cannot prove read-only
+    }
+  };
+
+  // Mirrors HardCilkPrinter::visitStmt / PrintHardCilkTask emission.
+  std::function<void(IRStmt *)> walkStmt = [&](IRStmt *S) {
+    if (!S || S->Silent || Blocked)
+      return;
+    if (auto *ES = dyn_cast<ESpawnIRStmt>(S)) {
+      for (auto &Arg : ES->Args)
+        walkExpr(Arg.get());
+    } else if (isa<SpawnNextIRStmt>(S)) {
+      // handleSpawnNext copies closure fields from plain idents only.
+    } else if (auto *CDS = dyn_cast<ClosureDeclIRStmt>(S)) {
+      // handleSpawnNextDecl prints SpawnCount except on the OVERLAP path.
+      if (!Info.IsOverlap && CDS->SpawnCount)
+        walkExpr(CDS->SpawnCount.get());
+    } else if (auto *RS = dyn_cast<ReturnIRStmt>(S)) {
+      if (!Task->isVoid() && RS->RetVal)
+        walkExpr(RS->RetVal.get());
+    } else if (auto *SS = dyn_cast<StoreIRStmt>(S)) {
+      if (Info.BufferedStoreAllowMap.count(SS)) {
+        // emitBufferedStore: address/data go out the argDataOut stream; only
+        // the subexpressions are printed, never a MEM_*_OUT.
+        if (auto *IE = dyn_cast<IndexIRExpr>(SS->Dest.get())) {
+          walkExpr(IE->Arr.get());
+          walkExpr(IE->Ind.get());
+        } else if (auto *DE = dyn_cast<DRefIRExpr>(SS->Dest.get())) {
+          walkExpr(DE->Expr.get());
+        } else {
+          // emitBufferedStore only handles Index/DRef dests; anything else
+          // falls back to plain printing, where a non-ident lvalue would be
+          // an m_axi write.
+          if (!isa<IdentIRExpr>(SS->Dest.get())) {
+            Blocked = true;
+            return;
+          }
+        }
+        walkExpr(SS->Src.get());
+      } else if (isa<IdentIRExpr>(SS->Dest.get())) {
+        // Plain local assignment; only the source can read memory.
+        walkExpr(SS->Src.get());
+      } else {
+        // emitMemStore (Index/DRef dest) emits a MEM_*_OUT, and any other
+        // lvalue (e.g. an arrow access) prints as `MEM_STRUCT(...) = v` — an
+        // m_axi write on this port either way.
+        Blocked = true;
+      }
+    } else if (auto *EW = dyn_cast<ExprWrapIRStmt>(S)) {
+      walkExpr(EW->Expr.get()); // a mem ++/-- blocks inside walkExpr
+    } else if (auto *CS = dyn_cast<CopyIRStmt>(S)) {
+      walkExpr(CS->Src.get());
+    } else if (auto *IS = dyn_cast<IfIRStmt>(S)) {
+      walkExpr(IS->Cond.get());
+    } else if (auto *LS = dyn_cast<LoopIRStmt>(S)) {
+      walkStmt(LS->Init);
+      walkExpr(LS->Cond.get());
+      walkStmt(LS->Inc);
+    } else if (isa<SyncIRStmt>(S) || isa<BreakIRStmt>(S) ||
+               isa<ContinueIRStmt>(S) || isa<ScopeAnnotIRStmt>(S)) {
+      // no expressions
+    } else {
+      Blocked = true; // ASTStmtWrap or new kinds: cannot prove read-only
+    }
+  };
+
+  for (auto &B : *Task) {
+    for (auto &S : *B)
+      walkStmt(S.get());
+    if (B->Term)
+      walkStmt(B->Term);
+  }
+
+  Plan.Blocked = Blocked;
+  if (!Blocked)
+    Plan.Sites = ReadSites;
+  // A single read site gains nothing from a channel of its own.
+  if (Blocked || ReadSites.size() < 2)
+    return Plan;
+  Plan.Active = true;
+  Plan.NumChannels =
+      std::min<unsigned>((unsigned)ReadSites.size(), MaxMemChannels);
+  for (unsigned I = 0; I < ReadSites.size(); ++I)
+    Plan.Site[ReadSites[I]] = I % MaxMemChannels;
+  return Plan;
+}
+
+// ─── Deep-state dataflow emission ────────────────────────────────────────────
+//
+// Emits the stage functions for a rewritten PE. The top-level function itself is
+// still printed by PrintHardCilkTask: only its body changes, from the flat
+// pipeline to a DATAFLOW region wiring these stages together.
+//
+// The original statements are reprinted here, split across stages, with two
+// redirections active (see DFSiteValue / DFIdentRedirect):
+//   * a lifted read site prints as the local holding its FIFO value;
+//   * a variable that lives in another stage prints as the local carrying it.
+//
+// EVERY STAGE BODY IS A FINITE FUNCTION -- one read from each input stream, one
+// write to each output stream, then return. It is tempting to wrap it in
+// `for (;;)` so the process is visibly free-running like the PE it replaces;
+// doing so DEADLOCKS the region. HLS gates a downstream dataflow process on a
+// `start_for_<stage>` FIFO whose write enable is the UPSTREAM process's
+// `ap_ready` -- one start token per completed upstream invocation, not one token
+// at reset. A stage that never returns never emits one, so merge's ap_start
+// never rises and df_ctx is never read. The free-running behaviour comes from
+// HLS re-invoking the finite process, not from a loop in the source.
+//
+// `#pragma HLS PIPELINE II = 1` therefore stays as the FIRST STATEMENT OF THE
+// FUNCTION BODY, where it is a function pipeline rather than a loop pipeline.
+// Without it a stage is re-invoked only after the previous invocation retires,
+// i.e. its II equals its latency (measured: HLS_SYN_TPT 26 instead of 1, and
+// half the throughput).
+
+// Tunables, set once from the command line.
+static deepstate::Opts DFOpts;
+
+// Byte address of a read site, exactly as the MEM_* macro would compute it:
+//   MEM_ARR_IN(m,a,i,T) == MEM_IN(m, (uint64_t)(a) + (uint64_t)(i)*sizeof(T), T)
+// so the issue stage and the original code address the same byte.
+static void printDFAddr(llvm::raw_ostream &Out, IRPrintContext &IRC,
+                        const IRExpr *Site) {
+  if (auto *IE = dyn_cast<IndexIRExpr>(Site)) {
+    Out << "((uint64_t)(";
+    IRC.ExprCB(&IRC, Out, IE->Arr.get());
+    Out << ") + (uint64_t)(";
+    IRC.ExprCB(&IRC, Out, IE->Ind.get());
+    Out << ") * sizeof(" << IE->ArrType.getAsString() << "))";
+    return;
+  }
+  auto *DE = dyn_cast<DRefIRExpr>(Site);
+  assert(DE && "deep-state read site is neither MEM_ARR_IN nor MEM_IN");
+  Out << "((uint64_t)(";
+  IRC.ExprCB(&IRC, Out, DE->Expr.get());
+  Out << "))";
+}
+
+// The m_axi port serving a site. Unchanged from the flat emission, so the
+// rewrite neither adds nor removes channels: the synthesized
+// C_M_AXI_GMEM_ID_WIDTH stays put, and a wrapper built against the old width
+// still matches (a mismatch there hangs on the first read rather than failing
+// to elaborate).
+static std::string dfMemPort(unsigned Chan) {
+  return GMemPlan.Active ? ("mem_" + std::to_string(Chan)) : std::string("mem");
+}
+
+void VitisHLSTarget::setDeepStateMode(int M) {
+  DFOpts.M = static_cast<deepstate::Mode>(M);
+}
+
+static void PrintDeepStateStages(
+    llvm::raw_ostream &Out, clang::ASTContext &C, IRPrintContext &IRC,
+    HardCilkPrinter &Printer, IRFunction *Task, HCTaskInfo &Info,
+    const deepstate::Plan &DF,
+    const std::vector<std::pair<std::string, std::string>> &Intfs,
+    bool IsTerminalCont) {
+  const std::string N = Task->getName();
+  const std::string TaskTy = Intfs[0].second;
+  const std::string Depth = N + "_DF_DEPTH";
+
+  Out << "// " << N << " is emitted as a DATAFLOW region: the m_axi latency is\n"
+      << "// crossed by 64-bit addresses instead of by the whole task closure,\n"
+      << "// which waits in a BRAM FIFO (df_ctx) and rejoins at the last stage.\n"
+      << "// A flushable pipeline would have registered roughly "
+      << DF.StateBitsBefore << " bits of closure\n"
+      << "// state (estimated depth " << DF.EstDepth << ").\n";
+  Out << "#define " << Depth << " " << DFOpts.Inflight << "\n\n";
+
+  // ── issue ──────────────────────────────────────────────────────────────────
+  Out << "static void " << N << "_df_issue(\n";
+  Out << "  hls::stream<" << TaskTy << "> &taskIn";
+  for (auto &S : DF.Sites)
+    Out << ",\n  hls::stream<uint64_t> &" << S.AddrStream;
+  for (auto &X : DF.Carry)
+    Out << ",\n  hls::stream<" << X.CTy << "> &" << X.Stream;
+  Out << ",\n  hls::stream<" << TaskTy << "> &df_ctx\n) {\n";
+  Out << "#pragma HLS PIPELINE II = 1\n";
+  Out << "    " << TaskTy << " args = taskIn.read();\n";
+  for (auto &S : DF.Sites) {
+    Out << "    " << S.AddrStream << ".write(";
+    printDFAddr(Out, IRC, S.E);
+    Out << ");\n";
+  }
+  for (auto &X : DF.Carry)
+    Out << "    " << X.Stream << ".write(args." << GetSym(X.Var->Name) << ");\n";
+  Out << "    df_ctx.write(args);\n";
+  Out << "}\n\n";
+
+  // ── one load per read site ─────────────────────────────────────────────────
+  // Carries nothing but the address, so its depth costs ~64 bits a stage
+  // whatever the closure width is. This is where the memory latency lives.
+  for (unsigned K = 0; K < DF.Sites.size(); ++K) {
+    const auto &S = DF.Sites[K];
+    const std::string Port = dfMemPort(S.Chan);
+    Out << "static void " << N << "_df_load" << K << "(\n";
+    Out << "  void *" << Port << ",\n";
+    Out << "  hls::stream<uint64_t> &" << S.AddrStream << ",\n";
+    Out << "  hls::stream<" << S.ElemTy << "> &" << S.DataStream << "\n) {\n";
+    Out << "#pragma HLS PIPELINE II = 1\n";
+    Out << "    uint64_t _addr = " << S.AddrStream << ".read();\n";
+    Out << "    " << S.DataStream << ".write(MEM_IN(" << Port << ", _addr, "
+        << S.ElemTy << "));\n";
+    Out << "}\n\n";
+  }
+
+  // ── compute ────────────────────────────────────────────────────────────────
+  // Only the narrow values reach here, so the arithmetic latency costs a few
+  // hundred bits rather than a few tens of thousands.
+  if (DF.hasCompute()) {
+    Out << "static void " << N << "_df_compute(\n";
+    bool First = true;
+    auto Sep = [&]() {
+      if (!First)
+        Out << ",\n";
+      First = false;
+    };
+    for (auto &X : DF.Carry) {
+      Sep();
+      Out << "  hls::stream<" << X.CTy << "> &" << X.Stream;
+    }
+    for (auto &S : DF.Sites)
+      if (S.InCompute) {
+        Sep();
+        Out << "  hls::stream<" << S.ElemTy << "> &" << S.DataStream;
+      }
+    for (auto &X : DF.Result) {
+      Sep();
+      Out << "  hls::stream<" << X.CTy << "> &" << X.Stream;
+    }
+    Out << "\n) {\n";
+    Out << "#pragma HLS PIPELINE II = 1\n";
+    for (auto &X : DF.Carry)
+      Out << "    " << X.CTy << " " << X.Local << " = " << X.Stream
+          << ".read();\n";
+    for (auto &S : DF.Sites)
+      if (S.InCompute)
+        Out << "    " << S.ElemTy << " " << S.ValueVar << " = " << S.DataStream
+            << ".read();\n";
+
+    // Print each definition by hand rather than through the printer: the
+    // destination and the incoming value of a mutated ARG field are the same
+    // IRVarRef (`args.contributions = args.contributions + ...`), so the two
+    // sides need different names and a single redirection map cannot give
+    // them that. Emitting the left-hand side here and only redirecting while
+    // the right-hand side prints keeps them apart, and adding the redirection
+    // afterwards makes a later statement see the new value.
+    DFSiteValue.clear();
+    DFIdentRedirect.clear();
+    for (auto &S : DF.Sites)
+      if (S.InCompute)
+        DFSiteValue[S.E] = S.ValueVar;
+    for (auto &X : DF.Carry)
+      DFIdentRedirect[X.Var] = X.Local;
+    for (auto &[V, Val] : DF.TrivialLoadVar)
+      DFIdentRedirect[V] = Val;
+    for (auto &Step : DF.Compute) {
+      Out << "    " << Step.CTy << " " << Step.Local << " = ";
+      IRC.ExprCB(&IRC, Out, deepstate::srcExpr(Step.S));
+      Out << ";\n";
+      DFIdentRedirect[Step.Def] = Step.Local;
+    }
+    for (auto &X : DF.Result)
+      Out << "    " << X.Stream << ".write(" << X.Local << ");\n";
+    DFSiteValue.clear();
+    DFIdentRedirect.clear();
+    Out << "}\n\n";
+  }
+
+  // ── merge ──────────────────────────────────────────────────────────────────
+  // Reads the closure back out of BRAM and emits the outgoing task(s). Nothing
+  // deep happens here, so the wide struct crosses only a stage or two.
+  Out << "static void " << N << "_df_merge(\n";
+  Out << "  hls::stream<" << TaskTy << "> &df_ctx";
+  for (auto &S : DF.Sites)
+    if (!S.InCompute)
+      Out << ",\n  hls::stream<" << S.ElemTy << "> &" << S.DataStream;
+  for (auto &X : DF.Result)
+    Out << ",\n  hls::stream<" << X.CTy << "> &" << X.Stream;
+  for (unsigned I = 1; I < Intfs.size(); ++I)
+    Out << ",\n  hls::stream<" << Intfs[I].second << "> &" << Intfs[I].first;
+  Out << "\n) {\n";
+  Out << "#pragma HLS PIPELINE II = 1\n";
+  Out << "    " << TaskTy << " args = df_ctx.read();\n";
+  for (auto &S : DF.Sites)
+    if (!S.InCompute)
+      Out << "    " << S.ElemTy << " " << S.ValueVar << " = " << S.DataStream
+          << ".read();\n";
+  for (auto &X : DF.Result)
+    Out << "    " << X.CTy << " " << X.Local << " = " << X.Stream
+        << ".read();\n";
+
+  DFSiteValue.clear();
+  DFIdentRedirect.clear();
+  for (auto &S : DF.Sites)
+    if (!S.InCompute)
+      DFSiteValue[S.E] = S.ValueVar;
+  for (auto &[V, Val] : DF.TrivialLoadVar)
+    DFIdentRedirect[V] = Val;
+  for (auto &X : DF.Result)
+    DFIdentRedirect[X.Var] = X.Local;
+
+  // Locals the merge statements still need in their own right. A local that has
+  // been redirected is already declared above as the stage's own value.
+  //
+  // Zero-initialised, unlike the flat emission's equivalent declarations. The
+  // split can leave a local that the original straight-line body assigned in a
+  // part of the task that now lives upstream, so merge reads it before writing
+  // it (pageRank's `v` and `prNextValue`: the closure fields built from them
+  // are dead — the OVERLAP wrapper overwrites `v` from the memory reply and
+  // nothing consumes `prNextValue` — so the result is bit-exact either way).
+  // Dead or not, reading an uninitialised local is undefined behaviour in C
+  // simulation and puts X's into RTL simulation, which then propagate through
+  // any waveform-based debugging of the PE. Initialising costs nothing: the
+  // value is overwritten or unused.
+  for (auto &Local : Task->Vars) {
+    if (Local.DeclLoc != IRVarDecl::LOCAL)
+      continue;
+    if (DFIdentRedirect.count(&Local))
+      continue;
+    Out << "    ";
+    auto *HCT = clangTypeToHardCilk(Local.Type);
+    printHardCilkDecl(Out, HCT, GetSym(Local.Name));
+    // `= 0` for the scalars this covers in practice; `= {}` for a record or an
+    // array, where `= 0` would not compile.
+    Out << (hctGetIf<HardCilkBaseType>(HCT) ? " = 0" : " = {}");
+    delete HCT;
+    Out << ";\n";
+  }
+  if (Info.SendArgList.size() > 1)
+    Out << "    uint8_t _cont_tag = CONT_TAG(args._cont);\n";
+  Out << "\n";
+
+  Printer.prepareForTask(Task);
+  Printer.emitStmtSubset(Task, DF.MergeStmts);
+  if ((Info.SendArgList.size() > 0 && Task->isVoid() &&
+       Task->Info.SpawnNextList.empty() && Task->Info.SpawnList.empty()) ||
+      IsTerminalCont) {
+    if (Info.EmitFinalArgOutFlush)
+      Printer.emitFinalArgOutFlush(Task);
+    Printer.emitCompletionArgOut(Task);
+  }
+  DFSiteValue.clear();
+  DFIdentRedirect.clear();
+  Out << "}\n\n";
+  (void)C;
+}
+
+// Extra m_axi directives for a deep-state PE. `latency` is only a scheduling
+// hint, but the right value depends on which shape the PE ended up in, and the
+// two shapes want OPPOSITE values -- hence the two Opts fields:
+//
+//   * flushable pipeline (Mode::Latency, or a Dataflow PE that failed a
+//     precondition): the declared latency IS the pipeline depth, and every
+//     stage of it registers the whole closure, so small is the point.
+//   * DATAFLOW region: the load process registers only a 64-bit address, so
+//     depth is nearly free there, and that depth is exactly what lets the
+//     schedule absorb a reply that arrives later than declared. Declaring 16
+//     against real memory latencies of 24/61 made throughput track memory
+//     latency; 64 makes it latency-independent and ~10x higher. See
+//     Opts::DFMAxiLatency.
+//
+// Deliberately NOT max_read_burst_length = 1. Every access here is a single
+// scalar, so the burst length only sizes burst-splitting logic that never
+// engages -- but 1 makes NUM_BEAT_WIDTH = clog2(1) = 0 in the generated m_axi
+// adapter, which then contains `{NUM_BEAT_WIDTH{1'b1}}`. Vivado accepts that
+// zero-replication; Verilator rejects it (%Error-ZEROREPL), which takes the
+// SystemC regression harness out of service for no gain.
+static void printDFMAxiTuning(llvm::raw_ostream &Out,
+                              const deepstate::Plan &DF) {
+  if (!DF.ApplyLatency)
+    return;
+  Out << " latency = "
+      << (DF.Apply ? DFOpts.DFMAxiLatency : DFOpts.MAxiLatency);
+  // The extra outstanding credits only pay for themselves when the loads run as
+  // their own dataflow processes; the flushable pipeline has one read in flight
+  // per stage regardless, so leave its credits at the config_interface default.
+  if (DF.Apply)
+    Out << " num_read_outstanding = " << DFOpts.Inflight;
+}
+
+// The rewritten top-level body: declare the channels and start the stages.
+// Channels must be hls::stream, not arrays -- with ap_ctrl_none HLS cannot
+// ping-pong a dataflow channel, so a plain array is either rejected or silently
+// serialised. Only df_ctx is forced into BRAM; the rest are narrow enough that
+// the default (SRL/LUTRAM) is cheaper.
+static void PrintDeepStateBody(
+    llvm::raw_ostream &Out, IRFunction *Task, HCTaskInfo &Info,
+    const deepstate::Plan &DF,
+    const std::vector<std::pair<std::string, std::string>> &Intfs) {
+  const std::string N = Task->getName();
+  const std::string TaskTy = Intfs[0].second;
+  const std::string Depth = N + "_DF_DEPTH";
+
+  Out << "#pragma HLS DATAFLOW\n\n";
+
+  std::vector<std::pair<std::string, std::string>> Chans; // name, type
+  for (auto &S : DF.Sites) {
+    Chans.push_back({S.AddrStream, "uint64_t"});
+    Chans.push_back({S.DataStream, S.ElemTy});
+  }
+  for (auto &X : DF.Carry)
+    Chans.push_back({X.Stream, X.CTy});
+  for (auto &X : DF.Result)
+    Chans.push_back({X.Stream, X.CTy});
+  Chans.push_back({"df_ctx", TaskTy});
+
+  for (auto &[Name, Ty] : Chans)
+    Out << "  static hls::stream<" << Ty << "> " << Name << "(\"" << Name
+        << "\");\n";
+  for (auto &[Name, Ty] : Chans) {
+    (void)Ty;
+    Out << "#pragma HLS STREAM variable = " << Name << " depth = " << Depth
+        << "\n";
+  }
+  // The whole point of the rewrite: the wide closure waits in block RAM.
+  Out << "#pragma HLS BIND_STORAGE variable = df_ctx type = fifo impl = bram\n";
+  Out << "\n";
+
+  Out << "  " << N << "_df_issue(taskIn";
+  for (auto &S : DF.Sites)
+    Out << ", " << S.AddrStream;
+  for (auto &X : DF.Carry)
+    Out << ", " << X.Stream;
+  Out << ", df_ctx);\n";
+
+  for (unsigned K = 0; K < DF.Sites.size(); ++K)
+    Out << "  " << N << "_df_load" << K << "(" << dfMemPort(DF.Sites[K].Chan)
+        << ", " << DF.Sites[K].AddrStream << ", " << DF.Sites[K].DataStream
+        << ");\n";
+
+  if (DF.hasCompute()) {
+    Out << "  " << N << "_df_compute(";
+    bool First = true;
+    auto Sep = [&]() {
+      if (!First)
+        Out << ", ";
+      First = false;
+    };
+    for (auto &X : DF.Carry) {
+      Sep();
+      Out << X.Stream;
+    }
+    for (auto &S : DF.Sites)
+      if (S.InCompute) {
+        Sep();
+        Out << S.DataStream;
+      }
+    for (auto &X : DF.Result) {
+      Sep();
+      Out << X.Stream;
+    }
+    Out << ");\n";
+  }
+
+  Out << "  " << N << "_df_merge(df_ctx";
+  for (auto &S : DF.Sites)
+    if (!S.InCompute)
+      Out << ", " << S.DataStream;
+  for (auto &X : DF.Result)
+    Out << ", " << X.Stream;
+  for (unsigned I = 1; I < Intfs.size(); ++I)
+    Out << ", " << Intfs[I].first;
+  Out << ");\n";
+
+  Out << "}\n\n";
+  (void)Info;
+}
+
 static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
                               HardCilkPrinter &Printer, IRFunction *Task,
                               HCTaskInfo &Info,
-                              const std::set<IRFunction *> &FuncsNeedingMem) {
-  // A terminal continuation has no send destinations and no spawn_next; it
-  // signals program completion by forwarding args._cont to the host.
+                              const IRFuncSetTy &FuncsNeedingMem,
+                              const OverlapGroup *Grp,
+                              const IRFuncSetTy &CacheableReaders,
+                              std::map<std::string, unsigned> &DFDepths) {
+  // A terminal continuation has no send destinations, no spawn_next, and no
+  // tail-spawn; it signals program completion by forwarding args._cont to the
+  // host. A continuation that tail-spawns another task (e.g. an OVERLAP loop's
+  // continuation spawning the reentry again) forwards _cont through that task
+  // struct instead, so it is not terminal and must not get an argOut port.
   bool IsTerminalCont = Info.IsCont && Info.SendArgList.empty() &&
-                        Task->Info.SpawnNextList.empty();
+                        Task->Info.SpawnNextList.empty() &&
+                        Task->Info.SpawnList.empty();
 
   std::vector<std::pair<std::string, std::string>> intfs;
-  Out << "void " << Task->getName() << " (\n";
+  // The signature is buffered rather than printed here: the deep-state dataflow
+  // rewrite has to emit its stage functions ahead of the top-level function, and
+  // it cannot decide whether to until the interface list and the memory plan are
+  // known.
+  std::string MemParams;
   intfs.push_back(std::make_pair("taskIn", Task->getName() + "_task"));
   bool HasMem = taskNeedsMem(Task, FuncsNeedingMem);
-  if (HasMem)
-    Out << "  void *mem,\n";
+  GMemPlan = HasMem ? planMemChannels(Task, Info, FuncsNeedingMem)
+                    : MemChannelPlan{};
+  if (HasMem) {
+    llvm::raw_string_ostream MP(MemParams);
+    if (GMemPlan.Active)
+      for (unsigned I = 0; I < GMemPlan.NumChannels; ++I)
+        MP << "  void *mem_" << I << ",\n";
+    else
+      MP << "  void *mem,\n";
+  }
   // Build spawn-target → spawn_next-function map by scanning ESpawnIRStmts.
-  std::map<IRFunction *, IRFunction *> SpawnSNMap;
+  IRFuncMapTy<IRFunction *> SpawnSNMap;
   for (auto &B : *Task)
     for (auto &S : *B)
       if (auto *ES = dyn_cast<ESpawnIRStmt>(S.get()))
@@ -1000,11 +1662,79 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
       PANIC("UNSUPPORTED: more than one spawn next in a function");
     }
     auto &SNDest = *Task->Info.SpawnNextList.begin();
-    intfs.push_back(std::make_pair("closureIn", "uint64_t"));
-    intfs.push_back(
-        std::make_pair("spawnNext_" + SNDest->getName(), SNDest->getName() + "_spawn_next"));
+    if (Grp && Grp->Internal.count(SNDest)) {
+      // OVERLAP reentry: push continuation state onto a single in-order FIFO
+      // that the generated SystemVerilog wrapper drains — no closure allocator
+      // (closureIn) and no spawn_next packet port.
+      intfs.push_back(std::make_pair("contStateOut_" + SNDest->getName(),
+                                     SNDest->getName() + "_task"));
+    } else {
+      intfs.push_back(std::make_pair("closureIn", "uint64_t"));
+      intfs.push_back(std::make_pair("spawnNext_" + SNDest->getName(),
+                                     SNDest->getName() + "_spawn_next"));
+    }
   }
 
+  // Vitis HLS aborts building the synthesis data model when a port name is too
+  // long: `SsdmCdfg.cpp: INTERNAL_ERROR: Port name change`, preceded by a
+  // rename message whose "from" and "to" names are identical. It costs a full
+  // csynth run to discover, and the name is assembled from task names the user
+  // chose, so warn here instead. Measured on triangleDAE: 68 characters
+  // synthesises, 80 does not — the true limit is somewhere between, so flag
+  // anything past the longest length known to work.
+  static constexpr size_t MaxKnownGoodPortName = 68;
+  for (auto &[intfName, intfTy] : intfs)
+    if (intfName.size() > MaxKnownGoodPortName)
+      llvm::errs() << "warning: port '" << intfName << "' on task '"
+                   << Task->getName() << "' is " << intfName.size()
+                   << " characters; Vitis HLS has been observed to fail with "
+                      "INTERNAL_ERROR (Port name change) on names this long. "
+                      "Shorten the task or continuation names.\n";
+
+  // Deep-state dataflow: decide before anything is printed, so the stage
+  // functions can go out ahead of the top-level one.
+  deepstate::Plan DF;
+  // Note that a PE that WRITES m_axi is passed through too. It has no read-site
+  // list (planMemChannels stops collecting at the store) so it can never be
+  // rewritten into a DATAFLOW region -- plan() re-checks that -- but it does have
+  // an m_axi port whose declared `latency` sets its pipeline depth, and hence how
+  // many copies of the closure the flushable pipeline registers. Gating the
+  // latency hint behind read-only left randomWalk_overlap's three storing applyFn
+  // PEs at the 64-cycle default and 169k register bits.
+  if (HasMem) {
+    unsigned InBits = 8u * (unsigned)(Info.TaskSize + Info.TaskPadding);
+    unsigned OutBits = InBits;
+    DF = deepstate::plan(Task, GMemPlan.Sites, GMemPlan.Site, InBits, OutBits,
+                         DFOpts, /*ReadOnly=*/!GMemPlan.Blocked);
+  } else {
+    DF.SkipReason = "no m_axi port";
+  }
+  llvm::errs() << "bombyx: deep-state: " << Task->getName() << ": ";
+  if (DF.Apply)
+    llvm::errs() << "DATAFLOW rewrite (" << DF.Sites.size() << " load site(s), "
+                 << DF.Compute.size() << " compute step(s), ~"
+                 << DF.StateBitsBefore << " bits of pipeline state avoided)";
+  else if (DF.ApplyLatency)
+    llvm::errs() << "m_axi latency = " << DFOpts.MAxiLatency
+                 << " (flushable pipeline kept; ~" << DF.StateBitsBefore
+                 << " bits of state at the default latency, cut to ~"
+                 << (DF.StateBitsBefore / 72 * (DFOpts.MAxiLatency + 8)) << ")";
+  else
+    llvm::errs() << "unchanged (" << DF.SkipReason << ")";
+  llvm::errs() << "\n";
+
+  if (DF.Apply) {
+    PrintDeepStateStages(Out, C, Printer.getPrintContext(), Printer, Task, Info,
+                         DF, intfs, IsTerminalCont);
+    // The one part of the rewrite that cannot be expressed in the source: the
+    // start-FIFO depth is a solution-level directive, so it has to reach the
+    // per-PE TCL. Same value as <PE>_DF_DEPTH -- the start tokens must not let
+    // `issue` run further ahead than the ctx FIFO can hold.
+    DFDepths[Task->getName()] = DFOpts.Inflight;
+  }
+
+  Out << "void " << Task->getName() << " (\n";
+  Out << MemParams;
   bool first = true;
   for (auto &[intfName, intfTy] : intfs) {
     if (!first)
@@ -1016,12 +1746,53 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
 
   for (auto &[intfName, _] : intfs)
     Out << "#pragma HLS INTERFACE mode = axis port = " << intfName << "\n";
-  if (HasMem)
-    Out << "#pragma HLS INTERFACE mode = m_axi port = mem\n";
+  if (HasMem && GMemPlan.Active) {
+    // Read-only PE: one port per read site, all on the default `gmem` bundle,
+    // each with its own AXI ID (`channel`) so the scheduler can overlap their
+    // transactions (see planMemChannels).
+    for (unsigned I = 0; I < GMemPlan.NumChannels; ++I) {
+      Out << "#pragma HLS INTERFACE mode = m_axi port = mem_" << I
+          << " bundle = gmem channel = " << I;
+      printDFMAxiTuning(Out, DF);
+      Out << "\n";
+    }
+  } else if (HasMem) {
+    Out << "#pragma HLS INTERFACE mode = m_axi port = mem";
+    printDFMAxiTuning(Out, DF);
+    // Intentionally no max_widen_bitwidth. Forcing a wide (256-bit) bus on an
+    // OVERLAP sub-PE made Vitis HLS emit read-data realignment logic keyed on
+    // wide-bus address bits while leaving the actual m_axi port at its narrow
+    // natural width — which returned 0 for unaligned sub-word reads (e.g. a[i]
+    // with i>0). Let Vitis infer the natural width; the OVERLAP wrapper's per-PE
+    // m_axi data width is reconciled to the synthesized width post-synthesis in
+    // build_hls.sh (see PrintVitisHLSArtifacts), so wrapper masters still agree
+    // with the collapsed PEs and the HardCilk-parsed port widths.
+    (void)Grp;
+    Out << "\n";
+    // Spatial-reuse cache. This PE reads one address per invocation, and the
+    // round that drives it issues addresses inside a single AXI beat back to
+    // back (`pGraph[2*v]` then `pGraph[2*v+1]`). A small cache on the port
+    // turns the second read into a hit, so the pair costs one memory round
+    // trip instead of two — the same saving as merging them into one wide
+    // read, with no change to the reply type or the wrapper.
+    //
+    // Emitted only when the pointer is provably never written anywhere on the
+    // FPGA (computeCacheableReaders). A cache over memory some other PE writes
+    // would serve stale data — a cross-PE RAW hazard the pragma cannot see.
+    // `lines=2` is the whole point (hold the beat across the pair); `depth=32`
+    // covers the reads in flight down the reader's in-order channel.
+    if (CacheableReaders.count(Task))
+      Out << "#pragma HLS cache port = mem lines = 2 depth = 32\n";
+  }
   // Every PE runs as a free-running, pipelined kernel: no block-level control
   // protocol and a flushable pipeline so it keeps draining its input streams.
   // This applies to m_axi PEs too — they still need ap_ctrl_none.
   Out << "#pragma HLS INTERFACE ap_ctrl_none port = return\n";
+  if (DF.Apply) {
+    PrintDeepStateBody(Out, Task, Info, DF, intfs);
+    GMemPlan = MemChannelPlan{};
+    return;
+  }
   Out << "#pragma HLS PIPELINE II = 1 style = flp\n";
   Out << "\n";
 
@@ -1053,6 +1824,7 @@ static void PrintHardCilkTask(llvm::raw_ostream &Out, clang::ASTContext &C,
     Printer.emitCompletionArgOut(Task);
   }
   Out << "}\n\n";
+  GMemPlan = MemChannelPlan{}; // deactivate: only this task's body is split
 }
 
 // ─── Memory Access Emitters ──────────────────────────────────────────────────
@@ -1092,22 +1864,30 @@ static std::string getAccessStructName(AccessIRExpr *AE) {
 }
 
 void handleArrow(AccessIRExpr *AE, IRPrintContext *C, llvm::raw_ostream &Out) {
+  if (printDFSiteValue(Out, AE))
+    return;
   IRVarRef SR = AE->getStructVarRef();
   assert(SR && "handleArrow: non-ident base not yet supported");
   std::string StructName = getAccessStructName(AE);
-  Out << "MEM_STRUCT(mem, ";
+  Out << "MEM_STRUCT(";
+  printMemReadPort(Out, AE);
+  Out << ", ";
   C->IdentCB(Out, SR);
   Out << ", " << StructName << ", " << AE->Field << ")";
 }
 
 void handleArray(IndexIRExpr *IE, IRPrintContext *C, llvm::raw_ostream &Out) {
+  if (printDFSiteValue(Out, IE))
+    return;
   if (auto *AE = dyn_cast<AccessIRExpr>(IE->Arr.get())) {
     if (AE->Arrow) {
       if (auto *Field = getAccessFieldDecl(AE);
           Field && Field->getType()->isArrayType()) {
         IRVarRef SR = AE->getStructVarRef();
         assert(SR && "handleArray: non-ident struct base not yet supported");
-        Out << "MEM_STRUCT_ARR_IN(mem, ";
+        Out << "MEM_STRUCT_ARR_IN(";
+        printMemReadPort(Out, IE);
+        Out << ", ";
         C->IdentCB(Out, SR);
         Out << ", " << getAccessStructName(AE) << ", " << AE->Field << ", ";
         C->ExprCB(C, Out, IE->Ind.get());
@@ -1116,7 +1896,9 @@ void handleArray(IndexIRExpr *IE, IRPrintContext *C, llvm::raw_ostream &Out) {
       }
     }
   }
-  Out << "MEM_ARR_IN(mem, ";
+  Out << "MEM_ARR_IN(";
+  printMemReadPort(Out, IE);
+  Out << ", ";
   C->ExprCB(C, Out, IE->Arr.get());
   Out << ", ";
   C->ExprCB(C, Out, IE->Ind.get());
@@ -1124,7 +1906,11 @@ void handleArray(IndexIRExpr *IE, IRPrintContext *C, llvm::raw_ostream &Out) {
 }
 
 void handleDeref(DRefIRExpr *DE, IRPrintContext *C, llvm::raw_ostream &Out) {
-  Out << "MEM_IN(mem, ";
+  if (printDFSiteValue(Out, DE))
+    return;
+  Out << "MEM_IN(";
+  printMemReadPort(Out, DE);
+  Out << ", ";
   C->ExprCB(C, Out, DE->Expr.get());
   Out << ", " << DE->PointeeType.getAsString() << ")";
 }
@@ -1198,19 +1984,25 @@ void handleRef(RefIRExpr *RE, IRPrintContext *C, llvm::raw_ostream &Out) {
 
 void VitisHLSTarget::PrintHardCilk(llvm::raw_ostream &Out,
                                    clang::ASTContext &C) {
+  DataflowStartFifoDepth.clear();
   Out << "#include \"hls_stream.h\"\n";
   Out << "#include \"" << AppName << "_defs.h\"\n";
   for (auto &Inc : ExtraIncludes)
     Out << Inc << "\n";
   Out << "\n";
 
-  const std::set<IRFunction *> FuncsNeedingMem = computeFuncsNeedingMem(P);
+  const IRFuncSetTy FuncsNeedingMem = computeFuncsNeedingMem(P);
 
   IRPrintContext IRC = IRPrintContext{
       .ASTCtx = C,
       .NewlineSymbol = "\n",
       .IdentCB =
           [&](llvm::raw_ostream &Out, IRVarRef VR) {
+            if (auto It = DFIdentRedirect.find(VR);
+                It != DFIdentRedirect.end()) {
+              Out << It->second;
+              return;
+            }
             switch (VR->DeclLoc) {
             case IRVarDecl::ARG:
               Out << "args." << GetSym(VR->Name);
@@ -1274,12 +2066,32 @@ void VitisHLSTarget::PrintHardCilk(llvm::raw_ostream &Out,
     PrintInlinableFunction(Out, C, F, FuncsNeedingMem);
   }
 
+  // Identify the collapsed OVERLAP subsystem: its member AXI PEs are all pinned
+  // to one shared bus width so the wrapper can wire their masters together.
+  const std::vector<OverlapGroup> OverlapGroups =
+      computeOverlapGroups(TaskInfos);
+
+  // Readers that may carry an `#pragma HLS cache` on their m_axi port: spatial
+  // reuse proven, and the pointer provably never written on the FPGA.
+  const IRFuncSetTy CacheableReaders =
+      computeCacheableReaders(P, TaskInfos);
+
   HardCilkPrinter Printer(Out, IRC, TaskInfos);
+  // A task streams its continuation state only when that continuation is
+  // collapsed into the same wrapper. The task that hands the loop body off to a
+  // real spawned callee keeps the scheduler's closure/allocator mechanics even
+  // though it is itself inside the wrapper.
+  for (const OverlapGroup &G : OverlapGroups)
+    for (IRFunction *T : G.Internal)
+      if (!T->Info.SpawnNextList.empty() &&
+          G.Internal.count(*T->Info.SpawnNextList.begin()))
+        Printer.StreamingContTasks.insert(T);
   for (auto &[T, Info] : TaskInfos) {
     if (Info.IsSynthetic)
       continue;
     PrintHardCilkTask(Out, C, Printer, T, const_cast<HCTaskInfo &>(Info),
-                      FuncsNeedingMem);
+                      FuncsNeedingMem, findOverlapGroup(OverlapGroups, T),
+                      CacheableReaders, DataflowStartFifoDepth);
   }
 }
 
@@ -1383,6 +2195,22 @@ void VitisHLSTarget::PrintDefs(llvm::raw_ostream &Out) {
     if (Info.IsSynthetic)
       continue;
     PrintDef(Out, T, const_cast<HCTaskInfo &>(Info));
+  }
+
+  // OVERLAP meta-task type hint: a `#pragma BOMBYX OVERLAP` loop is scheduled as
+  // a single meta task <AppName>_overlap_wrapper, entered with the loop-entry
+  // (root) task's closure. Publish that closure type under the wrapper's name so
+  // host / framework code can size and enqueue the meta task without knowing the
+  // subsystem's internal PEs.
+  for (auto &[T, Info] : TaskInfos) {
+    if (Info.IsOverlap && Info.IsRoot) {
+      Out << "// Meta-task closure for the '" << AppName
+          << "_overlap_wrapper' OVERLAP subsystem: it is the loop-entry task's\n"
+          << "// closure type (the first task inside the wrapper).\n";
+      Out << "using " << AppName << "_overlap_wrapper_task = " << T->getName()
+          << "_task;\n\n";
+      break;
+    }
   }
 }
 

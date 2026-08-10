@@ -46,6 +46,13 @@ struct ConvertOpts {
   // default: TC_CILK1EMU
   enum { TG_CILK1EMU, TG_HARDCILK, TG_TBB } Target = TG_CILK1EMU;
   bool HCGenDriver = false;
+  // --deep-state=none|latency|dataflow (deepstate::Mode). Threshold-gated, so a
+  // PE below the threshold is byte-identical whatever this is set to.
+  //   none     - emit every PE exactly as before
+  //   latency  - shorten the flushable pipeline via the m_axi latency (default)
+  //   dataflow - split the PE into dataflow stages (known to deadlock in RTL
+  //              simulation on Vitis 2024.1; opt in only to investigate it)
+  int DeepStateMode = 1;
   std::string OutputDir; // -d flag: override base output directory
   std::string AppName;   // stem of input file
 };
@@ -180,6 +187,7 @@ public:
             std::filesystem::create_directories(OutPath);
             std::string AppName = GOpts.AppName;
             // printFullIRProgram(llvm::errs(), P, Context);
+            VitisHLSTarget::setDeepStateMode(GOpts.DeepStateMode);
             VitisHLSTarget HT(P, AppName, *HCAnalysis,
                               std::move(DriverCallers));
 
@@ -344,9 +352,14 @@ public:
             }
 
             // Generate per-PE Vitis HLS TCL scripts and master build_hls.sh.
+            // After PrintHardCilk: the deep-state pass decides there which PEs
+            // become DATAFLOW regions, and each of those needs a
+            // `config_dataflow -start_fifo_depth` in its .tcl (no source pragma
+            // exists for it).
             PrintVitisHLSArtifacts(AppName, HCAnalysis->TaskInfos,
                                    "ALVEO_U55C", 300,
-                                   OutFilename.str());
+                                   OutFilename.str(),
+                                   HT.getDataflowStartFifoDepths());
             break;
           }
           }
@@ -552,6 +565,7 @@ int main(int argc, char *argv[]) {
       {"fdump-dot", required_argument, 0, 0},
       {"fgen-driver", no_argument, 0, 0},
       {"target", required_argument, 0, 0},
+      {"deep-state", required_argument, 0, 0},
   };
   int option_index = -1;
   while ((c = getopt_long(argc, argv, "vVt:d:", long_options, &option_index)) !=
@@ -581,6 +595,21 @@ int main(int argc, char *argv[]) {
         set_target(optarg);
         break;
       }
+      case 3: {
+        std::string M = optarg;
+        if (M == "none")
+          GOpts.DeepStateMode = 0;
+        else if (M == "latency")
+          GOpts.DeepStateMode = 1;
+        else if (M == "dataflow")
+          GOpts.DeepStateMode = 2;
+        else {
+          std::cerr << "--deep-state: expected none|latency|dataflow, got '" << M
+                    << "'" << std::endl;
+          exit(EXIT_FAILURE);
+        }
+        break;
+      }
       }
       break;
     case 't':
@@ -606,6 +635,10 @@ int main(int argc, char *argv[]) {
           "       --fdump-dot=<PASSES>\t Indices of passes to dump GraphViz "
           "output after, comma separated\n"
           "       --fgen-driver       \t (HardCilk only) generate driver code\n"
+          "       --deep-state=<MODE> \t (HardCilk only) what to do about PEs "
+          "whose flushable pipeline\n"
+          "                           \t registers a large closure: none | "
+          "latency (default) | dataflow\n"
           "   -t, --target=<TARGET>\t Output backend. Use TARGET=help to print "
           "available\n",
           argv[0]);

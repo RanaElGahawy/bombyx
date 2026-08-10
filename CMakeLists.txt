@@ -90,6 +90,7 @@ set(SOURCE_FILES
     # Vitis HLS backend: code generation and TCL synthesis scripts
     src/vitis/VitisHLSTarget.cpp
     src/vitis/VitisHLSTclGen.cpp
+    src/vitis/DeepStateDataflow.cpp
 )
 
 # Add executable
