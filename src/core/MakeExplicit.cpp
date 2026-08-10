@@ -121,59 +121,120 @@ private:
     }
   }
 
-  void analyzeStmt(IRStmt *S, std::set<IRVarRef> &free,
-                   std::set<IRVarRef> &refd) {
-    std::set<IRVarRef> V;
+  // Reads (upward-exposed uses) and the single variable defined by one
+  // statement. `Def` is the killed variable, or null if the statement defines
+  // nothing scalar.
+  void analyzeStmt(IRStmt *S, std::set<IRVarRef> &reads, IRVarRef &def) {
+    def = nullptr;
     ExprIdentifierVisitor _(S, [&](auto &VR, bool lhs) {
       if (!lhs) {
-        V.insert(VR);
+        reads.insert(VR);
       }
     });
-    for (auto *D : V) {
-      if (refd.find(D) == refd.end()) {
-        free.insert(D);
-        refd.insert(D);
-      }
-    }
-
-    if (auto *CS = dyn_cast<CopyIRStmt>(S)) {
-      if (refd.find(CS->Dest) == refd.end()) {
-        refd.insert(CS->Dest);
-        free.erase(CS->Dest);
-      }
-    }
+    if (auto *CS = dyn_cast<CopyIRStmt>(S))
+      def = CS->Dest;
   }
 
+  // Which variables a continuation must receive from its predecessor: those
+  // live on entry to its path, i.e. read along SOME path through it before
+  // being redefined.
+  //
+  // This has to be a real backward dataflow analysis over the path's CFG, not a
+  // linear scan of its blocks. A continuation whose body contains an `if` —
+  // randomWalk's `if (degree == 0) ... else ...` — has two blocks that are
+  // siblings, not predecessor and successor. Scanning them in sequence lets a
+  // definition on one arm kill the variable for the other:
+  //
+  //     else arm:  current = nbrs[k];        // scanned first -> "defined"
+  //     then arm:  my_walk[step] = current;  // read, but seen as already killed
+  //
+  // so `current` and `done` were dropped from the closure, the `then` arm read
+  // uninitialised storage, and the loop's early-stop flag never propagated —
+  // every walk ran exactly one step on garbage. Straight-line loop bodies
+  // (pageRank, triangleCount) never expose the difference, which is why this
+  // survived.
   void analyzePath(ContFun &CF, SetVector<IRBasicBlock *> &path,
                    std::set<IRVarRef> *inFrees) {
     std::set<IRVarRef> &free = CF.Args;
     std::set<IRVarRef> &refd = CF.Locals;
 
-    if (inFrees) {
-      for (auto &v : *inFrees) {
-        free.insert(v);
+    // Everything the successor continuation needs is live out of this path's
+    // sync: this path builds that closure, so it must carry those values too.
+    std::set<IRVarRef> LiveOutOfPath;
+    if (inFrees)
+      LiveOutOfPath = *inFrees;
+
+    std::unordered_map<IRBasicBlock *, std::set<IRVarRef>> Gen, Kill, In;
+
+    auto stmtsOf = [&](IRBasicBlock *bb, auto &&fn) {
+      for (auto &S : *bb)
+        fn(S.get());
+      if (bb->Term) {
+        // A null-valued ReturnIRStmt has no expression to visit;
+        // ExprIdentifierVisitor would dereference it.
+        auto *RS = dyn_cast<ReturnIRStmt>(bb->Term);
+        if (!RS || RS->RetVal)
+          fn(bb->Term);
+      }
+    };
+
+    for (auto *bb : path) {
+      auto &gen = Gen[bb];
+      auto &kill = Kill[bb];
+      std::set<IRVarRef> defined; // killed so far, scanning this block forward
+      stmtsOf(bb, [&](IRStmt *S) {
+        std::set<IRVarRef> reads;
+        IRVarRef def = nullptr;
+        analyzeStmt(S, reads, def);
+        for (auto *r : reads) {
+          if (!defined.count(r))
+            gen.insert(r);
+          refd.insert(r);
+        }
+        if (def) {
+          kill.insert(def);
+          defined.insert(def);
+          refd.insert(def);
+        }
+      });
+    }
+
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (auto *bb : path) {
+        std::set<IRVarRef> out;
+        for (auto *Succ : bb->Succs) {
+          // A successor outside this path is the next continuation, reached
+          // through the sync; its requirements are LiveOutOfPath.
+          if (path.count(Succ)) {
+            auto &si = In[Succ];
+            out.insert(si.begin(), si.end());
+          } else {
+            out.insert(LiveOutOfPath.begin(), LiveOutOfPath.end());
+          }
+        }
+        if (bb->Succs.empty())
+          out.insert(LiveOutOfPath.begin(), LiveOutOfPath.end());
+        std::set<IRVarRef> in = Gen[bb];
+        for (auto *v : out)
+          if (!Kill[bb].count(v))
+            in.insert(v);
+        if (in != In[bb]) {
+          In[bb] = std::move(in);
+          changed = true;
+        }
       }
     }
 
-    for (auto &bb : path) {
-      for (auto &S : *bb) {
-        analyzeStmt(S.get(), free, refd);
-      }
-      if (bb->Term) {
-        // Skip ReturnIRStmt with null RetVal — ExprIdentifierVisitor
-        // would crash trying to visit the null expression.
-        if (auto *RS = dyn_cast<ReturnIRStmt>(bb->Term)) {
-          if (!RS->RetVal)
-            continue;
-        }
-        analyzeStmt(bb->Term, free, refd);
-      }
-    }
-    for (auto *v : free) {
-      if (refd.find(v) != refd.end()) {
-        refd.erase(v);
-      }
-    }
+    // The successor's requirements reach the entry through Out[]/Kill[] above,
+    // so a value this path merely forwards stays live while one it defines
+    // itself (a reply landing in `v_size`) is correctly killed.
+    if (!path.empty())
+      free = In[path[0]];
+
+    for (auto *v : free)
+      refd.erase(v);
   }
 
 public:
