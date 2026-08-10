@@ -22,6 +22,7 @@
 #include "core/FlattenIR.hpp"
 #include "hardcilk/HardCilkAnalysis.hpp"
 #include "hardcilk/HardCilkDescGen.hpp"
+#include "hardcilk/HardCilkOverlapWrapperGen.hpp"
 #include "core/IR.hpp"
 #include "vitis/VitisHLSTarget.hpp"
 #include "vitis/VitisHLSTclGen.hpp"
@@ -322,6 +323,24 @@ public:
                   OutFilename.str() + "/" + AppName + "_driver.cpp";
               llvm::raw_fd_ostream Driver(DefsName, EC, llvm::sys::fs::OF_Text);
               HT.PrintDriver(Driver);
+            }
+
+            // One SystemVerilog top per `#pragma BOMBYX OVERLAP` loop, named
+            // after the group's wrapper. It instantiates that loop's collapsed
+            // PEs and is elaborated in place of them, so it sits beside the HLS
+            // sources and build_hls.sh copies it next to the synthesised RTL.
+            for (const OverlapGroup &G :
+                 computeOverlapGroups(HCAnalysis->TaskInfos)) {
+              std::string WrapName =
+                  OutFilename.str() + "/" + G.WrapperName + ".v";
+              llvm::raw_fd_ostream WrapOut(WrapName, EC,
+                                           llvm::sys::fs::OF_Text);
+              if (!PrintHardCilkOverlapWrapper(AppName, P, HCAnalysis->TaskInfos,
+                                               G, WrapOut)) {
+                WrapOut.close();
+                std::error_code RmEC;
+                std::filesystem::remove(WrapName, RmEC);
+              }
             }
 
             // Generate per-PE Vitis HLS TCL scripts and master build_hls.sh.

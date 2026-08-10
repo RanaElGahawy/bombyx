@@ -85,6 +85,7 @@ set(SOURCE_FILES
     src/hardcilk/HardCilkAnalysis.cpp
     src/hardcilk/HardCilkDescGen.cpp
     src/hardcilk/HardCilkDriver.cpp
+    src/hardcilk/HardCilkOverlapWrapperGen.cpp
 
     # Vitis HLS backend: code generation and TCL synthesis scripts
     src/vitis/VitisHLSTarget.cpp
