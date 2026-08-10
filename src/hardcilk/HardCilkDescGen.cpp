@@ -4,7 +4,18 @@
 #include "llvm/Support/JSON.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <map>
+#include <set>
 #include <vector>
+
+std::map<std::string, int> HCPECounts;
+
+// PE count for a task: the `--pes` override if one was given, else 1.
+static int peCountFor(llvm::StringRef Name) {
+  auto It = HCPECounts.find(Name.str());
+  return It == HCPECounts.end() ? 1 : It->second;
+}
 
 static llvm::json::Object getSchedulerSide(const HCTaskInfo &TaskInfo) {
   llvm::json::Object obj;
@@ -46,7 +57,7 @@ static llvm::json::Object printTaskDescriptor(IRFunction *Task,
   obj["isRoot"] = TaskInfo.IsRoot;
   obj["isCont"] = TaskInfo.IsCont;
   obj["hasAXI"] = TaskInfo.HasAXI;
-  obj["numProcessingElements"] = 1;
+  obj["numProcessingElements"] = peCountFor(Task->getName());
   obj["dynamicMemAlloc"] = false;
   int64_t closureSize = (int64_t)(TaskInfo.TaskSize + TaskInfo.TaskPadding) * 8;
   obj["widthTask"] = closureSize;
@@ -117,6 +128,16 @@ void PrintHardCilkDescJson(const std::string &AppName,
                            const TaskInfosTy &TaskInfos,
                            const std::string &OutputDir,
                            llvm::raw_ostream &Out) {
+  // peHDLPath must be a complete absolute path: the downstream architecture
+  // generator resolves it with `new File(peHDLPath).exists`, so a `-d` given as a
+  // relative directory (resolved against the compiler's CWD) must be absolutized
+  // here rather than echoed verbatim.
+  std::error_code AbsEC;
+  std::filesystem::path AbsPath =
+      std::filesystem::absolute(std::filesystem::path(OutputDir), AbsEC);
+  const std::string AbsOutputDir =
+      AbsEC ? OutputDir : AbsPath.lexically_normal().string();
+
   llvm::json::Object obj;
   obj["name"] = AppName;
   std::vector<llvm::json::Value> taskDescriptors;
