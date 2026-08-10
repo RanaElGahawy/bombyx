@@ -161,7 +161,7 @@ static std::vector<IRFunction *> sortedDests(const HCTaskInfo &Info) {
 // ─── Helper: callee collection ───────────────────────────────────────────────
 
 static void collectDirectCallees(IRFunction *F,
-                                 std::set<IRFunction *> &Callees) {
+                                 IRFuncSetTy &Callees) {
   auto visitExpr = [&](auto &&self, IRExpr *E) -> void {
     if (!E)
       return;
@@ -210,8 +210,8 @@ static void collectDirectCallees(IRFunction *F,
   }
 }
 
-static std::set<IRFunction *> computeFuncsNeedingMem(IRProgram &P) {
-  std::set<IRFunction *> Result;
+static IRFuncSetTy computeFuncsNeedingMem(IRProgram &P) {
+  IRFuncSetTy Result;
   for (auto &FPtr : P) {
     for (auto &Var : FPtr->Vars) {
       if (Var.DeclLoc != IRVarDecl::ARG)
@@ -233,7 +233,7 @@ static std::set<IRFunction *> computeFuncsNeedingMem(IRProgram &P) {
     for (auto &FPtr : P) {
       if (Result.count(FPtr.get()))
         continue;
-      std::set<IRFunction *> Callees;
+      IRFuncSetTy Callees;
       collectDirectCallees(FPtr.get(), Callees);
       for (auto *Callee : Callees) {
         if (Result.count(Callee)) {
@@ -312,7 +312,7 @@ public:
 static void
 PrintInlinableFunction(llvm::raw_ostream &Out, clang::ASTContext &C,
                        IRFunction *Fn,
-                       const std::set<IRFunction *> &FuncsNeedingMem) {
+                       const IRFuncSetTy &FuncsNeedingMem) {
   bool HasMem = FuncsNeedingMem.count(Fn) > 0;
 
   bool retIsRef = Fn->getReturnType()->isLValueReferenceType();

@@ -4,8 +4,10 @@
 #include <llvm/ADT/SetVector.h>
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <set>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -25,6 +27,40 @@ class IRBasicBlock;
 class IRFunction;
 class IRProgram;
 class IRExpr;
+
+// ─── Deterministic function ordering ─────────────────────────────────────────
+//
+// Ordering IRFunction* containers by POINTER — which is what plain
+// std::set<IRFunction *> / std::map<IRFunction *, T> and every std::unordered_*
+// keyed on IRFunction* do — makes iteration order depend on the addresses the
+// allocator happened to hand out. With ASLR (and the -fsanitize=address build
+// in particular) those addresses move run to run, so any emission whose order
+// follows such a container is not reproducible: the same compiler binary on the
+// same input emits PE bodies in a different order, permutes the descriptor's
+// taskDescriptors / spawnList / spawnNextList / sendArgumentList, and renumbers
+// order-derived local counters (`<task>_argsN`, `aN`).
+//
+// Order by task NAME instead. Names are unique among IR functions, so this is a
+// total order determined solely by the input program. The pointer comparison is
+// a defensive tiebreak only: it stops two same-named functions from collapsing
+// into a single key (a correctness bug, not just a determinism one). If it ever
+// fires, order between exactly those two is unspecified again — but no bombyx
+// pass creates duplicate task names.
+struct IRFunctionNameLess {
+  using is_transparent = void;
+  // Defined out of line below: it needs IRFunction to be complete, but the
+  // comparator itself must be nameable before IRFunction (IRFunctionInfo holds
+  // IRFuncSetTy members).
+  inline bool operator()(const IRFunction *A, const IRFunction *B) const;
+};
+
+// Deterministically-ordered replacements for std::set/std::map keyed on
+// IRFunction*. Prefer these anywhere the container's iteration order can reach
+// generated output — which, in the HardCilk/Vitis backends, is nearly
+// everywhere.
+using IRFuncSetTy = std::set<IRFunction *, IRFunctionNameLess>;
+template <typename T>
+using IRFuncMapTy = std::map<IRFunction *, T, IRFunctionNameLess>;
 
 enum ScopeAnnot { SA_OPEN, SA_CLOSE, SA_DO, SA_ELSE, SA_DAE_HERE };
 
@@ -53,6 +89,33 @@ struct IRVarDecl {
 
 typedef std::variant<ASTVarRef, IRFunction *> IRFunRef;
 typedef IRVarDecl *IRVarRef;
+
+// Same determinism argument as IRFunctionNameLess, for variable declarations.
+// IRFunction::Vars is a std::list, so every IRVarDecl is its own heap
+// allocation and a pointer-ordered std::set<IRVarRef> iterates in an order the
+// allocator (and hence ASLR) chooses. That order is observable: the deep-state
+// dataflow plan turns CarrySet into DFPlan::Carry, which fixes the order of the
+// generated `df_carry_*` stream declarations and transfers.
+//
+// Order by symbol name instead; the pointer comparison is only a tiebreak so
+// that two decls sharing a symbol stay distinct keys.
+struct IRVarRefNameLess {
+  using is_transparent = void;
+  bool operator()(IRVarRef A, IRVarRef B) const {
+    if (A == B)
+      return false;
+    if (!A || !B)
+      return B != nullptr;
+    const std::string &NA = GetSym(A->Name), &NB = GetSym(B->Name);
+    if (NA != NB)
+      return NA < NB;
+    return A < B;
+  }
+};
+
+using IRVarSetTy = std::set<IRVarRef, IRVarRefNameLess>;
+template <typename T>
+using IRVarMapTy = std::map<IRVarRef, T, IRVarRefNameLess>;
 
 static void identPrintSimple(llvm::raw_ostream &Out, IRVarRef VR) {
   Out << GetSym(VR->Name);
@@ -959,8 +1022,12 @@ public:
   struct IRFunctionInfo {
     bool IsTask = false;
     const FunctionDecl *RootFun = nullptr;
-    std::set<IRFunction *> SpawnList;
-    std::set<IRFunction *> SpawnNextList;
+    // Name-ordered, not pointer-ordered: these two sets are emitted verbatim
+    // as the descriptor's spawnList / spawnNextList arrays and are walked by
+    // the PE and OVERLAP-wrapper emitters, so pointer order would leak ASLR
+    // into the generated output.
+    IRFuncSetTy SpawnList;
+    IRFuncSetTy SpawnNextList;
   };
 
 private:
@@ -1021,6 +1088,20 @@ public:
   const IRType &getReturnType() const { return Ret; }
   bool isVoid() const { return (Ret->isVoidType()); }
 };
+
+// Out-of-line definition of the comparator declared above, now that IRFunction
+// is complete.
+inline bool IRFunctionNameLess::operator()(const IRFunction *A,
+                                           const IRFunction *B) const {
+  if (A == B)
+    return false;
+  if (!A || !B)
+    return B != nullptr;
+  const std::string &NA = A->getName(), &NB = B->getName();
+  if (NA != NB)
+    return NA < NB;
+  return A < B;
+}
 
 class IRProgram {
 private:

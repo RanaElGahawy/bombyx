@@ -78,7 +78,7 @@ template <typename T> inline const T *hctGetIf(const HardCilkType *Ty) {
 // ─── Task Info ───────────────────────────────────────────────────────────────
 
 struct HCTaskInfo {
-  std::set<IRFunction *> SendArgList;
+  IRFuncSetTy SendArgList;
   uint8_t Tag = 0; // 8-bit continuation tag; meaningful only when IsCont.
   bool IsRoot = false;
   bool IsCont = false;

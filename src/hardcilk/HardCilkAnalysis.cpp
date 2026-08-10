@@ -149,7 +149,7 @@ static uint32_t hardCilkTypeBitWidth(HardCilkBaseType Ty) {
 // ─── AXI / Memory-Access Analysis ───────────────────────────────────────────
 
 static void collectDirectCalleesHCA(IRFunction *F,
-                                    std::set<IRFunction *> &Callees) {
+                                    IRFuncSetTy &Callees) {
   auto visitExpr = [&](auto &&self, IRExpr *E) -> void {
     if (!E)
       return;
@@ -199,8 +199,8 @@ static void collectDirectCalleesHCA(IRFunction *F,
 }
 
 // Functions that have a pointer-type arg, or transitively call one that does.
-static std::set<IRFunction *> computeMemFunctions(IRProgram &P) {
-  std::set<IRFunction *> Result;
+static IRFuncSetTy computeMemFunctions(IRProgram &P) {
+  IRFuncSetTy Result;
   for (auto &FPtr : P) {
     for (auto &Var : FPtr->Vars) {
       if (Var.DeclLoc != IRVarDecl::ARG)
@@ -222,7 +222,7 @@ static std::set<IRFunction *> computeMemFunctions(IRProgram &P) {
     for (auto &FPtr : P) {
       if (Result.count(FPtr.get()))
         continue;
-      std::set<IRFunction *> Callees;
+      IRFuncSetTy Callees;
       collectDirectCalleesHCA(FPtr.get(), Callees);
       for (auto *Callee : Callees) {
         if (Result.count(Callee)) {
@@ -238,7 +238,7 @@ static std::set<IRFunction *> computeMemFunctions(IRProgram &P) {
 
 // True if the task body itself dereferences memory or calls a helper that does.
 static bool taskBodyAccessesMem(IRFunction *Task,
-                                const std::set<IRFunction *> &MemFuncs) {
+                                const IRFuncSetTy &MemFuncs) {
   auto checkExpr = [&](auto &&self, IRExpr *E) -> bool {
     if (!E)
       return false;
@@ -461,7 +461,7 @@ static void analyzeSendArguments(IRProgram &P, TaskInfosTy &TaskInfos) {
     for (auto &FPtr : P) {
       IRFunction *F = FPtr.get();
       auto FInfoIt = TaskInfos.find(F);
-      std::set<IRFunction *> ParentSendArgList;
+      IRFuncSetTy ParentSendArgList;
       if (FInfoIt != TaskInfos.end()) {
         ParentSendArgList.insert(FInfoIt->second.SendArgList.begin(),
                                  FInfoIt->second.SendArgList.end());
@@ -619,7 +619,7 @@ HardCilkAnalysisResult RunHardCilkAnalysis(IRProgram &P) {
   }
 
   // Assign each continuation type a unique 8-bit tag. Walk the program in
-  // IRProgram order (deterministic, unlike the TaskInfos unordered_map) so tag
+  // IRProgram order (source order, independent of TaskInfos' own order) so tag
   // values are stable across runs. Tag 0 is reserved for "untagged"; the high 8
   // bits of a continuation's closure address carry this tag so that a task with
   // multiple send destinations can route by it.
