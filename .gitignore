@@ -36,3 +36,17 @@
 !/tests/cilk5/ex/*.c
 !/tests/cilk5/ex/*h
 !/tests/cilk5/ex/*.cpp
+# Simulation and build artifacts under tests/ (regenerate with the build.sh /
+# run.sh scripts beside them).
+/tests/systemc/**/obj_dir/
+/tests/systemc/**/gen/
+/tests/systemc/**/syn/
+/tests/systemc/**/*.vcd
+/tests/systemc/**/*.log
+/tests/systemc/overlap_model
+/tests/systemc/rtl/tb_wrapper
+/tests/systemc/pagerank/tb_pagerank_overlap
+/tests/systemc/randomwalk/tb_randomwalk_overlap
+# TBB backend output trees (generated from tests/cilk5/im by run_all.sh).
+/tests/cilk5/tbb/
+*.bak
