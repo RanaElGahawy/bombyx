@@ -635,6 +635,53 @@ private:
     return true;
   }
 
+  // Lower an in-place ++/-- on a memory location to an explicit read-modify-
+  // write: `MEM_OUT(mem, a, T, MEM_IN(mem, a, T) +/- 1)`. A bare `MEM_IN(...)++`
+  // is not a legal AXI memory access (the location must be read, updated, then
+  // written back). Returns true when the statement was a memory inc/dec and has
+  // been emitted here. Non-memory operands (locals) fall through to the normal
+  // printer. The address subexpression is a simple field/ident ref with no side
+  // effects, so evaluating it twice is safe.
+  bool emitMemIncDec(ExprWrapIRStmt *EW) {
+    auto *UE = dyn_cast<UnopIRExpr>(EW->Expr.get());
+    if (!UE)
+      return false;
+    bool Inc = UE->Op == UnopIRExpr::UNOP_PREINC ||
+               UE->Op == UnopIRExpr::UNOP_POSTINC;
+    bool Dec = UE->Op == UnopIRExpr::UNOP_PREDEC ||
+               UE->Op == UnopIRExpr::UNOP_POSTDEC;
+    if (!Inc && !Dec)
+      return false;
+    const char *Op = Inc ? "+" : "-";
+
+    if (auto *DE = dyn_cast<DRefIRExpr>(UE->Expr.get())) {
+      std::string Ty = DE->PointeeType.getAsString();
+      Indent() << "MEM_OUT(mem, ";
+      C.ExprCB(&C, Out, DE->Expr.get());
+      Out << ", " << Ty << ", MEM_IN(mem, ";
+      C.ExprCB(&C, Out, DE->Expr.get());
+      Out << ", " << Ty << ") " << Op << " 1);\n";
+      return true;
+    }
+    // Plain array element `arr[i]++` (not a struct-field array); struct/arrow
+    // array accesses fall through to the default printer.
+    if (auto *IE = dyn_cast<IndexIRExpr>(UE->Expr.get());
+        IE && !isa<AccessIRExpr>(IE->Arr.get())) {
+      std::string Ty = IE->ArrType.getAsString();
+      Indent() << "MEM_ARR_OUT(mem, ";
+      C.ExprCB(&C, Out, IE->Arr.get());
+      Out << ", ";
+      C.ExprCB(&C, Out, IE->Ind.get());
+      Out << ", " << Ty << ", MEM_ARR_IN(mem, ";
+      C.ExprCB(&C, Out, IE->Arr.get());
+      Out << ", ";
+      C.ExprCB(&C, Out, IE->Ind.get());
+      Out << ", " << Ty << ") " << Op << " 1);\n";
+      return true;
+    }
+    return false;
+  }
+
   void visitStmt(IRStmt *S, IRBasicBlock *B) {
     auto *F = B->getParent();
     if (S->Silent)
@@ -664,6 +711,11 @@ private:
           S->print(Out, C);
         Out << ";\n";
       }
+    } else if (auto *EW = dyn_cast<ExprWrapIRStmt>(S);
+               EW && emitMemIncDec(EW)) {
+      // Handled: an in-place ++/-- on a memory location is lowered to an
+      // explicit read-modify-write (a bare `MEM_IN(...)++` is not a valid AXI
+      // memory access).
     } else {
       Indent();
       S->print(Out, C);
