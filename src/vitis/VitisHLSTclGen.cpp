@@ -94,10 +94,25 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
 
   // Collect non-synthetic task names for the build script.
   std::vector<std::string> KernelNames;
+  // A `#pragma BOMBYX OVERLAP` loop additionally emits a Verilog wrapper that,
+  // together with the collapsed sub-PEs, is grouped into one folder named after
+  // the wrapper under vitis_hls_output/.
+  const std::vector<OverlapGroup> OverlapGroups =
+      computeOverlapGroups(TaskInfos);
+  // kernel -> the wrapper that collapses it; a PE belongs to at most one.
+  std::map<std::string, std::string> KernelToWrapper;
 
   for (auto &[Task, Info] : TaskInfos) {
     if (Info.IsSynthetic)
       continue;
+    if (const OverlapGroup *G = findOverlapGroup(OverlapGroups, Task)) {
+      // A memReader collapsed into an OVERLAP wrapper is no longer
+      // instantiated: its read site is served by the wrapper's shared
+      // hand-written reader, so there is nothing to synthesise for it.
+      if (Task->Info.IsMemReader)
+        continue;
+      KernelToWrapper[Task->getName()] = G->WrapperName;
+    }
     KernelNames.push_back(Task->getName());
 
     fs::path TclPath = TclDir / (Task->getName() + ".tcl");
@@ -190,6 +205,29 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
   }
   Out << ")\n\n";
 
+  // OVERLAP grouping: the sub-PEs collapsed into a wrapper are copied under a
+  // folder named after that wrapper (see build_one), and its RTL is placed
+  // alongside them. There is one such folder per OVERLAP loop, so the mapping
+  // is per kernel rather than a single global list.
+  //
+  // The map is declared unconditionally, even when it is empty: build_one
+  // always consults it, and without a `declare -A` bash reads `[$KERNEL]` as an
+  // arithmetic subscript — i.e. as a variable *name* — so under `set -u` every
+  // PE dies with "<kernel>: unbound variable" after synthesis but before its
+  // RTL is copied.
+  Out << "declare -A KERNEL_WRAPPER=(";
+  for (auto &[K, W] : KernelToWrapper)
+    Out << " [" << K << "]=\"" << W << "\"";
+  Out << " )\n";
+  if (!OverlapGroups.empty()) {
+    Out << "WRAPPER_NAMES=(";
+    for (size_t i = 0; i < OverlapGroups.size(); ++i) {
+      if (i) Out << " ";
+      Out << OverlapGroups[i].WrapperName;
+    }
+    Out << ")\n\n";
+  }
+
   // Per-PE build, run as a backgrounded job. stdout/stderr of vitis_hls go to a
   // log file (not the console) so parallel runs do not interleave their output.
   Out << "build_one() {\n";
@@ -201,9 +239,16 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
   Out << "    if (cd \"$WORK_DIR\" && vitis_hls -f \"$TCL_FILE\" > vitis_hls.log 2>&1); then\n";
   Out << "        local RTL_SRC=\"${WORK_DIR}/${KERNEL}_proj/solution1/syn/verilog\"\n";
   Out << "        if [[ -d \"$RTL_SRC\" ]]; then\n";
-  Out << "            mkdir -p \"${RTL_ROOT}/${KERNEL}\"\n";
-  Out << "            cp -r \"${RTL_SRC}/.\" \"${RTL_ROOT}/${KERNEL}/\"\n";
-  Out << "            success \"${KERNEL} → ${RTL_ROOT}/${KERNEL}/\"\n";
+  // Sub-PEs collapsed into an OVERLAP wrapper have their RTL copied flat into
+  // the wrapper's folder (alongside the wrapper .v); all other PEs get their own
+  // folder directly under RTL_ROOT.
+  Out << "            local DEST=\"${RTL_ROOT}/${KERNEL}\"\n";
+  Out << "            if [[ -n \"${KERNEL_WRAPPER[$KERNEL]:-}\" ]]; then\n";
+  Out << "                DEST=\"${RTL_ROOT}/${KERNEL_WRAPPER[$KERNEL]}\"\n";
+  Out << "            fi\n";
+  Out << "            mkdir -p \"$DEST\"\n";
+  Out << "            cp -r \"${RTL_SRC}/.\" \"$DEST/\"\n";
+  Out << "            success \"${KERNEL} → ${DEST}/\"\n";
   Out << "            [[ \"$DEBUG\" == \"--debug\" ]] || rm -rf \"$WORK_DIR\"\n";
   Out << "            echo PASS > \"${STATUS_DIR}/${KERNEL}\"\n";
   Out << "        else\n";
@@ -236,6 +281,51 @@ void PrintVitisHLSArtifacts(const std::string &AppName,
   Out << "echo -e \"  Total  : ${#KERNELS[@]}\"\n";
   Out << "echo -e \"  ${GREEN}Passed${NC} : ${#PASS[@]}  ${PASS[*]:-}\"\n";
   Out << "echo -e \"  ${RED}Failed${NC} : ${#FAIL[@]}  ${FAIL[*]:-}\"\n";
+
+  if (!OverlapGroups.empty()) {
+    Out << "\n# \u2500\u2500 #pragma BOMBYX OVERLAP: collect the in-order streaming wrappers \u2500\u2500\u2500\u2500\n";
+    Out << "for WRAPPER_NAME in \"${WRAPPER_NAMES[@]}\"; do\n";
+    Out << "    WRAPPER=\"${SCRIPT_DIR}/${WRAPPER_NAME}.v\"\n";
+    Out << "    if [[ ! -f \"$WRAPPER\" ]]; then\n";
+    Out << "        error \"OVERLAP wrapper not found: $WRAPPER\"\n";
+    Out << "        continue\n";
+    Out << "    fi\n";
+    Out << "    mkdir -p \"$RTL_ROOT/$WRAPPER_NAME\"\n";
+    Out << "    cp \"$WRAPPER\" \"$RTL_ROOT/$WRAPPER_NAME/\"\n";
+    Out << "    info \"OVERLAP wrapper \u2192 ${RTL_ROOT}/${WRAPPER_NAME}/${WRAPPER_NAME}.v\"\n";
+    Out << "    info \"Elaborate the design with ${RTL_ROOT}/${WRAPPER_NAME}/${WRAPPER_NAME}.v as the top module,\"\n";
+    Out << "    info \"alongside the collapsed per-PE RTL in ${RTL_ROOT}/${WRAPPER_NAME}/.\"\n";
+    // \u2500\u2500 Reconcile wrapper m_axi data widths to the synthesized PEs \u2500\u2500\u2500\u2500\u2500
+    // With max_widen_bitwidth removed, Vitis HLS gives each collapsed memory PE
+    // its natural m_axi data width (C_M_AXI_GMEM_DATA_WIDTH in the PE's RTL). The
+    // wrapper is emitted before synthesis with a placeholder per-PE parameter
+    // MEM_DATA_WIDTH_<pe>; patch each to the synthesized width so the wrapper's
+    // external master matches the collapsed PE (and the width HardCilk parses).
+    Out << "\n    # Match the wrapper's per-PE m_axi width parameters to the synthesized PEs.\n";
+    Out << "    WRAP_DST=\"$RTL_ROOT/$WRAPPER_NAME/${WRAPPER_NAME}.v\"\n";
+    Out << "    for KERNEL in \"${!KERNEL_WRAPPER[@]}\"; do\n";
+    Out << "        [[ \"${KERNEL_WRAPPER[$KERNEL]}\" == \"$WRAPPER_NAME\" ]] || continue\n";
+    Out << "        PE_V=\"$RTL_ROOT/$WRAPPER_NAME/${KERNEL}.v\"\n";
+    Out << "        [[ -f \"$PE_V\" ]] || continue\n";
+    Out << "        W=$(grep -oE 'C_M_AXI_GMEM_DATA_WIDTH[[:space:]]*=[[:space:]]*[0-9]+' \"$PE_V\" | head -1 | grep -oE '[0-9]+$')\n";
+    Out << "        [[ -n \"$W\" ]] || continue\n";
+    Out << "        if grep -qE \"parameter[[:space:]]+MEM_DATA_WIDTH_${KERNEL}[[:space:]]*=\" \"$WRAP_DST\"; then\n";
+    Out << "            sed -i -E \"s/(parameter[[:space:]]+MEM_DATA_WIDTH_${KERNEL}[[:space:]]*=[[:space:]]*)[0-9]+/\\\\1${W}/\" \"$WRAP_DST\"\n";
+    Out << "            info \"OVERLAP m_axi width: ${KERNEL} = ${W} bits (patched ${WRAPPER_NAME})\"\n";
+    Out << "        fi\n";
+    // Same story for the AXI ID width. A PE's ID width follows its channel
+    // count (clog2(channels)), so adding a read site widens ARID; a wrapper
+    // port left at the 1-bit placeholder truncates it and R beats come back
+    // tagged with the wrong channel, which hangs the PE on its first read.
+    Out << "        IDW=$(grep -oE 'C_M_AXI_GMEM_ID_WIDTH[[:space:]]*=[[:space:]]*[0-9]+' \"$PE_V\" | head -1 | grep -oE '[0-9]+$')\n";
+    Out << "        if [[ -n \"$IDW\" ]] && grep -qE \"parameter[[:space:]]+MEM_ID_WIDTH_${KERNEL}[[:space:]]*=\" \"$WRAP_DST\"; then\n";
+    Out << "            sed -i -E \"s/(parameter[[:space:]]+MEM_ID_WIDTH_${KERNEL}[[:space:]]*=[[:space:]]*)[0-9]+/\\\\1${IDW}/\" \"$WRAP_DST\"\n";
+    Out << "            info \"OVERLAP m_axi ID width: ${KERNEL} = ${IDW} bits (patched ${WRAPPER_NAME})\"\n";
+    Out << "        fi\n";
+    Out << "    done\n";
+    Out << "done\n";
+  }
+
   Out << "\n[[ ${#FAIL[@]} -gt 0 ]] && exit 1 || exit 0\n";
 
   // Make the script executable.
