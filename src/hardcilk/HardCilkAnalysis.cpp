@@ -523,6 +523,16 @@ static void analyzeArgOutWriteBuffers(TaskInfosTy &TaskInfos) {
         !typeIsVoid(*Info.RetTy))
       continue;
 
+    // A buffered store leaves through argOut/argDataOut, and those ports exist
+    // only on a LEAF SENDER: a task with a non-empty spawn or spawn_next list
+    // forwards its argument through the spawned closure and never sends one, so
+    // VitisHLSTarget emits no argDataOut port for it (NeedsVoidSend) and
+    // HardCilkDescGen leaves it out of the JSON on the same rule. Buffering here
+    // would emit `argDataOut...write(...)` against a port that was never
+    // declared. Such a store stays a plain m_axi write instead.
+    if (!F->Info.SpawnList.empty() || !F->Info.SpawnNextList.empty())
+      continue;
+
     HardCilkStmtOrderCollector Collector;
     Collector.traverse(*F);
 
