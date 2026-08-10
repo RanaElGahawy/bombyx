@@ -1,0 +1,244 @@
+{
+  "fpgaModel": "ALVEO_U55C",
+  "isVitisProject": true,
+  "mallocList": {},
+  "memorySizeSim": 16,
+  "name": "triangleDAEOptimal",
+  "sendArgumentList": {
+    "applyFn_exit0": [
+      "spawnerFunction_cont0"
+    ],
+    "countIntersections_overlap_wrapper": [
+      "applyFn_reentry0_cont2"
+    ],
+    "spawnerFunction_cont0": [
+      "spawnerFunction_cont0"
+    ]
+  },
+  "spawnList": {
+    "applyFn": [
+      "applyFn_reentry0_overlap_wrapper"
+    ],
+    "applyFn_reentry0_cont2": [
+      "applyFn_reentry0_overlap_wrapper"
+    ],
+    "applyFn_reentry0_overlap_wrapper": [
+      "applyFn_exit0",
+      "countIntersections_overlap_wrapper"
+    ],
+    "spawnerFunction": [
+      "applyFn"
+    ]
+  },
+  "spawnNextList": {
+    "applyFn_reentry0_overlap_wrapper": [
+      "applyFn_reentry0_cont2"
+    ],
+    "spawnerFunction": [
+      "spawnerFunction_cont0"
+    ]
+  },
+  "targetFrequency": 300,
+  "taskDescriptors": [
+    {
+      "dynamicMemAlloc": false,
+      "generateArgOutWriteBuffer": false,
+      "hasAXI": true,
+      "isCont": false,
+      "isRoot": false,
+      "name": "applyFn",
+      "numProcessingElements": 1,
+      "peHDLPath": "/tmp/tmp.hbLbTWcQEb/triangleDAEOptimal_HardCilk/vitis_hls_output/applyFn",
+      "sidesConfigs": [
+        {
+          "capacityPhysicalQueue": 64,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 256,
+          "sideType": "scheduler"
+        }
+      ],
+      "spawnServersCount": 1,
+      "variableSpawn": false,
+      "widthMalloc": 0,
+      "widthTask": 256
+    },
+    {
+      "argumentSizeList": {
+        "argDataOut": 32
+      },
+      "dynamicMemAlloc": false,
+      "generateArgOutWriteBuffer": true,
+      "hasAXI": true,
+      "isCont": false,
+      "isRoot": false,
+      "name": "applyFn_exit0",
+      "numProcessingElements": 1,
+      "peHDLPath": "/tmp/tmp.hbLbTWcQEb/triangleDAEOptimal_HardCilk/vitis_hls_output/applyFn_exit0",
+      "sidesConfigs": [
+        {
+          "capacityPhysicalQueue": 64,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 256,
+          "sideType": "scheduler"
+        }
+      ],
+      "spawnServersCount": 1,
+      "variableSpawn": false,
+      "widthMalloc": 0,
+      "widthTask": 256
+    },
+    {
+      "closureWriteBeats": 1,
+      "dynamicMemAlloc": false,
+      "generateArgOutWriteBuffer": false,
+      "hasAXI": false,
+      "isCont": true,
+      "isRoot": false,
+      "name": "applyFn_reentry0_cont2",
+      "numProcessingElements": 1,
+      "peHDLPath": "/tmp/tmp.hbLbTWcQEb/triangleDAEOptimal_HardCilk/vitis_hls_output/applyFn_reentry0_cont2",
+      "sidesConfigs": [
+        {
+          "capacityPhysicalQueue": 64,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 512,
+          "sideType": "scheduler"
+        },
+        {
+          "capacityPhysicalQueue": 32,
+          "capacityVirtualQueue": 128,
+          "numVirtualServers": 1,
+          "portWidth": 64,
+          "sideType": "argumentNotifier"
+        },
+        {
+          "capacityPhysicalQueue": 32,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 64,
+          "sideType": "allocator"
+        }
+      ],
+      "spawnServersCount": 1,
+      "tag": 4,
+      "variableSpawn": false,
+      "widthMalloc": 0,
+      "widthTask": 512
+    },
+    {
+      "dynamicMemAlloc": false,
+      "hasAXI": false,
+      "isCont": false,
+      "isRoot": true,
+      "name": "spawnerFunction",
+      "numProcessingElements": 1,
+      "peHDLPath": "/tmp/tmp.hbLbTWcQEb/triangleDAEOptimal_HardCilk/vitis_hls_output/spawnerFunction",
+      "sidesConfigs": [
+        {
+          "capacityPhysicalQueue": 64,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 256,
+          "sideType": "scheduler"
+        }
+      ],
+      "variableSpawn": false,
+      "widthMalloc": 0,
+      "widthTask": 256
+    },
+    {
+      "closureWriteBeats": 1,
+      "dynamicMemAlloc": false,
+      "generateArgOutWriteBuffer": false,
+      "hasAXI": false,
+      "isCont": true,
+      "isRoot": false,
+      "name": "spawnerFunction_cont0",
+      "numProcessingElements": 1,
+      "peHDLPath": "/tmp/tmp.hbLbTWcQEb/triangleDAEOptimal_HardCilk/vitis_hls_output/spawnerFunction_cont0",
+      "sidesConfigs": [
+        {
+          "capacityPhysicalQueue": 64,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 128,
+          "sideType": "scheduler"
+        },
+        {
+          "capacityPhysicalQueue": 32,
+          "capacityVirtualQueue": 128,
+          "numVirtualServers": 1,
+          "portWidth": 64,
+          "sideType": "argumentNotifier"
+        },
+        {
+          "capacityPhysicalQueue": 32,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 64,
+          "sideType": "allocator"
+        }
+      ],
+      "spawnServersCount": 1,
+      "tag": 1,
+      "variableSpawn": false,
+      "widthMalloc": 0,
+      "widthTask": 128
+    },
+    {
+      "dynamicMemAlloc": false,
+      "generateArgOutWriteBuffer": false,
+      "hasAXI": true,
+      "isCont": false,
+      "isRoot": false,
+      "name": "applyFn_reentry0_overlap_wrapper",
+      "numProcessingElements": 1,
+      "peHDLPath": "/tmp/tmp.hbLbTWcQEb/triangleDAEOptimal_HardCilk/vitis_hls_output/applyFn_reentry0_overlap_wrapper",
+      "sidesConfigs": [
+        {
+          "capacityPhysicalQueue": 64,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 512,
+          "sideType": "scheduler"
+        }
+      ],
+      "spawnServersCount": 1,
+      "variableSpawn": false,
+      "widthMalloc": 0,
+      "widthTask": 512
+    },
+    {
+      "argumentSizeList": {
+        "argDataOut": 32
+      },
+      "dynamicMemAlloc": false,
+      "generateArgOutWriteBuffer": false,
+      "hasAXI": true,
+      "isCont": false,
+      "isRoot": false,
+      "name": "countIntersections_overlap_wrapper",
+      "numProcessingElements": 1,
+      "peHDLPath": "/tmp/tmp.hbLbTWcQEb/triangleDAEOptimal_HardCilk/vitis_hls_output/countIntersections_overlap_wrapper",
+      "sidesConfigs": [
+        {
+          "capacityPhysicalQueue": 64,
+          "capacityVirtualQueue": 4096,
+          "numVirtualServers": 1,
+          "portWidth": 256,
+          "sideType": "scheduler"
+        }
+      ],
+      "spawnServersCount": 1,
+      "variableSpawn": false,
+      "widthMalloc": 0,
+      "widthTask": 256
+    }
+  ],
+  "widthAXIAddress": 34,
+  "widthAddress": 64,
+  "widthContCounter": 32
+}

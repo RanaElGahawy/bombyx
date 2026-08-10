@@ -9,6 +9,11 @@ BOMBYX="$BASE/build/bin/bombyx-cc"
 
 echo "Running all Bombyx tests..."
 
+# OVERLAP wrapper golden regression (byte-identity of the generated Verilog).
+# Runs FIRST: the Bombyx_OpenCilk_Examples sources below are missing from the
+# tree, so `set -e` aborts the script before it reaches the end.
+"$BASE/tests/check_golden.sh"
+
 run_test() {
   NAME="$1"
   IN="$2"
