@@ -429,6 +429,19 @@ private:
   int IndentLvl = 1;
   std::set<SpawnNextIRStmt *> EmittedSpawnNexts;
   std::map<ClosureDeclIRStmt *, SpawnNextIRStmt *> ClosureToSpawnNext;
+  // True while emitting a task whose spawn_next continuation lives INSIDE the
+  // same OVERLAP wrapper. Only then is the continuation lowered to an in-order
+  // stream push (contStateOut_<cont>) instead of the closure/allocator/
+  // spawn_next machinery, and only then do its dependent spawns carry no
+  // closure reply address. A task that sits in a wrapper but whose spawn_next
+  // is outside it (the one that dependently spawns a real task, handing the
+  // loop body off to the scheduler) keeps the ordinary mechanics.
+  bool CurTaskOverlap = false;
+public:
+  // Tasks for which the above holds; filled from the OVERLAP groups.
+  IRFuncSetTy StreamingContTasks;
+
+private:
 
   llvm::raw_ostream &Indent() {
     for (int i = 0; i < IndentLvl; i++)
@@ -461,6 +474,15 @@ private:
   void handleSpawnNextDecl(ClosureDeclIRStmt *DS, IRFunction *F) {
     const std::string &SpawnNextFnName = DS->Fn->getName();
     const std::string SpawnNextClsName = "SN_" + SpawnNextFnName + "c";
+    if (CurTaskOverlap) {
+      // In-order streaming: the continuation state is a plain <cont>_task struct
+      // that we push onto the contStateOut FIFO. No allocator closure address
+      // (closureIn) and no spawn counter — the wrapper pairs each queued state
+      // with the in-order memory replies.
+      Indent() << SpawnNextFnName << "_task " << SpawnNextClsName << ";\n";
+      Indent() << SpawnNextClsName << "._cont = args._cont;\n\n";
+      return;
+    }
     Indent() << "uint32_t " << SpawnNextClsName << "_cnt = ";
     assert(DS->SpawnCount);
     C.ExprCB(&C, Out, DS->SpawnCount.get());
@@ -488,6 +510,16 @@ private:
     assert(SnInfoIt != TaskInfos.end());
     auto &SnInfo = SnInfoIt->second;
     const std::string Closure = SpawnNextName + "c"; // SN_<fn>c (assembled closure)
+
+    if (CurTaskOverlap) {
+      // Push the fully-populated continuation state onto the in-order FIFO the
+      // SystemVerilog merge wrapper reads. The wrapper fills the reply fields
+      // (e.g. a_i/b_j) from the ordered memory replies before driving <cont>.
+      Indent() << "contStateOut_" << SpawnNextFnName << ".write(" << Closure
+               << ");\n\n";
+      return;
+    }
+
     unsigned Beats = closureWriteBeats(SnInfo);
 
     if (Beats == 1) {
@@ -530,7 +562,12 @@ private:
     const std::string SpawnFnArgsName =
         (SpawnFnName + "_args") + std::to_string(SpawnCtr);
     Indent() << SpawnFnName << "_task " << SpawnFnArgsName << ";\n";
-    if (ES->SN) {
+    if (ES->SN && CurTaskOverlap) {
+      // In-order streaming: the dependent task's reply is matched to the queued
+      // continuation state by arrival order in the wrapper, not by a closure
+      // reply address, so no _cont is needed.
+      Indent() << SpawnFnArgsName << "._cont = 0;\n";
+    } else if (ES->SN) {
       const std::string &SpawnNextFnName = ES->SN->Fn->getName();
       const std::string SpawnNextContName = "SN_" + SpawnNextFnName + "c_k";
       if (ES->Dest) {
@@ -697,10 +734,24 @@ private:
       handleSpawnNextDecl(CDS, F);
       // Hoist spawnNext.write() before spawns: the scheduler must receive the
       // allow-count before any spawned task can complete and decrement it.
-      auto It = ClosureToSpawnNext.find(CDS);
-      if (It != ClosureToSpawnNext.end()) {
-        handleSpawnNext(It->second, F);
-        EmittedSpawnNexts.insert(It->second);
+      //
+      // Only on the scheduler path. An OVERLAP task streams its continuation
+      // state onto a FIFO the wrapper pops in order — no allow-count, nothing
+      // that can decrement early — so there is nothing to hoist for, and
+      // hoisting actively corrupts the state: the write copies the carried
+      // variables at the point it is emitted, so every update the loop body
+      // makes between the declaration and the sync is dropped. randomWalk's
+      // reentry advances the RNG and sets `done` in the condition of an `if`
+      // that sits after the declaration; hoisted, the continuation received the
+      // pre-advance seed and done == 0 forever. Emitting it at its own IR
+      // position (the block terminator, at the sync) snapshots the right
+      // values.
+      if (!CurTaskOverlap) {
+        auto It = ClosureToSpawnNext.find(CDS);
+        if (It != ClosureToSpawnNext.end()) {
+          handleSpawnNext(It->second, F);
+          EmittedSpawnNexts.insert(It->second);
+        }
       }
     } else if (auto *RS = dyn_cast<ReturnIRStmt>(S)) {
       handleSendArg(RS, F);
@@ -760,6 +811,7 @@ public:
   void prepareForTask(IRFunction *Task) {
     EmittedSpawnNexts.clear();
     ClosureToSpawnNext.clear();
+    CurTaskOverlap = StreamingContTasks.count(Task) > 0;
     for (auto &B : *Task) {
       if (!B->Term)
         continue;
